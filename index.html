@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="description" content="Medicano Resources Limited - Medical Equipment Catalog & Quoting System" />
+  <title>Medicano Resources | Medical Equipment Quoting</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
+              800: '#115e59',
+              900: '#134e4a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .sidebar-link.active { background-color: #0f766e; color: white; }
+    @media print {
+      .no-print { display: none !important; }
+      body * { visibility: hidden; }
+      #print-area, #print-area * { visibility: visible; }
+      #print-area { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
+      body { background: white; }
+    }
+    .print-only { display: none; }
+    /* Dark mode helpers */
+    html.dark body { background-color: #0f172a; color: #e2e8f0; }
+    html.dark .bg-white { background-color: #1e293b !important; }
+    html.dark .bg-slate-50 { background-color: #0f172a !important; }
+    html.dark .border-slate-100, html.dark .border-slate-200, html.dark .border-slate-300 { border-color: #334155 !important; }
+    html.dark .text-slate-800, html.dark .text-slate-700 { color: #e2e8f0 !important; }
+    html.dark .text-slate-600, html.dark .text-slate-500 { color: #94a3b8 !important; }
+    html.dark .bg-slate-50 thead, html.dark thead.bg-slate-50 { background-color: #1e293b !important; }
+    html.dark input, html.dark select, html.dark textarea { background-color: #1e293b; border-color: #475569; color: #e2e8f0; }
+    html.dark .hover\:bg-slate-50:hover { background-color: #334155 !important; }
+    html.dark .bg-brand-50 { background-color: #134e4a !important; }
+    html.dark .text-brand-800, html.dark .text-brand-700 { color: #5eead4 !important; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+  <!-- Mobile sidebar overlay -->
+  <div id="sidebar-overlay" class="no-print fixed inset-0 bg-black/50 z-30 hidden md:hidden" onclick="closeSidebar()"></div>
+  <div id="app" class="min-h-screen flex">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="no-print w-64 bg-brand-800 text-white flex-shrink-0 flex flex-col fixed h-full z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-200 shadow-2xl">
+      <div class="p-5 border-b border-brand-700">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-xl">🏥</div>
+          <div>
+            <h1 class="font-bold text-lg leading-tight">Medicano</h1>
+            <p class="text-xs text-brand-100 opacity-80">Resources Ltd</p>
+          </div>
+        </div>
+      </div>
+      <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+        <a href="#dashboard" data-page="dashboard" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-brand-700 transition">
+          <span>📊</span> Dashboard
+        </a>
+        <a href="#products" data-page="products" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-brand-700 transition">
+          <span>🛠️</span> Equipment Catalog
+        </a>
+        <a href="#clients" data-page="clients" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-brand-700 transition">
+          <span>🏥</span> Hospitals / Clients
+        </a>
+        <a href="#quotes" data-page="quotes" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-brand-700 transition">
+          <span>📋</span> Quotes / Projects
+        </a>
+        <a href="#rates" data-page="rates" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-brand-700 transition">
+          <span>💱</span> Exchange Rates
+        </a>
+        <a href="#settings" data-page="settings" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-brand-700 transition">
+          <span>⚙️</span> Settings
+        </a>
+      </nav>
+      <div class="p-4 border-t border-brand-700 text-xs text-brand-100">
+        <p class="opacity-70">Offline-ready • v1.0</p>
+        <p id="sync-status" class="mt-1">● Local data</p>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <div class="flex-1 md:ml-64 min-h-screen flex flex-col">
+      <!-- Top bar -->
+      <header class="no-print bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-20">
+        <div class="flex items-center gap-3">
+          <button id="menu-btn" class="md:hidden p-2 rounded-lg hover:bg-slate-100">☰</button>
+          <h2 id="page-title" class="text-lg font-semibold text-slate-800">Dashboard</h2>
+        </div>
+        <div class="flex items-center gap-3 text-sm">
+          <span id="current-rates" class="hidden sm:inline text-slate-500"></span>
+          <button id="dark-toggle" onclick="toggleDarkMode()" class="p-2 rounded-lg hover:bg-slate-100 text-lg" title="Toggle dark mode">🌙</button>
+          <span class="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">Offline Mode</span>
+        </div>
+      </header>
+
+      <!-- Pages -->
+      <main class="flex-1 p-4 md:p-6 overflow-auto">
+        <!-- DASHBOARD -->
+        <section id="page-dashboard" class="page">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+              <p class="text-sm text-slate-500">Total Equipment</p>
+              <p class="text-3xl font-bold text-brand-700 mt-1" id="stat-products">0</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+              <p class="text-sm text-slate-500">Active Quotes</p>
+              <p class="text-3xl font-bold text-blue-600 mt-1" id="stat-quotes">0</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+              <p class="text-sm text-slate-500">Clients</p>
+              <p class="text-3xl font-bold text-purple-600 mt-1" id="stat-clients">0</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+              <p class="text-sm text-slate-500">Low Stock Items</p>
+              <p class="text-3xl font-bold text-amber-600 mt-1" id="stat-lowstock">0</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+              <h3 class="font-semibold mb-4">Recent Quotes</h3>
+              <div id="recent-quotes" class="space-y-3 text-sm"></div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+              <h3 class="font-semibold mb-4">Quick Actions</h3>
+              <div class="flex flex-wrap gap-3">
+                <button onclick="navigate('quotes'); showNewQuote()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm">+ New Quote</button>
+                <button onclick="navigate('products'); showProductForm()" class="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 text-sm">+ Add Equipment</button>
+                <button onclick="navigate('clients'); showClientForm()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">+ Add Client</button>
+              </div>
+              <div class="mt-6 p-4 bg-brand-50 rounded-lg text-sm">
+                <p class="font-medium text-brand-800">Company</p>
+                <p class="text-brand-700 mt-1">Medicano Resources Limited</p>
+                <p class="text-slate-600 text-xs mt-2">6, Ojulari Street, Off Kunsela Road, Chisco Bus Stop, Ikate Elegushi, Lekki Expressway</p>
+                <p class="text-slate-600 text-xs">Tel: 08023203522 | 07045763887</p>
+                <p class="text-slate-600 text-xs">enquiries@medicanoresources.com</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PRODUCTS -->
+        <section id="page-products" class="page hidden">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div class="flex gap-2 flex-1">
+              <input id="product-search" type="search" placeholder="Search equipment..." class="flex-1 max-w-md px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+              <select id="product-category-filter" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                <option value="">All Categories</option>
+              </select>
+            </div>
+            <button onclick="showProductForm()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">+ Add Equipment</button>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-slate-50 text-slate-600 text-left">
+                  <tr>
+                    <th class="px-4 py-3 font-medium">SKU</th>
+                    <th class="px-4 py-3 font-medium">Name</th>
+                    <th class="px-4 py-3 font-medium">Category</th>
+                    <th class="px-4 py-3 font-medium">Price</th>
+                    <th class="px-4 py-3 font-medium">Stock</th>
+                    <th class="px-4 py-3 font-medium">Status</th>
+                    <th class="px-4 py-3 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="products-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- CLIENTS -->
+        <section id="page-clients" class="page hidden">
+          <div class="flex justify-between items-center mb-5">
+            <input id="client-search" type="search" placeholder="Search hospitals..." class="max-w-md px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+            <button onclick="showClientForm()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">+ Add Client</button>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-slate-50 text-slate-600 text-left">
+                  <tr>
+                    <th class="px-4 py-3 font-medium">Hospital / Clinic</th>
+                    <th class="px-4 py-3 font-medium">Contact</th>
+                    <th class="px-4 py-3 font-medium">Phone</th>
+                    <th class="px-4 py-3 font-medium">Email</th>
+                    <th class="px-4 py-3 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="clients-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- QUOTES LIST -->
+        <section id="page-quotes" class="page hidden">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div class="flex gap-2">
+              <select id="quote-status-filter" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                <option value="">All Statuses</option>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="accepted">Accepted</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+            <button onclick="showNewQuote()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">+ New Quote / Project</button>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-slate-50 text-slate-600 text-left">
+                  <tr>
+                    <th class="px-4 py-3 font-medium">Quote #</th>
+                    <th class="px-4 py-3 font-medium">Client</th>
+                    <th class="px-4 py-3 font-medium">Title</th>
+                    <th class="px-4 py-3 font-medium">Total (NGN)</th>
+                    <th class="px-4 py-3 font-medium">Status</th>
+                    <th class="px-4 py-3 font-medium">Date</th>
+                    <th class="px-4 py-3 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="quotes-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- QUOTE BUILDER / VIEW -->
+        <section id="page-quote-editor" class="page hidden">
+          <div class="mb-4 flex items-center gap-3">
+            <button onclick="navigate('quotes')" class="text-sm text-brand-600 hover:underline">← Back to Quotes</button>
+            <h3 id="quote-editor-title" class="font-semibold text-lg">New Quote</h3>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 space-y-4">
+              <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Client / Hospital *</label>
+                    <select id="quote-client" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"></select>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Quote Title / Project Name *</label>
+                    <input id="quote-title" type="text" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="e.g. Radiology Department Upgrade" />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Valid Until</label>
+                    <input id="quote-valid" type="date" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                    <select id="quote-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                      <option value="draft">Draft</option>
+                      <option value="sent">Sent</option>
+                      <option value="accepted">Accepted</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="mt-4">
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Notes / Terms</label>
+                  <textarea id="quote-notes" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Payment terms, delivery notes..."></textarea>
+                </div>
+              </div>
+
+              <!-- Product Picker with Search + Checkboxes -->
+              <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+                <h4 class="font-medium mb-3">Select Equipment to Add</h4>
+                <div class="flex flex-col sm:flex-row gap-2 mb-3">
+                  <input id="quote-product-search" type="search" placeholder="Search tools / equipment..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" oninput="renderQuoteProductPicker()" />
+                  <div class="flex gap-2">
+                    <button type="button" onclick="selectAllQuoteProducts(true)" class="px-3 py-2 text-sm bg-brand-100 text-brand-800 rounded-lg hover:bg-brand-200">Select All</button>
+                    <button type="button" onclick="selectAllQuoteProducts(false)" class="px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">Clear</button>
+                    <button type="button" onclick="addSelectedProductsToQuote()" class="px-3 py-2 text-sm bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium">Add Selected</button>
+                  </div>
+                </div>
+                <div id="quote-product-picker" class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 text-sm">
+                  <!-- filled by JS -->
+                </div>
+              </div>
+
+              <!-- Line Items -->
+              <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+                <div class="flex justify-between items-center mb-3">
+                  <h4 class="font-medium">Line Items</h4>
+                  <span id="quote-item-count" class="text-xs text-slate-500">0 items</span>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead class="text-slate-500 text-left">
+                      <tr>
+                        <th class="pb-2 font-medium">Equipment</th>
+                        <th class="pb-2 font-medium w-20">Qty</th>
+                        <th class="pb-2 font-medium">Unit Price (Orig)</th>
+                        <th class="pb-2 font-medium">Unit (NGN)</th>
+                        <th class="pb-2 font-medium">Line Total (NGN)</th>
+                        <th class="pb-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="quote-items-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 sticky top-20">
+                <h4 class="font-medium mb-4">Quote Summary</h4>
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-slate-500">Subtotal</span>
+                    <span id="quote-subtotal">₦0.00</span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-slate-500">Discount (%)</span>
+                    <input id="quote-discount" type="number" min="0" max="100" value="0" class="w-20 px-2 py-1 border rounded text-right text-sm" oninput="recalcQuote()" />
+                  </div>
+                  <div class="flex justify-between font-semibold text-lg border-t pt-2 mt-2">
+                    <span>Total (NGN)</span>
+                    <span id="quote-total" class="text-brand-700">₦0.00</span>
+                  </div>
+                </div>
+                <div class="mt-5 space-y-2">
+                  <button onclick="saveQuote()" class="w-full py-2.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium text-sm">Save Quote</button>
+                  <button onclick="printQuote()" class="w-full py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-medium text-sm">Print / PDF</button>
+                  <button onclick="if(confirm('Delete this quote?')) deleteCurrentQuote()" id="btn-delete-quote" class="w-full py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm hidden">Delete</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- RATES -->
+        <section id="page-rates" class="page hidden">
+          <div class="max-w-xl bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+            <h3 class="font-semibold text-lg mb-1">Exchange Rates (Manual)</h3>
+            <p class="text-sm text-slate-500 mb-6">Update rates used to convert USD / EUR equipment prices into Naira. Architecture is ready for API integration later.</p>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">1 USD = ? NGN</label>
+                <input id="rate-usd" type="number" step="0.01" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">1 EUR = ? NGN</label>
+                <input id="rate-eur" type="number" step="0.01" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+              </div>
+              <button onclick="saveRates()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">Save Rates</button>
+              <p id="rates-updated" class="text-xs text-slate-500 mt-2"></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- SETTINGS -->
+        <section id="page-settings" class="page hidden">
+          <div class="max-w-2xl space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+              <h3 class="font-semibold text-lg mb-4">Company Information</h3>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <label class="block text-slate-500 mb-1">Company Name</label>
+                  <input id="set-company" type="text" class="w-full px-3 py-2 border rounded-lg" value="Medicano Resources Limited" />
+                </div>
+                <div>
+                  <label class="block text-slate-500 mb-1">Email</label>
+                  <input id="set-email" type="email" class="w-full px-3 py-2 border rounded-lg" value="enquiries@medicanoresources.com" />
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="block text-slate-500 mb-1">Address</label>
+                  <input id="set-address" type="text" class="w-full px-3 py-2 border rounded-lg" value="6, Ojulari Street, Off Kunsela Road, Chisco Bus Stop, Ikate Elegushi, Lekki Expressway" />
+                </div>
+                <div>
+                  <label class="block text-slate-500 mb-1">Phone 1</label>
+                  <input id="set-phone1" type="text" class="w-full px-3 py-2 border rounded-lg" value="08023203522" />
+                </div>
+                <div>
+                  <label class="block text-slate-500 mb-1">Phone 2</label>
+                  <input id="set-phone2" type="text" class="w-full px-3 py-2 border rounded-lg" value="07045763887" />
+                </div>
+              </div>
+              <button onclick="saveSettings()" class="mt-4 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm">Save Settings</button>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+              <h3 class="font-semibold text-lg mb-2">Data Management</h3>
+              <p class="text-sm text-slate-500 mb-4">All data is stored locally in this browser (offline-first). Export/import to backup or move between devices.</p>
+              <div class="flex flex-wrap gap-3">
+                <button onclick="exportData()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export All Data (JSON)</button>
+                <label class="px-4 py-2 bg-brand-100 text-brand-800 rounded-lg text-sm cursor-pointer hover:bg-brand-200">
+                  Import Data
+                  <input type="file" accept=".json" class="hidden" onchange="importData(event)" />
+                </label>
+                <button onclick="if(confirm('This will erase ALL local data. Continue?')) resetData()" class="px-4 py-2 text-red-600 border border-red-200 rounded-lg text-sm hover:bg-red-50">Reset All Data</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Product Modal -->
+  <div id="modal-product" class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div class="p-5 border-b flex justify-between items-center">
+        <h3 id="product-modal-title" class="font-semibold text-lg">Add Equipment</h3>
+        <button onclick="closeModal('modal-product')" class="text-slate-400 hover:text-slate-600 text-xl">×</button>
+      </div>
+      <form id="product-form" class="p-5 space-y-4" onsubmit="saveProduct(event)">
+        <input type="hidden" id="product-id" />
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">SKU *</label>
+            <input id="p-sku" required class="w-full px-3 py-2 border rounded-lg text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Category *</label>
+            <input id="p-category" required list="category-list" class="w-full px-3 py-2 border rounded-lg text-sm" />
+            <datalist id="category-list"></datalist>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Name *</label>
+          <input id="p-name" required class="w-full px-3 py-2 border rounded-lg text-sm" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Description / Specs</label>
+          <textarea id="p-desc" rows="3" class="w-full px-3 py-2 border rounded-lg text-sm"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Price *</label>
+            <input id="p-price" type="number" step="0.01" min="0" required class="w-full px-3 py-2 border rounded-lg text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Currency *</label>
+            <select id="p-currency" class="w-full px-3 py-2 border rounded-lg text-sm">
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="NGN">NGN</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Stock Qty</label>
+            <input id="p-stock" type="number" min="0" value="0" class="w-full px-3 py-2 border rounded-lg text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Low Stock Alert</label>
+            <input id="p-low" type="number" min="0" value="2" class="w-full px-3 py-2 border rounded-lg text-sm" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Brand</label>
+          <input id="p-brand" class="w-full px-3 py-2 border rounded-lg text-sm" />
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="p-active" type="checkbox" checked class="rounded" />
+          <label for="p-active" class="text-sm">Active (available for quotes)</label>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modal-product')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm">Save Equipment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Client Modal -->
+  <div id="modal-client" class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
+      <div class="p-5 border-b flex justify-between items-center">
+        <h3 id="client-modal-title" class="font-semibold text-lg">Add Client</h3>
+        <button onclick="closeModal('modal-client')" class="text-slate-400 hover:text-slate-600 text-xl">×</button>
+      </div>
+      <form id="client-form" class="p-5 space-y-4" onsubmit="saveClient(event)">
+        <input type="hidden" id="client-id" />
+        <div>
+          <label class="block text-sm font-medium mb-1">Hospital / Clinic Name *</label>
+          <input id="c-name" required class="w-full px-3 py-2 border rounded-lg text-sm" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Contact Person</label>
+          <input id="c-contact" class="w-full px-3 py-2 border rounded-lg text-sm" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Phone</label>
+          <input id="c-phone" class="w-full px-3 py-2 border rounded-lg text-sm" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Email</label>
+          <input id="c-email" type="email" class="w-full px-3 py-2 border rounded-lg text-sm" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Address</label>
+          <textarea id="c-address" rows="2" class="w-full px-3 py-2 border rounded-lg text-sm"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modal-client')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm">Save Client</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Print template (hidden) -->
+  <div id="print-area" class="print-only p-8 max-w-4xl mx-auto text-sm">
+    <!-- filled by JS -->
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
