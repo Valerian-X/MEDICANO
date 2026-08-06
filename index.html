@@ -82,6 +82,9 @@
         <a href="#quotes" data-page="quotes" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-brand-700 transition">
           <span>📋</span> Quotes / Projects
         </a>
+        <a href="#presentation" data-page="presentation" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-brand-700 transition">
+          <span>📑</span> Client Presentation
+        </a>
         <a href="#rates" data-page="rates" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-brand-700 transition">
           <span>💱</span> Exchange Rates
         </a>
@@ -171,6 +174,7 @@
               <table class="w-full text-sm">
                 <thead class="bg-slate-50 text-slate-600 text-left">
                   <tr>
+                    <th class="px-4 py-3 font-medium w-14">Image</th>
                     <th class="px-4 py-3 font-medium">SKU</th>
                     <th class="px-4 py-3 font-medium">Name</th>
                     <th class="px-4 py-3 font-medium">Category</th>
@@ -349,6 +353,63 @@
           </div>
         </section>
 
+        <!-- CLIENT PRESENTATION -->
+        <section id="page-presentation" class="page hidden">
+          <div class="max-w-4xl space-y-5">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+              <h3 class="font-semibold text-lg mb-1">Client Presentation PDF</h3>
+              <p class="text-sm text-slate-500 mb-4">Create a high-quality brochure of selected machines to present to hospitals. This is <strong>not</strong> a quotation — it showcases products with images, features and prices.</p>
+              
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Presentation Title</label>
+                  <input id="pres-title" type="text" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="e.g. Radiology Solutions 2026" value="Medical Equipment Portfolio" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Prepared For (optional)</label>
+                  <input id="pres-client" type="text" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Hospital or client name" />
+                </div>
+              </div>
+
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Layout Style</label>
+                <div class="flex flex-wrap gap-3">
+                  <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                    <input type="radio" name="pres-layout" value="detailed" checked class="text-brand-600" />
+                    <div>
+                      <p class="text-sm font-medium">Detailed</p>
+                      <p class="text-xs text-slate-500">1 machine per page — premium look</p>
+                    </div>
+                  </label>
+                  <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                    <input type="radio" name="pres-layout" value="brochure" class="text-brand-600" />
+                    <div>
+                      <p class="text-sm font-medium">Brochure</p>
+                      <p class="text-xs text-slate-500">2 machines per page — compact</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+              <div class="flex flex-col sm:flex-row gap-2 mb-3">
+                <input id="pres-search" type="search" placeholder="Search equipment..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" oninput="renderPresPicker()" />
+                <div class="flex gap-2">
+                  <button type="button" onclick="selectAllPres(true)" class="px-3 py-2 text-sm bg-brand-100 text-brand-800 rounded-lg">Select All</button>
+                  <button type="button" onclick="selectAllPres(false)" class="px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg">Clear</button>
+                </div>
+              </div>
+              <div id="pres-picker" class="max-h-64 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 text-sm mb-4">
+                <!-- filled by JS -->
+              </div>
+              <button onclick="generatePresentation()" class="w-full sm:w-auto px-6 py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium text-sm">
+                Generate High-Quality PDF Presentation
+              </button>
+            </div>
+          </div>
+        </section>
+
         <!-- RATES -->
         <section id="page-rates" class="page hidden">
           <div class="max-w-xl bg-white rounded-xl shadow-sm border border-slate-100 p-6">
@@ -442,7 +503,26 @@
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Description / Specs</label>
-          <textarea id="p-desc" rows="3" class="w-full px-3 py-2 border rounded-lg text-sm"></textarea>
+          <textarea id="p-desc" rows="3" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Technical specifications..."></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Key Features</label>
+          <textarea id="p-features" rows="3" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="One feature per line&#10;e.g.&#10;3.0 Tesla magnet&#10;Full body imaging&#10;Advanced coils included"></textarea>
+          <p class="text-xs text-slate-400 mt-1">One feature per line — shown as bullets in presentations</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Product Image</label>
+          <div class="flex items-start gap-3">
+            <div id="p-image-preview" class="w-20 h-20 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+              <span class="text-2xl text-slate-300">📷</span>
+            </div>
+            <div class="flex-1">
+              <input type="file" id="p-image" accept="image/*" class="text-sm w-full" onchange="previewProductImage(event)" />
+              <p class="text-xs text-slate-400 mt-1">Recommended: under 400 KB for best performance</p>
+              <button type="button" onclick="clearProductImage()" class="text-xs text-red-500 mt-1 hover:underline">Remove image</button>
+            </div>
+          </div>
+          <input type="hidden" id="p-image-data" />
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>

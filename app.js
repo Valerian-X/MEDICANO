@@ -280,6 +280,7 @@ function navigate(page) {
     clients: 'Hospitals / Clients',
     quotes: 'Quotes / Projects',
     'quote-editor': 'Quote Editor',
+    presentation: 'Client Presentation',
     rates: 'Exchange Rates',
     settings: 'Settings'
   };
@@ -299,6 +300,7 @@ function navigate(page) {
   if (page === 'products') renderProducts();
   if (page === 'clients') renderClients();
   if (page === 'quotes') renderQuotes();
+  if (page === 'presentation') renderPresPicker();
   if (page === 'rates') renderRates();
   if (page === 'settings') renderSettings();
 }
@@ -371,7 +373,11 @@ function renderProducts() {
   tbody.innerHTML = list.map(p => {
     const ngn = toNGN(p.price, p.currency);
     const low = p.stock <= p.lowStock;
+    const thumb = p.image
+      ? `<img src="${p.image}" class="w-10 h-10 rounded object-cover border border-slate-200" alt="" />`
+      : `<div class="w-10 h-10 rounded bg-slate-100 flex items-center justify-center text-slate-400 text-xs">—</div>`;
     return `<tr class="border-t border-slate-100 hover:bg-slate-50">
+      <td class="px-4 py-3">${thumb}</td>
       <td class="px-4 py-3 font-mono text-xs">${p.sku}</td>
       <td class="px-4 py-3">
         <p class="font-medium">${p.name}</p>
@@ -391,7 +397,7 @@ function renderProducts() {
         <button onclick="if(confirm('Delete this item?')) deleteProduct('${p.id}')" class="text-red-500 hover:underline text-xs">Del</button>
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">No equipment found</td></tr>';
+  }).join('') || '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No equipment found</td></tr>';
 
   // datalist for categories
   document.getElementById('category-list').innerHTML = cats.map(c => `<option value="${c}">`).join('');
@@ -405,6 +411,7 @@ function showProductForm(id = null) {
     document.getElementById('p-sku').value = p.sku;
     document.getElementById('p-name').value = p.name;
     document.getElementById('p-desc').value = p.description || '';
+    document.getElementById('p-features').value = p.features || '';
     document.getElementById('p-category').value = p.category;
     document.getElementById('p-price').value = p.price;
     document.getElementById('p-currency').value = p.currency;
@@ -412,16 +419,67 @@ function showProductForm(id = null) {
     document.getElementById('p-low').value = p.lowStock;
     document.getElementById('p-brand').value = p.brand || '';
     document.getElementById('p-active').checked = p.active;
+    document.getElementById('p-image-data').value = p.image || '';
+    updateImagePreview(p.image || '');
   } else {
     document.getElementById('product-form').reset();
     document.getElementById('p-active').checked = true;
     document.getElementById('p-low').value = 2;
+    document.getElementById('p-image-data').value = '';
+    updateImagePreview('');
   }
   document.getElementById('modal-product').classList.remove('hidden');
 }
 
 function editProduct(id) {
   showProductForm(id);
+}
+
+function updateImagePreview(dataUrl) {
+  const box = document.getElementById('p-image-preview');
+  if (!box) return;
+  if (dataUrl) {
+    box.innerHTML = `<img src="${dataUrl}" class="w-full h-full object-cover" alt="Preview" />`;
+  } else {
+    box.innerHTML = '<span class="text-2xl text-slate-300">📷</span>';
+  }
+}
+
+function previewProductImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 600 * 1024) {
+    alert('Image is large. For best performance please use an image under 400–500 KB.');
+  }
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    // Optional light compression via canvas for very large images
+    const img = new Image();
+    img.onload = function() {
+      const maxW = 800;
+      let w = img.width, h = img.height;
+      if (w > maxW) {
+        h = Math.round(h * (maxW / w));
+        w = maxW;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      const compressed = canvas.toDataURL('image/jpeg', 0.82);
+      document.getElementById('p-image-data').value = compressed;
+      updateImagePreview(compressed);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearProductImage() {
+  document.getElementById('p-image-data').value = '';
+  document.getElementById('p-image').value = '';
+  updateImagePreview('');
 }
 
 function saveProduct(e) {
@@ -432,13 +490,15 @@ function saveProduct(e) {
     sku: document.getElementById('p-sku').value.trim(),
     name: document.getElementById('p-name').value.trim(),
     description: document.getElementById('p-desc').value.trim(),
+    features: document.getElementById('p-features').value.trim(),
     category: document.getElementById('p-category').value.trim(),
     brand: document.getElementById('p-brand').value.trim(),
     price: parseFloat(document.getElementById('p-price').value) || 0,
     currency: document.getElementById('p-currency').value,
     stock: parseInt(document.getElementById('p-stock').value) || 0,
     lowStock: parseInt(document.getElementById('p-low').value) || 0,
-    active: document.getElementById('p-active').checked
+    active: document.getElementById('p-active').checked,
+    image: document.getElementById('p-image-data').value || ''
   };
 
   if (id) {
@@ -866,11 +926,16 @@ function printQuote() {
     alert('Please allow pop-ups to print the quotation.');
     return;
   }
+  const clientName = client ? client.name : 'Client';
+  // Clean name for filename suggestion (remove characters that are bad in filenames)
+  const safeClientName = clientName.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
+  const docTitle = `Quotation ${quoteNum} - ${safeClientName}`;
+
   printWin.document.write(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Quotation ${quoteNum} - ${co.name}</title>
+  <title>${docTitle}</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; color: #1e293b; margin: 0; padding: 24px; }
     @media print {
@@ -884,8 +949,6 @@ function printQuote() {
   <script>
     window.onload = function() {
       window.print();
-      // Optional: close after print dialog (some browsers)
-      // setTimeout(function(){ window.close(); }, 500);
     };
   <\/script>
 </body>
@@ -970,6 +1033,179 @@ function resetData() {
   saveData();
   navigate('dashboard');
   alert('All data has been reset to defaults.');
+}
+
+// -------------------- Client Presentation --------------------
+function renderPresPicker() {
+  const search = (document.getElementById('pres-search')?.value || '').toLowerCase();
+  const container = document.getElementById('pres-picker');
+  if (!container) return;
+
+  const list = data.products.filter(p => p.active).filter(p =>
+    !search ||
+    p.name.toLowerCase().includes(search) ||
+    p.sku.toLowerCase().includes(search) ||
+    (p.category || '').toLowerCase().includes(search)
+  );
+
+  if (list.length === 0) {
+    container.innerHTML = '<p class="p-4 text-slate-400 text-center">No equipment found</p>';
+    return;
+  }
+
+  container.innerHTML = list.map(p => {
+    const thumb = p.image
+      ? `<img src="${p.image}" class="w-12 h-12 rounded object-cover border" alt="" />`
+      : `<div class="w-12 h-12 rounded bg-slate-100 flex items-center justify-center text-slate-400">📷</div>`;
+    return `<label class="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer">
+      <input type="checkbox" class="pres-check rounded" value="${p.id}" />
+      ${thumb}
+      <div class="flex-1 min-w-0">
+        <p class="font-medium truncate">${p.name}</p>
+        <p class="text-xs text-slate-500">${p.sku} • ${p.category} • ${formatMoney(p.price, p.currency)}</p>
+      </div>
+    </label>`;
+  }).join('');
+}
+
+function selectAllPres(checked) {
+  document.querySelectorAll('#pres-picker .pres-check').forEach(cb => { cb.checked = checked; });
+}
+
+function generatePresentation() {
+  const checked = [...document.querySelectorAll('#pres-picker .pres-check:checked')];
+  if (checked.length === 0) {
+    alert('Please select at least one machine to include in the presentation.');
+    return;
+  }
+
+  const products = checked.map(cb => getProduct(cb.value)).filter(Boolean);
+  const title = document.getElementById('pres-title')?.value.trim() || 'Medical Equipment Portfolio';
+  const forClient = document.getElementById('pres-client')?.value.trim() || '';
+  const layout = document.querySelector('input[name="pres-layout"]:checked')?.value || 'detailed';
+  const co = data.company;
+
+  let bodyHtml = '';
+
+  if (layout === 'detailed') {
+    // One premium page per product
+    products.forEach((p, idx) => {
+      const features = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean);
+      const featureList = features.length
+        ? `<ul style="margin:12px 0 0;padding-left:18px;color:#334155;font-size:13px;line-height:1.6;">${features.map(f => `<li style="margin-bottom:4px;">${f}</li>`).join('')}</ul>`
+        : '';
+      const imgBlock = p.image
+        ? `<div style="width:100%;height:280px;background:#f1f5f9;border-radius:12px;overflow:hidden;margin-bottom:20px;">
+             <img src="${p.image}" style="width:100%;height:100%;object-fit:cover;" alt="${p.name}" />
+           </div>`
+        : `<div style="width:100%;height:180px;background:linear-gradient(135deg,#0f766e22,#14b8a622);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;color:#0f766e;font-size:48px;">🏥</div>`;
+
+      bodyHtml += `
+        <div style="page-break-after:always;padding:8px 0 24px;">
+          ${idx === 0 ? presentationCover(co, title, forClient, products.length) : ''}
+          <div style="border-top:4px solid #0f766e;padding-top:20px;">
+            <p style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#0f766e;margin:0 0 6px;">${p.category || 'Equipment'}</p>
+            <h2 style="margin:0 0 4px;font-size:22px;color:#0f172a;font-weight:700;">${p.name}</h2>
+            <p style="margin:0 0 16px;font-size:12px;color:#64748b;">${p.sku}${p.brand ? ' • ' + p.brand : ''}</p>
+            ${imgBlock}
+            <div style="display:flex;gap:24px;align-items:flex-start;">
+              <div style="flex:1;">
+                ${p.description ? `<p style="margin:0;font-size:13px;color:#334155;line-height:1.6;">${p.description}</p>` : ''}
+                ${featureList}
+              </div>
+              <div style="width:160px;flex-shrink:0;background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:16px;text-align:center;">
+                <p style="margin:0;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#0f766e;">Price</p>
+                <p style="margin:8px 0 0;font-size:18px;font-weight:700;color:#0f766e;">${formatMoney(p.price, p.currency)}</p>
+                <p style="margin:4px 0 0;font-size:12px;color:#64748b;">${formatNGN(toNGN(p.price, p.currency))}</p>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between;">
+            <span>${co.name}</span>
+            <span>Page ${idx + 1} of ${products.length}</span>
+          </div>
+        </div>`;
+    });
+  } else {
+    // Brochure: 2 per page
+    bodyHtml += presentationCover(co, title, forClient, products.length);
+    for (let i = 0; i < products.length; i += 2) {
+      const pair = products.slice(i, i + 2);
+      bodyHtml += `<div style="page-break-after:always;padding:8px 0;">`;
+      pair.forEach(p => {
+        const features = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).slice(0, 4);
+        const featureList = features.length
+          ? `<ul style="margin:8px 0 0;padding-left:16px;color:#475569;font-size:11px;line-height:1.5;">${features.map(f => `<li>${f}</li>`).join('')}</ul>`
+          : '';
+        const img = p.image
+          ? `<img src="${p.image}" style="width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;" alt="" />`
+          : `<div style="width:120px;height:120px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:32px;">🏥</div>`;
+
+        bodyHtml += `
+          <div style="display:flex;gap:16px;padding:16px 0;border-bottom:1px solid #e2e8f0;align-items:flex-start;">
+            ${img}
+            <div style="flex:1;min-width:0;">
+              <p style="margin:0;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#0f766e;">${p.category || ''}</p>
+              <h3 style="margin:2px 0 4px;font-size:15px;color:#0f172a;">${p.name}</h3>
+              <p style="margin:0;font-size:11px;color:#64748b;">${p.sku}${p.brand ? ' • ' + p.brand : ''}</p>
+              ${p.description ? `<p style="margin:6px 0 0;font-size:11px;color:#475569;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${p.description}</p>` : ''}
+              ${featureList}
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <p style="margin:0;font-size:14px;font-weight:700;color:#0f766e;">${formatMoney(p.price, p.currency)}</p>
+              <p style="margin:2px 0 0;font-size:11px;color:#64748b;">${formatNGN(toNGN(p.price, p.currency))}</p>
+            </div>
+          </div>`;
+      });
+      bodyHtml += `
+        <div style="margin-top:20px;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between;">
+          <span>${co.name}</span>
+          <span>${Math.floor(i / 2) + 1}</span>
+        </div>
+      </div>`;
+    }
+  }
+
+  const safeTitle = title.replace(/[\\/:*?"<>|]/g, ' ').slice(0, 60);
+  const printWin = window.open('', '_blank', 'width=950,height=700');
+  if (!printWin) {
+    alert('Please allow pop-ups to generate the presentation.');
+    return;
+  }
+
+  printWin.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${safeTitle} - ${co.name}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #0f172a; margin: 0; padding: 28px 32px; background: #fff; }
+    @media print {
+      body { padding: 12mm; }
+      @page { margin: 12mm; size: A4; }
+    }
+  </style>
+</head>
+<body>
+  ${bodyHtml}
+  <script>window.onload = function(){ window.print(); };<\/script>
+</body>
+</html>`);
+  printWin.document.close();
+}
+
+function presentationCover(co, title, forClient, count) {
+  return `
+    <div style="page-break-after:always;min-height:70vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:40px 20px;">
+      <div style="width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#0f766e,#14b8a6);display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:24px;">🏥</div>
+      <p style="margin:0;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#0f766e;font-weight:600;">${co.name}</p>
+      <h1 style="margin:16px 0 8px;font-size:28px;font-weight:700;color:#0f172a;max-width:480px;line-height:1.25;">${title}</h1>
+      ${forClient ? `<p style="margin:8px 0 0;font-size:14px;color:#475569;">Prepared for <strong>${forClient}</strong></p>` : ''}
+      <p style="margin:24px 0 0;font-size:12px;color:#94a3b8;">${count} equipment item${count !== 1 ? 's' : ''} • ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+      <div style="margin-top:48px;width:80px;height:3px;background:#0f766e;border-radius:2px;"></div>
+      <p style="margin-top:24px;font-size:11px;color:#64748b;max-width:360px;line-height:1.5;">${co.address}<br>Tel: ${co.phone1} | ${co.phone2}<br>${co.email}</p>
+    </div>`;
 }
 
 // -------------------- Dark Mode --------------------
