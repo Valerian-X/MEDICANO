@@ -8,51 +8,7 @@
   <title>Medicano Resources | Medical Equipment Quoting</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#f0fdfa',
-              100: '#ccfbf1',
-              500: '#14b8a6',
-              600: '#0d9488',
-              700: '#0f766e',
-              800: '#115e59',
-              900: '#134e4a'
-            }
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    [x-cloak] { display: none !important; }
-    .sidebar-link.active { background-color: #0f766e; color: white; }
-    @media print {
-      .no-print { display: none !important; }
-      body * { visibility: hidden; }
-      #print-area, #print-area * { visibility: visible; }
-      #print-area { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
-      body { background: white; }
-    }
-    .print-only { display: none; }
-    /* Dark mode helpers */
-    html.dark body { background-color: #0f172a; color: #e2e8f0; }
-    html.dark .bg-white { background-color: #1e293b !important; }
-    html.dark .bg-slate-50 { background-color: #0f172a !important; }
-    html.dark .border-slate-100, html.dark .border-slate-200, html.dark .border-slate-300 { border-color: #334155 !important; }
-    html.dark .text-slate-800, html.dark .text-slate-700 { color: #e2e8f0 !important; }
-    html.dark .text-slate-600, html.dark .text-slate-500 { color: #94a3b8 !important; }
-    html.dark .bg-slate-50 thead, html.dark thead.bg-slate-50 { background-color: #1e293b !important; }
-    html.dark input, html.dark select, html.dark textarea { background-color: #1e293b; border-color: #475569; color: #e2e8f0; }
-    html.dark .hover\:bg-slate-50:hover { background-color: #334155 !important; }
-    html.dark .bg-brand-50 { background-color: #134e4a !important; }
-    html.dark .text-brand-800, html.dark .text-brand-700 { color: #5eead4 !important; }
-  </style>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
   <!-- Mobile sidebar overlay -->
@@ -459,6 +415,19 @@
               </div>
               <button onclick="saveSettings()" class="mt-4 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm">Save Settings</button>
             </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+              <h3 class="font-semibold text-lg mb-1">Equipment Categories</h3>
+              <p class="text-sm text-slate-500 mb-4">Manage categories used in the equipment dropdown when adding machines.</p>
+              <div class="flex gap-2 mb-3">
+                <input id="new-category" type="text" placeholder="New category name..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                <button onclick="addCategory()" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium whitespace-nowrap">Add</button>
+              </div>
+              <ul id="categories-list" class="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden text-sm">
+                <!-- filled by JS -->
+              </ul>
+            </div>
+
             <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
               <h3 class="font-semibold text-lg mb-2">Data Management</h3>
               <p class="text-sm text-slate-500 mb-4">All data is stored locally in this browser (offline-first). Export/import to backup or move between devices.</p>
@@ -493,8 +462,9 @@
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Category *</label>
-            <input id="p-category" required list="category-list" class="w-full px-3 py-2 border rounded-lg text-sm" />
-            <datalist id="category-list"></datalist>
+            <select id="p-category" required class="w-full px-3 py-2 border rounded-lg text-sm">
+              <option value="">Select category...</option>
+            </select>
           </div>
         </div>
         <div>

@@ -17,6 +17,16 @@ const DEFAULT_DATA = {
     EUR: 1780.00,   // 1 EUR = NGN
     updatedAt: new Date().toISOString()
   },
+  categories: [
+    'Imaging',
+    'Surgical / Anesthesia',
+    'Patient Monitoring & Life Support',
+    'Sterilization & CSSD',
+    'Laboratory',
+    'Dental',
+    'Physiotherapy',
+    'Hospital Furniture'
+  ],
   products: [
     {
       id: 'p1',
@@ -222,6 +232,11 @@ function loadData() {
       if (!data.clients) data.clients = [];
       if (!data.quotes) data.quotes = [];
       if (!data.nextQuoteNum) data.nextQuoteNum = 1001;
+      if (!data.categories || !Array.isArray(data.categories)) {
+        // Seed from existing products + defaults
+        const fromProducts = [...new Set(data.products.map(p => p.category).filter(Boolean))];
+        data.categories = [...new Set([...(DEFAULT_DATA.categories || []), ...fromProducts])].sort();
+      }
     } else {
       data = JSON.parse(JSON.stringify(DEFAULT_DATA));
       saveData();
@@ -357,11 +372,15 @@ function renderProducts() {
   const search = (document.getElementById('product-search')?.value || '').toLowerCase();
   const cat = document.getElementById('product-category-filter')?.value || '';
 
-  const cats = [...new Set(data.products.map(p => p.category))].sort();
+  const cats = (data.categories && data.categories.length)
+    ? data.categories.slice().sort()
+    : [...new Set(data.products.map(p => p.category).filter(Boolean))].sort();
   const filterEl = document.getElementById('product-category-filter');
-  const currentVal = filterEl.value;
-  filterEl.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
-  filterEl.value = currentVal;
+  const currentVal = filterEl ? filterEl.value : '';
+  if (filterEl) {
+    filterEl.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    filterEl.value = currentVal;
+  }
 
   const list = data.products.filter(p => {
     const matchSearch = !search || p.name.toLowerCase().includes(search) || p.sku.toLowerCase().includes(search) || (p.description || '').toLowerCase().includes(search);
@@ -398,9 +417,6 @@ function renderProducts() {
       </td>
     </tr>`;
   }).join('') || '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No equipment found</td></tr>';
-
-  // datalist for categories
-  document.getElementById('category-list').innerHTML = cats.map(c => `<option value="${c}">`).join('');
 }
 
 function showProductForm(id = null) {
@@ -412,7 +428,7 @@ function showProductForm(id = null) {
     document.getElementById('p-name').value = p.name;
     document.getElementById('p-desc').value = p.description || '';
     document.getElementById('p-features').value = p.features || '';
-    document.getElementById('p-category').value = p.category;
+    populateCategorySelect(p.category);
     document.getElementById('p-price').value = p.price;
     document.getElementById('p-currency').value = p.currency;
     document.getElementById('p-stock').value = p.stock;
@@ -427,6 +443,7 @@ function showProductForm(id = null) {
     document.getElementById('p-low').value = 2;
     document.getElementById('p-image-data').value = '';
     updateImagePreview('');
+    populateCategorySelect('');
   }
   document.getElementById('modal-product').classList.remove('hidden');
 }
@@ -983,6 +1000,7 @@ function renderSettings() {
   document.getElementById('set-address').value = c.address;
   document.getElementById('set-phone1').value = c.phone1;
   document.getElementById('set-phone2').value = c.phone2;
+  renderCategoriesList();
 }
 
 function saveSettings() {
@@ -993,6 +1011,65 @@ function saveSettings() {
   data.company.phone2 = document.getElementById('set-phone2').value.trim();
   saveData();
   alert('Company settings saved.');
+}
+
+function renderCategoriesList() {
+  const list = document.getElementById('categories-list');
+  if (!list) return;
+  const cats = (data.categories || []).slice().sort();
+  if (cats.length === 0) {
+    list.innerHTML = '<li class="px-4 py-3 text-slate-400 text-center">No categories yet. Add one above.</li>';
+    return;
+  }
+  list.innerHTML = cats.map(cat => `
+    <li class="flex items-center justify-between px-4 py-2.5 hover:bg-slate-50">
+      <span>${cat}</span>
+      <button onclick="deleteCategory('${cat.replace(/'/g, "\\'")}')" class="text-red-500 hover:underline text-xs">Delete</button>
+    </li>
+  `).join('');
+}
+
+function addCategory() {
+  const input = document.getElementById('new-category');
+  const name = (input?.value || '').trim();
+  if (!name) {
+    alert('Please enter a category name.');
+    return;
+  }
+  if (!data.categories) data.categories = [];
+  const exists = data.categories.some(c => c.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    alert('This category already exists.');
+    return;
+  }
+  data.categories.push(name);
+  data.categories.sort();
+  saveData();
+  input.value = '';
+  renderCategoriesList();
+  populateCategorySelect();
+}
+
+function deleteCategory(name) {
+  const inUse = data.products.some(p => p.category === name);
+  if (inUse && !confirm(`"${name}" is used by some equipment. Delete anyway?`)) return;
+  data.categories = (data.categories || []).filter(c => c !== name);
+  saveData();
+  renderCategoriesList();
+  populateCategorySelect();
+}
+
+function populateCategorySelect(selectedValue) {
+  const sel = document.getElementById('p-category');
+  if (!sel) return;
+  const cats = (data.categories || []).slice().sort();
+  const current = selectedValue !== undefined ? selectedValue : sel.value;
+  sel.innerHTML = '<option value="">Select category...</option>' +
+    cats.map(c => `<option value="${c}" ${c === current ? 'selected' : ''}>${c}</option>`).join('');
+  // If editing a product with a category not in the list, still show it
+  if (current && !cats.includes(current)) {
+    sel.innerHTML += `<option value="${current}" selected>${current} (not in list)</option>`;
+  }
 }
 
 // -------------------- Data import/export --------------------

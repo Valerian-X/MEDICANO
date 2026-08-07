@@ -58,4 +58,4 @@ All data is stored in the browser’s localStorage under the key `medicano_data_
 - Barcode / QR support
 
 ---
-Built for Medicano Resources Limited • Offline-first • English 
+Built for Medicano Resources Limited • Offline-first • English
