@@ -1692,38 +1692,60 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
     doc.text(formatNairaPlain(priceNgn), x + w - pad, y + h - pad - 2, { align: 'right' });
   }
 
-  function drawSummary(yBottom, list) {
-    const rows = list.length;
-    const panelH = 28 + rows * 18 + 55;
-    const y = yBottom - panelH;
+  function drawSummaryPage(list, pageNo, total) {
+    // Always its own page — 16pt type, professional spacing, vertically centered
+    setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+    setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+    doc.text('INVESTMENT', M, 48);
+    setCol(NAVY); doc.setFontSize(22);
+    doc.text('Pricing Summary', M, 76);
+    setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 92, M + 54, 92);
+
+    const rowH = 36;
+    const padY = 28;
+    const headerBand = 36;
+    const totalBand = 48;
+    const noteH = 24;
+    const panelH = padY + headerBand + list.length * rowH + 16 + totalBand + noteH + padY;
     const cardW = W - 2 * M;
+    const panelY = Math.max(120, (H - panelH) / 2);
+
     setFill(NAVY);
-    doc.roundedRect(M, y, cardW, panelH, 8, 8, 'F');
-    setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-    doc.text('PRICING SUMMARY', M + 18, y + 20);
-    let ry = y + 40;
+    doc.roundedRect(M, panelY, cardW, panelH, 10, 10, 'F');
+
+    setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.text('PRICING SUMMARY', M + 28, panelY + padY + 12);
+
+    let ry = panelY + padY + headerBand + 8;
     list.forEach(p => {
-      setCol(CREAM2); doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
-      doc.text(String(p.name).substring(0, 50), M + 18, ry);
-      doc.text(formatNairaPlain(toNGN(p.price, p.currency)), W - M - 18, ry, { align: 'right' });
-      ry += 17;
+      setCol(CREAM2); doc.setFont('helvetica', 'normal'); doc.setFontSize(16);
+      const name = String(p.name || '').substring(0, 42);
+      doc.text(name, M + 28, ry);
+      doc.setFont('helvetica', 'bold');
+      doc.text(formatNairaPlain(toNGN(p.price, p.currency)), W - M - 28, ry, { align: 'right' });
+      ry += rowH;
     });
-    setDraw([80, 100, 120]); doc.setLineWidth(0.75);
-    doc.line(M + 18, ry - 6, W - M - 18, ry - 6);
-    ry += 10;
-    const total = list.reduce((s, p) => s + toNGN(p.price, p.currency), 0);
-    setCol(CREAM); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-    doc.text('TOTAL PROPOSAL VALUE', M + 18, ry);
-    setCol(GOLD); doc.setFontSize(14);
-    doc.text(formatNairaPlain(total), W - M - 18, ry, { align: 'right' });
-    setCol([160, 170, 185]); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.2);
-    doc.text('Prices are indicative and exclude installation, freight, and applicable duties.', M + 18, y + panelH - 12);
-    return panelH;
+
+    setDraw([80, 100, 120]); doc.setLineWidth(0.9);
+    doc.line(M + 28, ry - rowH / 2 + 4, W - M - 28, ry - rowH / 2 + 4);
+    ry += 12;
+
+    const totalNgn = list.reduce((s, p) => s + toNGN(p.price, p.currency), 0);
+    setCol(CREAM); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+    doc.text('TOTAL PROPOSAL VALUE', M + 28, ry + 8);
+    setCol(GOLD); doc.setFontSize(18);
+    doc.text(formatNairaPlain(totalNgn), W - M - 28, ry + 8, { align: 'right' });
+
+    setCol([160, 170, 185]); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    doc.text('Prices are indicative and exclude installation, freight, and applicable duties.',
+      M + 28, panelY + panelH - 18);
+
+    footer(pageNo, total);
   }
 
   const packs = packMachines(products);
-  const summaryOwn = packs.length && packs[packs.length - 1].items.length >= 3;
-  const catPages = packs.length + (summaryOwn ? 1 : 0);
+  // Pricing summary is always its own page
+  const catPages = packs.length + 1;
   const totalPages = 2 + catPages + 2;
 
   // ---- COVER ----
@@ -1845,38 +1867,24 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
 
     const gap = 12;
     const totalH = pack.items.reduce((s, it) => s + it.h, 0) + gap * (pack.items.length - 1);
-    const isLast = pi === packs.length - 1 && !summaryOwn;
-    const summaryH = isLast ? (28 + products.length * 18 + 55) : 0;
-    const contentH = totalH + (isLast ? summaryH + 16 : 0);
     const topLimit = 95;
     const bottomLimit = 50;
     const area = H - topLimit - bottomLimit;
-    // vertical center: top of first card
-    let yTop = topLimit + (area - contentH) / 2;
+    // vertical center the card group
+    let yTop = topLimit + Math.max(0, (area - totalH) / 2);
     const cardW = W - 2 * M;
     pack.items.forEach(it => {
       drawCard(it.p, M, yTop, cardW, it.h);
       yTop += it.h + gap;
     });
-    if (isLast) {
-      drawSummary(H - bottomLimit, products);
-    }
     footer(pageNo, totalPages);
     pageNo++;
   });
 
-  if (summaryOwn) {
-    doc.addPage();
-    setFill(CREAM); doc.rect(0, 0, W, H, 'F');
-    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
-    doc.text('Pricing Summary', M, 50);
-    setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 66, M + 54, 66);
-    const panelH = 28 + products.length * 18 + 55;
-    const yMid = H / 2 - panelH / 2 + panelH;
-    drawSummary(yMid, products);
-    footer(pageNo, totalPages);
-    pageNo++;
-  }
+  // Pricing summary — always its own page
+  doc.addPage();
+  drawSummaryPage(products, pageNo, totalPages);
+  pageNo++;
 
   // ---- TERMS ----
   // Fonts +2pt from previous (head 14, body 12.5); group vertically centered
