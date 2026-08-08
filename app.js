@@ -1490,23 +1490,82 @@ function generatePresentation() {
   const layout = document.querySelector('input[name="pres-layout"]:checked')?.value || 'detailed';
   const co = data.company;
   const dateStr = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-  const perPage = layout === 'brochure' ? 2 : 1;
 
-  // Page count: cover + about + catalogue pages + maybe summary on last
-  const cataloguePages = Math.ceil(products.length / perPage);
-  const totalPages = 2 + cataloguePages; // cover + about + catalogue (summary fits on last catalogue page when possible)
+  // Flexible packing: estimate card height and fill each page
+  const GAP = 14;
+  const SUMMARY_H = 28 + products.length * 22 + 70;
+  const firstUsable = layout === 'detailed' ? 520 : 540;
+  const nextUsable = layout === 'detailed' ? 560 : 580;
+
+  function estimateCardHeight(p) {
+    const feats = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).length;
+    const descLen = (p.description || '').length;
+    const descLines = Math.max(1, Math.ceil(descLen / 70));
+    // base image+pad ~170, tag+title ~40, desc, bullets, price ~30
+    let h = 170 + 40 + descLines * 13 + Math.max(feats, 1) * 16 + 36;
+    if (layout === 'detailed') h = Math.max(h, 210);
+    else h = Math.max(h, 160);
+    return Math.min(h, 320);
+  }
+
+  const heights = products.map(estimateCardHeight);
+  const packs = []; // { items: [{p, idx, h}], startIdx, usedH }
+  let i = 0;
+  while (i < products.length) {
+    const usable = packs.length === 0 ? firstUsable : nextUsable;
+    const items = [];
+    let used = 0;
+    while (i < products.length) {
+      const h = heights[i];
+      const need = items.length === 0 ? h : h + GAP;
+      // reserve summary space only on potential last pack
+      const remainingAfter = products.length - i - 1;
+      const reserve = remainingAfter === 0 ? Math.min(SUMMARY_H + 12, 160) : 0;
+      if (used + need + (remainingAfter === 0 ? 0 : 0) > usable && items.length > 0) break;
+      // if single card is huge, still place it
+      if (items.length > 0 && used + need > usable) break;
+      items.push({ p: products[i], idx: i, h });
+      used += need;
+      i++;
+      // detailed prefers fewer per page if very tall
+      if (layout === 'detailed' && items.length >= 2 && used > usable * 0.85) break;
+      if (layout === 'brochure' && items.length >= 4) break;
+    }
+    packs.push({ items, startIdx: items[0].idx, usedH: used, usable });
+  }
+
+  // Try attach summary to last pack if space allows
+  let summaryOwnPage = false;
+  if (packs.length) {
+    const last = packs[packs.length - 1];
+    if (last.usedH + GAP + SUMMARY_H > last.usable) {
+      summaryOwnPage = true;
+    }
+  }
+
+  const catPageCount = packs.length + (summaryOwnPage ? 1 : 0);
+  const totalPages = 2 + catPageCount + 2; // cover + about + catalogue(+summary) + terms + closing
 
   let pages = [];
   pages.push(presCoverPage(co, forClient, dateStr, totalPages));
   pages.push(presAboutPage(co, totalPages));
 
-  for (let i = 0; i < products.length; i += perPage) {
-    const chunk = products.slice(i, i + perPage);
-    const pageNo = 3 + Math.floor(i / perPage);
-    const isFirstCat = i === 0;
-    const isLastCat = i + perPage >= products.length;
-    pages.push(presCataloguePage(co, chunk, products, i, products.length, pageNo, totalPages, isFirstCat, isLastCat, layout));
+  packs.forEach((pack, pi) => {
+    const pageNo = 3 + pi;
+    const isFirstCat = pi === 0;
+    const isLastCat = pi === packs.length - 1 && !summaryOwnPage;
+    const center = pack.usedH < pack.usable * 0.72; // balance sparse pages
+    pages.push(presCataloguePage(
+      co, pack, products, pageNo, totalPages, isFirstCat, isLastCat, center, isLastCat
+    ));
+  });
+
+  if (summaryOwnPage) {
+    pages.push(presSummaryOnlyPage(co, products, 2 + packs.length + 1, totalPages));
   }
+
+  pages.push(presTermsPage(co, 2 + catPageCount + 1, totalPages));
+  pages.push(presClosingPage(co, forClient, 2 + catPageCount + 2, totalPages));
 
   const safeTitle = title.replace(/[\\/:*?"<>|]/g, ' ').slice(0, 60);
   const printWin = window.open('', '_blank', 'width=900,height=700');
@@ -1630,10 +1689,12 @@ function generatePresentation() {
     .cat-header .count { float: right; text-align: right; margin-top: -40px; }
     .cat-header .count .big { font-size: 28pt; font-weight: 300; color: rgba(80,100,120,0.7); }
     .cat-header .count .small { font-size: 8pt; color: rgba(150,160,175,0.9); }
-    .cat-body { padding: 24px 42px 48px; }
+    .cat-body { padding: 24px 42px 48px; min-height: 520px; display: flex; flex-direction: column; }
+    .cat-body.center-cards { justify-content: center; }
+    .cat-cards { display: flex; flex-direction: column; gap: 14pt; }
     .machine-card {
       background: #fff; border: 0.75pt solid var(--line); border-radius: 8pt;
-      padding: 18pt; display: flex; gap: 20pt; margin-bottom: 16pt;
+      padding: 18pt; display: flex; gap: 20pt;
       page-break-inside: avoid;
     }
     .machine-card .img {
@@ -1684,6 +1745,23 @@ function generatePresentation() {
     }
     .summary-total .amt { font-size: 17pt; font-weight: 700; color: var(--gold); }
     .summary-note { font-size: 7.6pt; color: rgba(160,170,185,0.95); margin-top: 12px; }
+
+    /* Terms & closing */
+    .terms-wrap { padding: 48px 42px 56px; }
+    .terms-wrap h1 { font-size: 18pt; font-weight: 700; color: var(--navy); margin-top: 8px; }
+    .terms-item { margin-bottom: 14px; }
+    .terms-item .lab {
+      font-size: 8.5pt; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--navy); margin-bottom: 3px;
+    }
+    .terms-item .val { font-size: 9pt; color: #47484f; line-height: 1.45; }
+    .closing-wrap { padding: 56px 48px 56px; max-width: 520px; }
+    .closing-wrap p { font-size: 10.5pt; color: #38393d; line-height: 1.55; margin-bottom: 14px; }
+    .closing-sign { margin-top: 36px; }
+    .closing-sign .yours { font-size: 10.5pt; color: #38393d; margin-bottom: 28px; }
+    .closing-sign .for { font-size: 10pt; font-weight: 500; color: var(--navy); }
+    .closing-sign .name { font-size: 12pt; font-weight: 700; color: var(--navy); margin-top: 28px; }
+    .closing-sign .role { font-size: 9.5pt; color: var(--gray); margin-top: 2px; }
 
     /* Footer */
     .page-footer {
@@ -1793,53 +1871,54 @@ function presAboutPage(co, totalPages) {
   </div>`;
 }
 
-function presCataloguePage(co, chunk, allProducts, startIdx, totalMachines, pageNo, totalPages, isFirst, isLast, layout) {
-  const cards = chunk.map((p, j) => {
-    const globalIdx = startIdx + j;
-    const features = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).slice(0, 6);
-    const priceNgn = toNGN(p.price, p.currency);
-    const img = p.image
-      ? `<img src="${p.image}" alt="" />`
-      : `<span class="ph">🏥</span>`;
-    const specs = features.length
-      ? `<ul class="specs">${features.map(f => `<li>${escHtml(f)}</li>`).join('')}</ul>`
-      : '';
-    return `
-      <div class="machine-card">
-        <div class="img">${img}</div>
-        <div class="txt">
-          <div class="tag">${escHtml((p.category || 'Medical Equipment').toUpperCase())}</div>
-          <div class="name">${escHtml(p.name)}</div>
-          <div class="uline"></div>
-          ${p.description ? `<p class="desc">${escHtml(p.description)}</p>` : ''}
-          ${specs}
-          <div class="price-block">
-            <div class="lab">Price</div>
-            <div class="amt">${formatNairaPlain(priceNgn)}</div>
-          </div>
+function presMachineCard(p) {
+  const features = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).slice(0, 6);
+  const priceNgn = toNGN(p.price, p.currency);
+  const img = p.image ? `<img src="${p.image}" alt="" />` : `<span class="ph">🏥</span>`;
+  const specs = features.length
+    ? `<ul class="specs">${features.map(f => `<li>${escHtml(f)}</li>`).join('')}</ul>`
+    : '';
+  return `
+    <div class="machine-card">
+      <div class="img">${img}</div>
+      <div class="txt">
+        <div class="tag">${escHtml((p.category || 'Medical Equipment').toUpperCase())}</div>
+        <div class="name">${escHtml(p.name)}</div>
+        <div class="uline"></div>
+        ${p.description ? `<p class="desc">${escHtml(p.description)}</p>` : ''}
+        ${specs}
+        <div class="price-block">
+          <div class="lab">Price</div>
+          <div class="amt">${formatNairaPlain(priceNgn)}</div>
         </div>
-      </div>`;
-  }).join('');
+      </div>
+    </div>`;
+}
 
-  let summary = '';
-  if (isLast) {
-    const rows = allProducts.map(p => {
-      const ngn = toNGN(p.price, p.currency);
-      return `<div class="summary-row"><span>${escHtml(p.name)}</span><span>${formatNairaPlain(ngn)}</span></div>`;
-    }).join('');
-    const total = allProducts.reduce((s, p) => s + toNGN(p.price, p.currency), 0);
-    summary = `
-      <div class="summary">
-        <div class="sk">Pricing Summary</div>
-        <div style="margin-top:14px">${rows}</div>
-        <div class="summary-divider"></div>
-        <div class="summary-total">
-          <span>TOTAL PROPOSAL VALUE</span>
-          <span class="amt">${formatNairaPlain(total)}</span>
-        </div>
-        <div class="summary-note">Prices are indicative and exclude installation, freight, and applicable duties.</div>
-      </div>`;
-  }
+function presPricingSummaryHtml(allProducts) {
+  const rows = allProducts.map(p => {
+    const ngn = toNGN(p.price, p.currency);
+    return `<div class="summary-row"><span>${escHtml(p.name)}</span><span>${formatNairaPlain(ngn)}</span></div>`;
+  }).join('');
+  const total = allProducts.reduce((s, p) => s + toNGN(p.price, p.currency), 0);
+  return `
+    <div class="summary">
+      <div class="sk">Pricing Summary</div>
+      <div style="margin-top:14px">${rows}</div>
+      <div class="summary-divider"></div>
+      <div class="summary-total">
+        <span>TOTAL PROPOSAL VALUE</span>
+        <span class="amt">${formatNairaPlain(total)}</span>
+      </div>
+      <div class="summary-note">Prices are indicative and exclude installation, freight, and applicable duties.</div>
+    </div>`;
+}
+
+function presCataloguePage(co, pack, allProducts, pageNo, totalPages, isFirst, isLast, center, includeSummary) {
+  const cards = pack.items.map(it => presMachineCard(it.p)).join('');
+  const startIdx = pack.startIdx;
+  const totalMachines = allProducts.length;
+  const summary = includeSummary ? presPricingSummaryHtml(allProducts) : '';
 
   const header = isFirst
     ? `<div class="cat-header">
@@ -1858,11 +1937,85 @@ function presCataloguePage(co, chunk, allProducts, startIdx, totalMachines, page
   return `
   <div class="page">
     ${header}
-    <div class="cat-body">
-      ${cards}
+    <div class="cat-body${center && !includeSummary ? ' center-cards' : ''}">
+      <div class="cat-cards">${cards}</div>
       ${summary}
     </div>
     <div class="page-footer${isFirst ? ' dark' : ''}" style="${isFirst ? 'color:var(--goldsoft)' : ''}">
+      <span>${escHtml((co.name || '').toUpperCase())}</span>
+      <span>${String(pageNo).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}</span>
+    </div>
+  </div>`;
+}
+
+function presSummaryOnlyPage(co, allProducts, pageNo, totalPages) {
+  return `
+  <div class="page">
+    <div class="cat-header light">
+      <div class="kicker">Investment</div>
+      <h1 style="font-size:20pt">Pricing Summary</h1>
+      <div class="gold-rule"></div>
+    </div>
+    <div class="cat-body">
+      ${presPricingSummaryHtml(allProducts)}
+    </div>
+    <div class="page-footer">
+      <span>${escHtml((co.name || '').toUpperCase())}</span>
+      <span>${String(pageNo).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}</span>
+    </div>
+  </div>`;
+}
+
+function presTermsPage(co, pageNo, totalPages) {
+  const terms = [
+    ['Quote Validity', 'Quotation is only stated as at Today’s Exchange Rate, which is subject to change at any time based on the exchange rate fluctuations. This is valid for 30 days from the date stated on this invoice after which reconfirmation of rates would be necessary.'],
+    ['Origin', 'As indicated.'],
+    ['Estimated Delivery', 'Within 3–4 weeks from the date of the receipt of the confirmed order and pre-order payment.'],
+    ['Payment Terms', 'Our standard payment term is 70% Mobilization payment to commence, 10% on arrival at the Nigerian Cargo session, 20% balance payment on delivery and installation (or as proposed and agreed with the hospital).'],
+    ['Repayment Penalty', 'This is allowed within the tenor of this offer without penalty. Payment outside the tenor period attracts additional charge of 3.5% flat per month and will result in repossession of the machine if payment isn’t made; this would be withheld until full payment is made.'],
+    ['Comfort', 'Duly signed Letter of Award / PO stating the agreed payment terms.'],
+    ['Warranty', '12 months manufacturers warranty.'],
+    ['Carriage', 'Inland Carriage, Freight and other associated port charges are included within our quotation. It is based on routings via our freight forwarders.'],
+    ['Manuals & Spare Parts', 'Spare parts will be detailed within the operator’s manuals for all equipment supplied complete with drawings, fault finding etc. (where applicable).'],
+    ['Preventive Maintenance', 'After the warranty elapses, we strongly recommend quarterly “After sales services” agreement at a fixed mutually agreeable fee. To this end, Medicano Resources Limited will be committed to keeping its appointment to have its trained bio-engineer visit the hospital every quarter for a routine machine check to avoid breakdown. This we term preventive maintenance services.']
+  ];
+  const items = terms.map(([lab, val]) => `
+    <div class="terms-item">
+      <div class="lab">${escHtml(lab)}</div>
+      <div class="val">${escHtml(val)}</div>
+    </div>`).join('');
+
+  return `
+  <div class="page">
+    <div class="terms-wrap">
+      <div class="kicker">Commercial Terms</div>
+      <h1>Terms and Conditions</h1>
+      <div class="gold-rule"></div>
+      ${items}
+    </div>
+    <div class="page-footer">
+      <span>${escHtml((co.name || '').toUpperCase())}</span>
+      <span>${String(pageNo).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}</span>
+    </div>
+  </div>`;
+}
+
+function presClosingPage(co, forClient, pageNo, totalPages) {
+  return `
+  <div class="page">
+    <div class="closing-wrap">
+      <div class="kicker">Next Steps</div>
+      <div class="gold-rule"></div>
+      <p>Thank you for doing business with us while we look forward to receiving the confirmation of your order.</p>
+      <p>For further information or any clarification, please contact us the undersigned on Tel. <strong>09099995426</strong> or call Francis on <strong>08023203522</strong>. E-mail: <strong>enquiries@medicanoresources.com</strong></p>
+      <div class="closing-sign">
+        <div class="yours">Yours faithfully,</div>
+        <div class="for">FOR: ${escHtml(co.name || 'Medicano Resources Limited')}</div>
+        <div class="name">Francis Opara</div>
+        <div class="role">CEO</div>
+      </div>
+    </div>
+    <div class="page-footer">
       <span>${escHtml((co.name || '').toUpperCase())}</span>
       <span>${String(pageNo).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}</span>
     </div>
