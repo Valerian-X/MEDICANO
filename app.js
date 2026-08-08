@@ -1494,7 +1494,7 @@ function generatePresentation() {
   // Flexible packing: 1–3 cards per page based on how much detail each card has
   const GAP = 12;
   const SUMMARY_H = 28 + products.length * 22 + 70;
-  const firstUsable = 500;
+  const firstUsable = 560;
   const nextUsable = 560;
 
   function estimateCardHeight(p) {
@@ -1665,26 +1665,40 @@ function generatePresentation() {
     .about-right .brand-lines { font-size: 9pt; font-weight: 500; letter-spacing: 0.12em; color: var(--cream2); line-height: 1.55; margin-top: 4px; }
     .about-right .contact { margin-top: auto; border-top: 0.75pt solid rgba(60,80,100,0.8); padding-top: 12px; font-size: 7.6pt; color: rgba(200,205,215,0.95); line-height: 1.6; }
 
-    /* Catalogue */
+    /* Catalogue — same header + body on every catalogue page */
     .cat-header {
-      background: var(--navy); color: var(--cream);
-      padding: 28px 42px 22px; min-height: 100px;
+      background: transparent; color: var(--navy);
+      padding: 32px 42px 8px;
     }
-    .cat-header.light {
-      background: transparent; color: var(--navy); padding: 36px 42px 12px;
+    .cat-header h1 { font-size: 22pt; font-weight: 700; margin: 0; }
+    .cat-header .sub { font-size: 10pt; font-weight: 300; color: var(--gray); margin-top: 4px; }
+    .cat-header .count { float: right; text-align: right; margin-top: -36px; }
+    .cat-header .count .big { font-size: 26pt; font-weight: 300; color: rgba(80,100,120,0.55); }
+    .cat-header .count .small { font-size: 8pt; color: var(--gray); }
+    .cat-body {
+      position: absolute;
+      left: 0; right: 0;
+      top: 88px;
+      bottom: 48px;
+      padding: 0 42px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: stretch;
     }
-    .cat-header h1 { font-size: 22pt; font-weight: 700; margin-top: 6px; }
-    .cat-header .sub { font-size: 10pt; font-weight: 300; color: rgba(200,205,215,0.9); margin-top: 4px; }
-    .cat-header.light .sub { color: var(--gray); }
-    .cat-header .count { float: right; text-align: right; margin-top: -40px; }
-    .cat-header .count .big { font-size: 28pt; font-weight: 300; color: rgba(80,100,120,0.7); }
-    .cat-header .count .small { font-size: 8pt; color: rgba(150,160,175,0.9); }
-    .cat-body { padding: 20px 42px 52px; min-height: 540px; display: flex; flex-direction: column; }
-    .cat-body.center-cards { justify-content: center; }
-    .cat-cards { display: flex; flex-direction: column; gap: 12pt; width: 100%; }
+    .cat-body.has-summary { justify-content: center; }
+    .cat-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12pt;
+      width: 100%;
+      max-width: 100%;
+    }
     .machine-card {
       background: #fff; border: 0.75pt solid var(--line); border-radius: 8pt;
-      padding: 14pt 16pt; display: flex; gap: 16pt; width: 100%;
+      padding: 14pt 16pt; display: flex; gap: 16pt;
+      width: 100%; max-width: 100%;
+      box-sizing: border-box;
       page-break-inside: avoid;
     }
     .machine-card .img {
@@ -1910,26 +1924,27 @@ function presCataloguePage(co, pack, allProducts, pageNo, totalPages, isFirst, i
   const totalMachines = allProducts.length;
   const summary = includeSummary ? presPricingSummaryHtml(allProducts) : '';
 
-  const header = isFirst
-    ? `<div class="cat-header">
-         <h1 style="font-size:24pt;font-weight:700;margin-top:4px">Equipment Catalogue</h1>
-         <div class="sub">Selected for your facility, with indicative pricing in Naira.</div>
-         <div class="count"><div class="big">${String(startIdx + 1).padStart(2, '0')}</div><div class="small">of ${String(totalMachines).padStart(2, '0')} systems</div></div>
-       </div>`
-    : `<div class="cat-header light">
-         <h1 style="font-size:22pt;font-weight:700">Equipment Catalogue</h1>
-         <div class="sub" style="float:right;margin-top:-28px">continued</div>
-         <div class="gold-rule"></div>
-       </div>`;
+  const continued = isFirst ? '' : '<span style="font-weight:300;color:var(--gray);font-size:10pt;float:right;margin-top:8px">continued</span>';
+  const header = `
+    <div class="cat-header">
+      <h1>Equipment Catalogue</h1>
+      ${continued}
+      <div class="sub">${isFirst ? 'Selected for your facility, with indicative pricing in Naira.' : '&nbsp;'}</div>
+      <div class="count">
+        <div class="big">${String(startIdx + 1).padStart(2, '0')}</div>
+        <div class="small">of ${String(totalMachines).padStart(2, '0')} systems</div>
+      </div>
+      <div class="gold-rule"></div>
+    </div>`;
 
   return `
   <div class="page">
     ${header}
-    <div class="cat-body${center && !includeSummary ? ' center-cards' : ''}">
+    <div class="cat-body${includeSummary ? ' has-summary' : ''}">
       <div class="cat-cards">${cards}</div>
       ${summary}
     </div>
-    <div class="page-footer${isFirst ? ' dark' : ''}" style="${isFirst ? 'color:var(--goldsoft)' : ''}">
+    <div class="page-footer">
       <span>${escHtml((co.name || '').toUpperCase())}</span>
       <span>${String(pageNo).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}</span>
     </div>
