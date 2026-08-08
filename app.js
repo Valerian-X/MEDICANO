@@ -1608,25 +1608,33 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   const setFill = (rgb) => doc.setFillColor(rgb[0], rgb[1], rgb[2]);
   const setDraw = (rgb) => doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
 
+  // Standard body size matches T&C body (12.5pt)
+  const BODY = 12.5;
+  const BODY_LEAD = 16;
+
   function wrap(text, fontSize, maxW, font='normal') {
     doc.setFont('helvetica', font);
     doc.setFontSize(fontSize);
     return doc.splitTextToSize(String(text || ''), maxW);
   }
 
+  // Consistent large page-number design on every page
   function footer(pageNo, total) {
     setCol(GRAY);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.2);
+    doc.setFontSize(9);
     doc.text((co.name || 'MEDICANO RESOURCES LIMITED').toUpperCase(), M, 28);
-    doc.text(String(pageNo).padStart(2, '0') + ' / ' + String(total).padStart(2, '0'), W - M, 28, { align: 'right' });
+    setCol([115, 128, 140]);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(18);
+    doc.text(String(pageNo).padStart(2, '0') + ' / ' + String(total).padStart(2, '0'), W - M, 32, { align: 'right' });
   }
 
   function estimateCardH(p) {
     const feats = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).length;
-    const descLines = Math.max(1, wrap(p.description || '', 8.5, W - 2 * M - 140).length);
-    let h = 100 + descLines * 12 + Math.max(feats, 0) * 14 + 24;
-    return Math.max(130, Math.min(h, 220));
+    const descLines = Math.max(1, wrap(p.description || '', BODY, W - 2 * M - 140).length);
+    let h = 100 + descLines * BODY_LEAD + Math.max(feats, 0) * (BODY_LEAD - 1) + 28;
+    return Math.max(140, Math.min(h, 260));
   }
 
   function packMachines(list) {
@@ -1655,23 +1663,26 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   function drawCard(p, x, y, w, h) {
     setFill(WHITE); setDraw(LINE); doc.setLineWidth(0.75);
     doc.roundedRect(x, y, w, h, 8, 8, 'FD');
-    const pad = 14, imgW = 110;
+    const pad = 14;
+    // Square image frame (same width and height)
+    const imgSize = Math.min(118, h - 2 * pad);
+    const imgY = y + pad + Math.max(0, (h - 2 * pad - imgSize) / 2);
     setFill(NAVY2); setDraw(GOLD); doc.setLineWidth(1);
-    doc.roundedRect(x + pad, y + pad, imgW, h - 2 * pad, 4, 4, 'FD');
+    doc.roundedRect(x + pad, imgY, imgSize, imgSize, 4, 4, 'FD');
     // image or placeholder
     if (p.image) {
       try {
-        doc.addImage(p.image, 'JPEG', x + pad + 1, y + pad + 1, imgW - 2, h - 2 * pad - 2);
+        doc.addImage(p.image, 'JPEG', x + pad + 1, imgY + 1, imgSize - 2, imgSize - 2);
       } catch (e) {
         setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(16);
-        doc.text('EQ', x + pad + imgW / 2, y + h / 2, { align: 'center' });
+        doc.text('EQ', x + pad + imgSize / 2, imgY + imgSize / 2 + 5, { align: 'center' });
       }
     } else {
       setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(16);
-      doc.text('EQ', x + pad + imgW / 2, y + h / 2, { align: 'center' });
+      doc.text('EQ', x + pad + imgSize / 2, imgY + imgSize / 2 + 5, { align: 'center' });
     }
-    const tx = x + pad + imgW + 16;
-    const tw = w - (pad + imgW + 16) - pad;
+    const tx = x + pad + imgSize + 16;
+    const tw = w - (pad + imgSize + 16) - pad;
     let ty = y + pad + 12;
     setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.4);
     doc.text(String(p.category || 'EQUIPMENT').toUpperCase(), tx, ty);
@@ -1681,20 +1692,21 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
     nameLines.slice(0, 2).forEach(ln => { doc.text(ln, tx, ty); ty += 14; });
     setDraw(LINE); doc.setLineWidth(1); doc.line(tx, ty, tx + 28, ty);
     ty += 14;
-    setCol([87, 88, 92]); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-    wrap(p.description || '', 8.5, tw).slice(0, 4).forEach(ln => { doc.text(ln, tx, ty); ty += 11; });
+    setCol([87, 88, 92]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
+    wrap(p.description || '', BODY, tw).slice(0, 4).forEach(ln => { doc.text(ln, tx, ty); ty += BODY_LEAD - 2; });
     ty += 6;
     const feats = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).slice(0, 5);
     feats.forEach(f => {
       setFill(GOLD); doc.circle(tx + 3, ty - 2, 1.6, 'F');
-      setCol([56, 57, 61]); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.3);
-      doc.text(f.substring(0, 80), tx + 10, ty);
-      ty += 13;
+      setCol([56, 57, 61]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
+      doc.text(f.substring(0, 72), tx + 10, ty);
+      ty += BODY_LEAD - 1;
     });
     const priceNgn = toNGN(p.price, p.currency);
-    setCol(GRAY); doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8);
-    doc.text('PRICE', x + w - pad, y + h - pad - 16, { align: 'right' });
-    setCol(NAVY); doc.setFontSize(12.5);
+    setCol(GRAY); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+    doc.text('PRICE', x + w - pad, y + h - pad - 18, { align: 'right' });
+    setCol(NAVY); doc.setFontSize(BODY);
+    doc.setFont('helvetica', 'bold');
     doc.text(formatNairaPlain(priceNgn), x + w - pad, y + h - pad - 2, { align: 'right' });
   }
 
@@ -1724,7 +1736,7 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
 
     let ry = panelY + padY + headerBand + 8;
     list.forEach(p => {
-      setCol(CREAM2); doc.setFont('helvetica', 'normal'); doc.setFontSize(14);
+      setCol(CREAM2); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
       const name = String(p.name || '').substring(0, 42);
       doc.text(name, M + 28, ry);
       doc.setFont('helvetica', 'bold');
@@ -1742,7 +1754,7 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
     setCol(GOLD); doc.setFontSize(18);
     doc.text(formatNairaPlain(totalNgn), W - M - 28, ry + 8, { align: 'right' });
 
-    setCol([160, 170, 185]); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    setCol([160, 170, 185]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
     doc.text('Prices are indicative and exclude installation, freight, and applicable duties.',
       M + 28, panelY + panelH - 18);
 
@@ -1772,22 +1784,23 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   setCol([184, 191, 204]); doc.setFontSize(11.5);
   doc.text('Prepared for ' + forClient, W / 2, H * 0.42 + 92, { align: 'center' });
   doc.text(dateStr, W / 2, H * 0.42 + 110, { align: 'center' });
-  // Bottom company details — legible & organised (near page bottom)
+  // Bottom company details — smaller footer type on cover
   setDraw([56, 77, 102]); doc.setLineWidth(0.75);
-  doc.line(M, H - 110, W - M, H - 110);
-  setCol([210, 216, 224]); doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
-  const addrLines = wrap(co.address || '', 9.5, W - 2 * M - 80);
-  let by = H - 92;
-  addrLines.forEach(ln => { doc.text(ln, M, by); by += 13; });
-  by += 4;
-  doc.setFontSize(9.5);
+  doc.line(M, H - 100, W - M, H - 100);
+  const footSize = 9;
+  const footLead = 12;
+  setCol([210, 216, 224]); doc.setFont('helvetica', 'normal'); doc.setFontSize(footSize);
+  const addrLines = wrap(co.address || '', footSize, W - 2 * M - 90);
+  let by = H - 88;
+  addrLines.forEach(ln => { doc.text(ln, M, by); by += footLead; });
+  by += 2;
   if (co.phone1 || co.phone2) {
     doc.text('Tel: ' + [co.phone1, co.phone2].filter(Boolean).join('  |  '), M, by);
-    by += 13;
+    by += footLead;
   }
   if (co.email) doc.text('Email: ' + co.email, M, by);
-  setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-  doc.text('01 / ' + String(totalPages).padStart(2, '0'), W - M, H - 48, { align: 'right' });
+  setCol([115, 128, 140]); doc.setFont('helvetica', 'normal'); doc.setFontSize(18);
+  doc.text('01 / ' + String(totalPages).padStart(2, '0'), W - M, H - 40, { align: 'right' });
 
   // ---- ABOUT ----
   doc.addPage();
@@ -1800,13 +1813,7 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   doc.text('EQUIPMENT, BUILT', W - panelW + 18, 110);
   doc.text('FOR AFRICAN', W - panelW + 18, 128);
   doc.text('HEALTHCARE.', W - panelW + 18, 146);
-  // Right panel contact
-  setDraw([56, 77, 102]); doc.setLineWidth(0.75);
-  doc.line(W - panelW + 18, H - 90, W - 24, H - 90);
-  setCol([200, 205, 215]); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-  doc.text(co.phone1 || '', W - panelW + 18, H - 70);
-  if (co.phone2) doc.text(co.phone2, W - panelW + 18, H - 56);
-  doc.text(co.email || '', W - panelW + 18, H - 40);
+  // No phone/email at bottom-right — contact is only in the cards below
 
   setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
   doc.text('COMPANY PROFILE', M, 58);
@@ -1815,40 +1822,70 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   doc.text('Resources Limited', M, 120);
   setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 138, M + 54, 138);
   const about = (co.name || 'Medicano Resources Limited') + ' supplies and supports advanced medical equipment for hospitals, diagnostic centres, and specialist clinics across Nigeria. We partner with leading manufacturers to bring reliable systems backed by local installation, training, and after-sales support.';
-  setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+  setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
+  // Clear space between gold rule and company description
   let ay = 168;
-  wrap(about, 11, W - panelW - M - 28).forEach(ln => { doc.text(ln, M, ay); ay += 17; });
+  wrap(about, BODY, W - panelW - M - 28).forEach(ln => { doc.text(ln, M, ay); ay += BODY_LEAD; });
   ay += 22;
   setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
   doc.text('What We Offer', M, ay); ay += 22;
   ['Certified new and pre-owned clinical systems', 'Site planning, installation, and commissioning', 'Preventive maintenance and engineer support', 'Staff training and clinical workflow onboarding', 'Flexible procurement and supply options'].forEach(item => {
     setFill(GOLD); doc.circle(M + 4, ay - 3, 2, 'F');
-    setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
-    doc.text(item, M + 14, ay); ay += 20;
+    setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
+    doc.text(item, M + 14, ay); ay += BODY_LEAD + 2;
   });
-  // Detail cards: address / phone / email
+  // Detail cards: address / phone / email — taller so full address fits
   ay += 28;
   const cardGap = 12;
   const leftW = W - panelW - M - 28;
   const cardW3 = (leftW - cardGap * 2) / 3;
-  const cardH = 100;
+  const cardH = 150;
   const cards = [
-    ['REGISTERED OFFICE', co.address || ''],
-    ['DIRECT LINE', [co.phone1, co.phone2].filter(Boolean).join('\n')],
-    ['CORRESPONDENCE', co.email || '']
+    ['REGISTERED OFFICE', co.address || '', 'text'],
+    ['DIRECT LINE', [co.phone1, co.phone2].filter(Boolean).join('\n'), 'text'],
+    ['CORRESPONDENCE', co.email || '', 'email']
   ];
   cards.forEach((card, i) => {
     const cx = M + i * (cardW3 + cardGap);
     setFill(WHITE); setDraw(LINE); doc.setLineWidth(0.75);
     doc.roundedRect(cx, ay, cardW3, cardH, 6, 6, 'FD');
-    setDraw(GOLD); doc.setLineWidth(1.6); doc.line(cx + 12, ay + 16, cx + 34, ay + 16);
-    setCol(GRAY); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-    doc.text(card[0], cx + 12, ay + 32);
-    setCol(NAVY); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-    let vy = ay + 48;
-    wrap(card[1], 8.5, cardW3 - 22).slice(0, 4).forEach(ln => {
-      doc.text(ln, cx + 12, vy); vy += 12;
-    });
+    // Gold accent with clear space before the label and address
+    setDraw(GOLD); doc.setLineWidth(1.6); doc.line(cx + 12, ay + 18, cx + 34, ay + 18);
+    setCol(GRAY); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+    doc.text(card[0], cx + 12, ay + 40);
+    setCol(NAVY); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
+    let vy = ay + 60;
+    const maxTextW = cardW3 - 24;
+    if (card[2] === 'email' && card[1]) {
+      const email = String(card[1]).trim();
+      const lines = wrap(email, BODY, maxTextW);
+      lines.forEach((ln, li) => {
+        // Clickable mailto link (jsPDF)
+        try {
+          if (typeof doc.textWithLink === 'function') {
+            setCol([11, 90, 160]);
+            doc.textWithLink(ln, cx + 12, vy, { url: 'mailto:' + email });
+          } else {
+            setCol([11, 90, 160]);
+            doc.text(ln, cx + 12, vy);
+            const tw = doc.getTextWidth(ln);
+            doc.link(cx + 12, vy - BODY + 2, tw, BODY + 2, { url: 'mailto:' + email });
+          }
+        } catch (e) {
+          setCol([11, 90, 160]);
+          doc.text(ln, cx + 12, vy);
+        }
+        // Underline to show it is a link
+        setDraw([11, 90, 160]); doc.setLineWidth(0.6);
+        const tw2 = doc.getTextWidth(ln);
+        doc.line(cx + 12, vy + 2, cx + 12 + tw2, vy + 2);
+        vy += BODY_LEAD - 2;
+      });
+    } else {
+      wrap(card[1], BODY, maxTextW).slice(0, 6).forEach(ln => {
+        doc.text(ln, cx + 12, vy); vy += BODY_LEAD - 2;
+      });
+    }
   });
   footer(2, totalPages);
 
@@ -1860,15 +1897,12 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
     setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
     doc.text('Equipment Catalogue', M, 48);
     if (pi > 0) {
-      setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-      doc.text('continued', W - M - 50, 48, { align: 'right' });
+      setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
+      doc.text('continued', W - M, 48, { align: 'right' });
     } else {
-      setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+      setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
       doc.text('Selected for your facility, with indicative pricing in Naira.', M, 66);
     }
-    // Large page number (not systems counter)
-    setCol([115, 128, 140]); doc.setFont('helvetica', 'normal'); doc.setFontSize(22);
-    doc.text(String(pageNo).padStart(2, '0'), W - M, 48, { align: 'right' });
     setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 78, M + 54, 78);
 
     const gap = 12;
@@ -1981,8 +2015,15 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   doc.text('CEO', M, cy + 18);
   footer(pageNo, totalPages);
 
-  const safe = (title || 'Presentation').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 50);
-  doc.save(safe + ' - ' + (forClient || 'Client').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 30) + '.pdf');
+  // Filename leads with client/hospital name
+  const sanitize = (s, max) => String(s || '')
+    .replace(/[\\/:*?"<>|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max || 50);
+  const clientName = sanitize(forClient, 50) || 'Client';
+  const docTitle = sanitize(title, 40) || 'Presentation';
+  doc.save(clientName + ' - ' + docTitle + '.pdf');
 }
 
 function escHtml(s) {
