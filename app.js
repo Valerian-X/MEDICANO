@@ -1477,552 +1477,355 @@ function formatNairaPlain(n) {
   return 'N' + v.toLocaleString('en-US');
 }
 
+function loadJsPdf() {
+  return new Promise((resolve, reject) => {
+    if (window.jspdf && window.jspdf.jsPDF) return resolve(window.jspdf.jsPDF);
+    if (window.jsPDF) return resolve(window.jsPDF);
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = () => resolve((window.jspdf && window.jspdf.jsPDF) || window.jsPDF);
+    s.onerror = () => reject(new Error('Could not load PDF engine. Please connect to the internet once to generate presentations.'));
+    document.head.appendChild(s);
+  });
+}
+
 function generatePresentation() {
   const checked = [...document.querySelectorAll('#pres-picker .pres-check:checked')];
   if (checked.length === 0) {
     alert('Please select at least one machine to include in the presentation.');
     return;
   }
-
   const products = checked.map(cb => getProduct(cb.value)).filter(Boolean);
-  const title = document.getElementById('pres-title')?.value.trim() || 'Medical Equipment Proposal';
   const forClient = document.getElementById('pres-client')?.value.trim() || 'Our Valued Hospital Partner';
-  const layout = document.querySelector('input[name="pres-layout"]:checked')?.value || 'detailed';
   const co = data.company;
   const dateStr = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const title = document.getElementById('pres-title')?.value.trim() || 'Medical Equipment Proposal';
 
-  // Flexible packing: 1–3 cards per page based on how much detail each card has
-  const GAP = 12;
-  const SUMMARY_H = 28 + products.length * 22 + 70;
-  const firstUsable = 560;
-  const nextUsable = 560;
+  const btn = document.querySelector('#page-presentation button[onclick="generatePresentation()"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating PDF…'; }
 
-  function estimateCardHeight(p) {
+  loadJsPdf().then(JsPDF => {
+    buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title);
+  }).catch(err => {
+    alert(err.message || 'PDF generation failed.');
+  }).finally(() => {
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate High-Quality PDF Presentation'; }
+  });
+}
+
+function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
+  const doc = new JsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
+  const W = doc.internal.pageSize.getWidth();  // 595.28
+  const H = doc.internal.pageSize.getHeight(); // 841.89
+  const M = 42;
+  const NAVY = [11, 22, 38];
+  const NAVY2 = [24, 44, 68];
+  const GOLD = [196, 162, 96];
+  const GOLDSOFT = [214, 190, 140];
+  const CREAM = [247, 244, 237];
+  const CREAM2 = [238, 233, 222];
+  const INK = [30, 30, 32];
+  const GRAY = [110, 112, 118];
+  const LINE = [222, 216, 202];
+  const WHITE = [255, 255, 255];
+
+  const setCol = (rgb) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+  const setFill = (rgb) => doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+  const setDraw = (rgb) => doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
+
+  function wrap(text, fontSize, maxW, font='normal') {
+    doc.setFont('helvetica', font);
+    doc.setFontSize(fontSize);
+    return doc.splitTextToSize(String(text || ''), maxW);
+  }
+
+  function footer(pageNo, total) {
+    setCol(GRAY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.2);
+    doc.text((co.name || 'MEDICANO RESOURCES LIMITED').toUpperCase(), M, 28);
+    doc.text(String(pageNo).padStart(2, '0') + ' / ' + String(total).padStart(2, '0'), W - M, 28, { align: 'right' });
+  }
+
+  function estimateCardH(p) {
     const feats = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).length;
-    const descLen = (p.description || '').length;
-    const descLines = Math.max(0, Math.ceil(descLen / 85));
-    let h = 118 + descLines * 12 + Math.max(feats, 0) * 14 + 28;
-    h = Math.max(h, 130);
-    return Math.min(h, 280);
+    const descLines = Math.max(1, wrap(p.description || '', 8.5, W - 2 * M - 140).length);
+    let h = 100 + descLines * 12 + Math.max(feats, 0) * 14 + 24;
+    return Math.max(130, Math.min(h, 220));
   }
 
-  const heights = products.map(estimateCardHeight);
-  const packs = [];
-  let i = 0;
-  while (i < products.length) {
-    const usable = packs.length === 0 ? firstUsable : nextUsable;
-    const items = [];
-    let used = 0;
-    while (i < products.length) {
-      const h = heights[i];
-      const need = items.length === 0 ? h : h + GAP;
-      if (items.length > 0 && used + need > usable) break;
-      items.push({ p: products[i], idx: i, h });
-      used += need;
-      i++;
-      if (items.length >= 3) break; // max 3 full-width cards per page
+  function packMachines(list) {
+    const usable = 560;
+    const gap = 12;
+    const heights = list.map(estimateCardH);
+    const packs = [];
+    let i = 0;
+    while (i < list.length) {
+      const items = [];
+      let used = 0;
+      while (i < list.length) {
+        const h = heights[i];
+        const need = items.length ? h + gap : h;
+        if (items.length && used + need > usable) break;
+        items.push({ p: list[i], h, idx: i });
+        used += need;
+        i++;
+        if (items.length >= 3) break;
+      }
+      packs.push({ items, usedH: used });
     }
-    packs.push({ items, startIdx: items[0].idx, usedH: used, usable });
+    return packs;
   }
 
-  let summaryOwnPage = false;
-  if (packs.length) {
-    const last = packs[packs.length - 1];
-    if (last.usedH + GAP + SUMMARY_H > last.usable) {
-      summaryOwnPage = true;
+  function drawCard(p, x, y, w, h) {
+    setFill(WHITE); setDraw(LINE); doc.setLineWidth(0.75);
+    doc.roundedRect(x, y, w, h, 8, 8, 'FD');
+    const pad = 14, imgW = 110;
+    setFill(NAVY2); setDraw(GOLD); doc.setLineWidth(1);
+    doc.roundedRect(x + pad, y + pad, imgW, h - 2 * pad, 4, 4, 'FD');
+    // image or placeholder
+    if (p.image) {
+      try {
+        doc.addImage(p.image, 'JPEG', x + pad + 1, y + pad + 1, imgW - 2, h - 2 * pad - 2);
+      } catch (e) {
+        setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(16);
+        doc.text('EQ', x + pad + imgW / 2, y + h / 2, { align: 'center' });
+      }
+    } else {
+      setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(16);
+      doc.text('EQ', x + pad + imgW / 2, y + h / 2, { align: 'center' });
     }
+    const tx = x + pad + imgW + 16;
+    const tw = w - (pad + imgW + 16) - pad;
+    let ty = y + pad + 12;
+    setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.4);
+    doc.text(String(p.category || 'EQUIPMENT').toUpperCase(), tx, ty);
+    ty += 16;
+    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+    const nameLines = wrap(p.name, 13, tw, 'bold');
+    nameLines.slice(0, 2).forEach(ln => { doc.text(ln, tx, ty); ty += 14; });
+    setDraw(LINE); doc.setLineWidth(1); doc.line(tx, ty, tx + 28, ty);
+    ty += 14;
+    setCol([87, 88, 92]); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    wrap(p.description || '', 8.5, tw).slice(0, 4).forEach(ln => { doc.text(ln, tx, ty); ty += 11; });
+    ty += 6;
+    const feats = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).slice(0, 5);
+    feats.forEach(f => {
+      setFill(GOLD); doc.circle(tx + 3, ty - 2, 1.6, 'F');
+      setCol([56, 57, 61]); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.3);
+      doc.text(f.substring(0, 80), tx + 10, ty);
+      ty += 13;
+    });
+    const priceNgn = toNGN(p.price, p.currency);
+    setCol(GRAY); doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8);
+    doc.text('PRICE', x + w - pad, y + h - pad - 16, { align: 'right' });
+    setCol(NAVY); doc.setFontSize(12.5);
+    doc.text(formatNairaPlain(priceNgn), x + w - pad, y + h - pad - 2, { align: 'right' });
   }
 
-  const catPageCount = packs.length + (summaryOwnPage ? 1 : 0);
-  const totalPages = 2 + catPageCount + 2; // cover + about + catalogue(+summary) + terms + closing
+  function drawSummary(yBottom, list) {
+    const rows = list.length;
+    const panelH = 28 + rows * 18 + 55;
+    const y = yBottom - panelH;
+    const cardW = W - 2 * M;
+    setFill(NAVY);
+    doc.roundedRect(M, y, cardW, panelH, 8, 8, 'F');
+    setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.text('PRICING SUMMARY', M + 18, y + 20);
+    let ry = y + 40;
+    list.forEach(p => {
+      setCol(CREAM2); doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+      doc.text(String(p.name).substring(0, 50), M + 18, ry);
+      doc.text(formatNairaPlain(toNGN(p.price, p.currency)), W - M - 18, ry, { align: 'right' });
+      ry += 17;
+    });
+    setDraw([80, 100, 120]); doc.setLineWidth(0.75);
+    doc.line(M + 18, ry - 6, W - M - 18, ry - 6);
+    ry += 10;
+    const total = list.reduce((s, p) => s + toNGN(p.price, p.currency), 0);
+    setCol(CREAM); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+    doc.text('TOTAL PROPOSAL VALUE', M + 18, ry);
+    setCol(GOLD); doc.setFontSize(14);
+    doc.text(formatNairaPlain(total), W - M - 18, ry, { align: 'right' });
+    setCol([160, 170, 185]); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.2);
+    doc.text('Prices are indicative and exclude installation, freight, and applicable duties.', M + 18, y + panelH - 12);
+    return panelH;
+  }
 
-  let pages = [];
-  pages.push(presCoverPage(co, forClient, dateStr, totalPages));
-  pages.push(presAboutPage(co, totalPages));
+  const packs = packMachines(products);
+  const summaryOwn = packs.length && packs[packs.length - 1].items.length >= 3;
+  const catPages = packs.length + (summaryOwn ? 1 : 0);
+  const totalPages = 2 + catPages + 2;
 
+  // ---- COVER ----
+  setFill(NAVY); doc.rect(0, 0, W, H, 'F');
+  setDraw([56, 77, 102]); doc.setLineWidth(0.75);
+  doc.rect(26, 26, W - 52, H - 52);
+  setCol([184, 191, 204]); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+  doc.text('CLIENT PRESENTATION', M, 60);
+  const nameParts = (co.name || 'MEDICANO RESOURCES LIMITED').split(/\s+/);
+  const main = (nameParts[0] || 'MEDICANO').toUpperCase();
+  const sub = (nameParts.slice(1).join(' ') || 'RESOURCES LIMITED').toUpperCase();
+  setCol(CREAM); doc.setFont('helvetica', 'bold'); doc.setFontSize(34);
+  doc.text(main, W / 2, H * 0.48, { align: 'center' });
+  setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(12);
+  doc.text(sub, W / 2, H * 0.48 + 22, { align: 'center' });
+  setDraw(GOLD); doc.setLineWidth(1.4);
+  doc.line(W / 2 - 27, H * 0.48 + 38, W / 2 + 27, H * 0.48 + 38);
+  setCol(CREAM); doc.setFontSize(14); doc.text('Medical Equipment Proposal', W / 2, H * 0.48 + 60, { align: 'center' });
+  setCol([184, 191, 204]); doc.setFontSize(10.5);
+  doc.text('Prepared for ' + forClient, W / 2, H * 0.48 + 80, { align: 'center' });
+  doc.text(dateStr, W / 2, H * 0.48 + 96, { align: 'center' });
+  setDraw([56, 77, 102]); doc.setLineWidth(0.75); doc.line(M, 96, W - M, 96);
+  setCol([191, 199, 212]); doc.setFontSize(7.8);
+  doc.text(co.address || '', M, 74);
+  doc.text([co.phone1, co.phone2, co.email].filter(Boolean).join('  |  '), M, 58);
+  setCol(GOLDSOFT); doc.text('01 / ' + String(totalPages).padStart(2, '0'), W - M, 58, { align: 'right' });
+
+  // ---- ABOUT ----
+  doc.addPage();
+  setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+  const panelW = 170;
+  setFill(NAVY); doc.rect(W - panelW, 0, panelW, H, 'F');
+  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.text('PRECISION', W - panelW + 20, 80);
+  setCol(CREAM2); doc.text('EQUIPMENT, BUILT', W - panelW + 20, 96);
+  doc.text('FOR AFRICAN', W - panelW + 20, 110);
+  doc.text('HEALTHCARE.', W - panelW + 20, 124);
+  setCol([200, 205, 215]); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  doc.text(co.phone1 || '', W - panelW + 20, H - 48);
+  doc.text(co.email || '', W - panelW + 20, H - 34);
+  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+  doc.text('COMPANY PROFILE', M, 70);
+  setCol(NAVY); doc.setFontSize(22);
+  doc.text('About ' + (nameParts[0] || 'Medicano'), M, 100);
+  doc.text('Resources Limited', M, 124);
+  setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 140, M + 54, 140);
+  const about = (co.name || 'Medicano Resources Limited') + ' supplies and supports advanced medical equipment for hospitals, diagnostic centres, and specialist clinics across Nigeria. We partner with leading manufacturers to bring reliable systems backed by local installation, training, and after-sales support.';
+  setCol([71, 72, 79]); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  let ay = 168;
+  wrap(about, 10, W - panelW - M - 28).forEach(ln => { doc.text(ln, M, ay); ay += 14; });
+  ay += 16; setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+  doc.text('What We Offer', M, ay); ay += 18;
+  ['Certified new and pre-owned clinical systems', 'Site planning, installation, and commissioning', 'Preventive maintenance and engineer support', 'Staff training and clinical workflow onboarding', 'Flexible procurement and supply options'].forEach(item => {
+    setFill(GOLD); doc.circle(M + 3, ay - 3, 1.6, 'F');
+    setCol([71, 72, 79]); doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    doc.text(item, M + 12, ay); ay += 16;
+  });
+  footer(2, totalPages);
+
+  // ---- CATALOGUE ----
+  let pageNo = 3;
   packs.forEach((pack, pi) => {
-    const pageNo = 3 + pi;
-    const isFirstCat = pi === 0;
-    const isLastCat = pi === packs.length - 1 && !summaryOwnPage;
-    // Always vertically center card stack to balance space above and below
-    pages.push(presCataloguePage(
-      co, pack, products, pageNo, totalPages, isFirstCat, isLastCat, true, isLastCat
-    ));
+    doc.addPage();
+    setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
+    doc.text('Equipment Catalogue', M, 48);
+    if (pi > 0) {
+      setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+      doc.text('continued', W - M, 48, { align: 'right' });
+    } else {
+      setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+      doc.text('Selected for your facility, with indicative pricing in Naira.', M, 66);
+    }
+    const startIdx = pack.items[0].idx;
+    setCol([115, 128, 140]); doc.setFont('helvetica', 'normal'); doc.setFontSize(22);
+    doc.text(String(startIdx + 1).padStart(2, '0'), W - M, 42, { align: 'right' });
+    setCol(GRAY); doc.setFontSize(7.5);
+    doc.text('of ' + String(products.length).padStart(2, '0') + ' systems', W - M, 56, { align: 'right' });
+    setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 78, M + 54, 78);
+
+    const gap = 12;
+    const totalH = pack.items.reduce((s, it) => s + it.h, 0) + gap * (pack.items.length - 1);
+    const isLast = pi === packs.length - 1 && !summaryOwn;
+    const summaryH = isLast ? (28 + products.length * 18 + 55) : 0;
+    const contentH = totalH + (isLast ? summaryH + 16 : 0);
+    const topLimit = 95;
+    const bottomLimit = 50;
+    const area = H - topLimit - bottomLimit;
+    // vertical center: top of first card
+    let yTop = topLimit + (area - contentH) / 2;
+    const cardW = W - 2 * M;
+    pack.items.forEach(it => {
+      drawCard(it.p, M, yTop, cardW, it.h);
+      yTop += it.h + gap;
+    });
+    if (isLast) {
+      drawSummary(H - bottomLimit, products);
+    }
+    footer(pageNo, totalPages);
+    pageNo++;
   });
 
-  if (summaryOwnPage) {
-    pages.push(presSummaryOnlyPage(co, products, 2 + packs.length + 1, totalPages));
+  if (summaryOwn) {
+    doc.addPage();
+    setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
+    doc.text('Pricing Summary', M, 50);
+    setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 66, M + 54, 66);
+    const panelH = 28 + products.length * 18 + 55;
+    const yMid = H / 2 - panelH / 2 + panelH;
+    drawSummary(yMid, products);
+    footer(pageNo, totalPages);
+    pageNo++;
   }
 
-  pages.push(presTermsPage(co, 2 + catPageCount + 1, totalPages));
-  pages.push(presClosingPage(co, forClient, 2 + catPageCount + 2, totalPages));
-
-  const safeTitle = title.replace(/[\\/:*?"<>|]/g, ' ').slice(0, 60);
-  const printWin = window.open('', '_blank', 'width=900,height=700');
-  if (!printWin) {
-    alert('Please allow pop-ups to generate the presentation.');
-    return;
-  }
-
-  printWin.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${safeTitle} — ${co.name}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --navy: #0B1626;
-      --navy2: #182C44;
-      --gold: #C4A260;
-      --goldsoft: #D6BE8C;
-      --cream: #F7F4ED;
-      --cream2: #EEE9DE;
-      --ink: #1E1E20;
-      --gray: #6E7076;
-      --line: #DED8CA;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
-      background: #333;
-      color: var(--ink);
-    }
-    .page {
-      width: 210mm;
-      min-height: 297mm;
-      margin: 0 auto 12px;
-      background: var(--cream);
-      position: relative;
-      page-break-after: always;
-      overflow: hidden;
-    }
-    .page:last-child { page-break-after: auto; }
-    @media print {
-      body { background: white; }
-      .page { margin: 0; width: 100%; min-height: 100vh; box-shadow: none; }
-      @page { size: A4; margin: 0; }
-    }
-
-    /* Cover */
-    .cover { background: var(--navy); color: var(--cream); }
-    .cover-frame {
-      position: absolute; inset: 26pt;
-      border: 0.75pt solid rgba(80,100,120,0.6);
-      pointer-events: none;
-    }
-    .cover-inner {
-      padding: 60px 48px 48px;
-      min-height: 297mm;
-      display: flex;
-      flex-direction: column;
-    }
-    .cover-kicker {
-      font-size: 8.5pt; font-weight: 500; letter-spacing: 0.28em;
-      text-transform: uppercase; color: rgba(180,190,200,0.9);
-    }
-    .cover-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-    .cover-name { font-size: 36pt; font-weight: 700; letter-spacing: 0.04em; color: var(--cream); }
-    .cover-sub { font-size: 12.5pt; font-weight: 300; letter-spacing: 0.35em; color: var(--goldsoft); margin-top: 6px; }
-    .cover-rule { width: 54pt; height: 1.4pt; background: var(--gold); margin: 28px auto; }
-    .cover-title { font-size: 14.5pt; font-weight: 400; color: var(--cream); }
-    .cover-for { font-size: 10.5pt; font-weight: 300; color: rgba(180,190,200,0.95); margin-top: 14px; }
-    .cover-date { font-size: 10.5pt; font-weight: 300; color: rgba(180,190,200,0.85); margin-top: 6px; }
-    .cover-bottom { border-top: 0.75pt solid rgba(60,80,100,0.8); padding-top: 14px; font-size: 8.3pt; color: rgba(190,200,210,0.95); display: flex; justify-content: space-between; align-items: flex-end; }
-    .cover-bottom .pg { color: var(--goldsoft); letter-spacing: 0.1em; }
-
-    /* About */
-    .about { display: flex; min-height: 297mm; }
-    .about-left { flex: 1; padding: 48px 36px 40px 42px; }
-    .about-right {
-      width: 190pt; background: var(--navy); color: var(--cream);
-      padding: 48px 24px 36px; display: flex; flex-direction: column;
-    }
-    .kicker { font-size: 9pt; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); }
-    .about-h { font-size: 25pt; font-weight: 700; color: var(--navy); line-height: 1.15; margin-top: 12px; }
-    .gold-rule { width: 54pt; height: 1.4pt; background: var(--gold); margin: 16px 0 20px; }
-    .about-body { font-size: 10.3pt; color: #47484f; line-height: 1.55; }
-    .about-h3 { font-size: 11.5pt; font-weight: 500; color: var(--navy); margin: 28px 0 12px; }
-    .offer-list { list-style: none; }
-    .offer-list li {
-      font-size: 9.8pt; color: #47484f; padding-left: 16px; position: relative;
-      margin-bottom: 10px; line-height: 1.4;
-    }
-    .offer-list li::before {
-      content: ''; position: absolute; left: 0; top: 6px;
-      width: 5px; height: 5px; border-radius: 50%; background: var(--gold);
-    }
-    .detail-cards { display: flex; gap: 12px; margin-top: 32px; }
-    .detail-card {
-      flex: 1; background: #fff; border: 0.75pt solid var(--line);
-      border-radius: 6pt; padding: 14px 12px; min-height: 90px;
-    }
-    .detail-card .bar { width: 22pt; height: 1.6pt; background: var(--gold); margin-bottom: 10px; }
-    .detail-card .lab { font-size: 7.3pt; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gray); }
-    .detail-card .val { font-size: 8.3pt; color: var(--navy); margin-top: 8px; line-height: 1.35; }
-    .about-right .brand { font-size: 9pt; font-weight: 500; letter-spacing: 0.15em; color: var(--gold); margin-top: 24px; }
-    .about-right .brand-lines { font-size: 9pt; font-weight: 500; letter-spacing: 0.12em; color: var(--cream2); line-height: 1.55; margin-top: 4px; }
-    .about-right .contact { margin-top: auto; border-top: 0.75pt solid rgba(60,80,100,0.8); padding-top: 12px; font-size: 7.6pt; color: rgba(200,205,215,0.95); line-height: 1.6; }
-
-    /* Catalogue — same header + body on every catalogue page */
-    .cat-header {
-      background: transparent; color: var(--navy);
-      padding: 32px 42px 8px;
-    }
-    .cat-header h1 { font-size: 22pt; font-weight: 700; margin: 0; }
-    .cat-header .sub { font-size: 10pt; font-weight: 300; color: var(--gray); margin-top: 4px; }
-    .cat-header .count { float: right; text-align: right; margin-top: -36px; }
-    .cat-header .count .big { font-size: 26pt; font-weight: 300; color: rgba(80,100,120,0.55); }
-    .cat-header .count .small { font-size: 8pt; color: var(--gray); }
-    .cat-body {
-      position: absolute;
-      left: 0; right: 0;
-      top: 88px;
-      bottom: 48px;
-      padding: 0 42px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: stretch;
-    }
-    .cat-body.has-summary { justify-content: center; }
-    .cat-cards {
-      display: flex;
-      flex-direction: column;
-      gap: 12pt;
-      width: 100%;
-      max-width: 100%;
-    }
-    .machine-card {
-      background: #fff; border: 0.75pt solid var(--line); border-radius: 8pt;
-      padding: 14pt 16pt; display: flex; gap: 16pt;
-      width: 100%; max-width: 100%;
-      box-sizing: border-box;
-      page-break-inside: avoid;
-    }
-    .machine-card .img {
-      width: 120pt; min-height: 110pt; max-height: 140pt; flex-shrink: 0;
-      border: 1pt solid var(--gold); border-radius: 4pt; overflow: hidden;
-      background: linear-gradient(145deg, #182C44, #0B1626);
-      display: flex; align-items: center; justify-content: center;
-    }
-    .machine-card .img img { width: 100%; height: 100%; object-fit: cover; display: block; min-height: 110pt; max-height: 140pt; }
-    .machine-card .img .ph { font-size: 32pt; opacity: 0.5; }
-    .machine-card .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-    .machine-card .tag {
-      font-size: 7.6pt; font-weight: 500; letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--gold);
-    }
-    .machine-card .name { font-size: 15.5pt; font-weight: 700; color: var(--navy); margin-top: 6px; }
-    .machine-card .uline { width: 30pt; height: 1pt; background: var(--line); margin: 8px 0 10px; }
-    .machine-card .desc { font-size: 8.9pt; color: #57585c; line-height: 1.45; }
-    .machine-card .specs { list-style: none; margin-top: 12px; }
-    .machine-card .specs li {
-      font-size: 8.6pt; color: #38393d; padding-left: 14px; position: relative;
-      margin-bottom: 6px; line-height: 1.35;
-    }
-    .machine-card .specs li::before {
-      content: ''; position: absolute; left: 0; top: 5px;
-      width: 4.5px; height: 4.5px; border-radius: 50%; background: var(--gold);
-    }
-    .machine-card .price-block { margin-top: auto; text-align: right; padding-top: 10px; }
-    .machine-card .price-block .lab {
-      font-size: 7pt; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gray);
-    }
-    .machine-card .price-block .amt { font-size: 13.5pt; font-weight: 700; color: var(--navy); }
-
-    /* Pricing summary */
-    .summary {
-      background: var(--navy); border-radius: 8pt; padding: 22px 24px 18px;
-      color: var(--cream); margin-top: 8px; page-break-inside: avoid;
-    }
-    .summary .sk { font-size: 9.5pt; font-weight: 500; letter-spacing: 0.2em; color: var(--gold); }
-    .summary-row {
-      display: flex; justify-content: space-between; font-size: 10pt;
-      color: var(--cream2); padding: 7px 0; border-bottom: none;
-    }
-    .summary-divider { height: 0.75pt; background: rgba(80,100,120,0.7); margin: 10px 0 12px; }
-    .summary-total {
-      display: flex; justify-content: space-between; align-items: baseline;
-      font-size: 11pt; font-weight: 500; color: var(--cream); letter-spacing: 0.04em;
-    }
-    .summary-total .amt { font-size: 17pt; font-weight: 700; color: var(--gold); }
-    .summary-note { font-size: 7.6pt; color: rgba(160,170,185,0.95); margin-top: 12px; }
-
-    /* Terms & closing */
-    .terms-wrap { padding: 48px 42px 56px; }
-    .terms-wrap h1 { font-size: 18pt; font-weight: 700; color: var(--navy); margin-top: 8px; }
-    .terms-item { margin-bottom: 14px; }
-    .terms-item .lab {
-      font-size: 8.5pt; font-weight: 600; letter-spacing: 0.06em;
-      text-transform: uppercase; color: var(--navy); margin-bottom: 3px;
-    }
-    .terms-item .val { font-size: 9pt; color: #47484f; line-height: 1.45; }
-    .closing-wrap { padding: 56px 48px 56px; max-width: 520px; }
-    .closing-wrap p { font-size: 10.5pt; color: #38393d; line-height: 1.55; margin-bottom: 14px; }
-    .closing-sign { margin-top: 36px; }
-    .closing-sign .yours { font-size: 10.5pt; color: #38393d; margin-bottom: 28px; }
-    .closing-sign .for { font-size: 10pt; font-weight: 500; color: var(--navy); }
-    .closing-sign .name { font-size: 12pt; font-weight: 700; color: var(--navy); margin-top: 28px; }
-    .closing-sign .role { font-size: 9.5pt; color: var(--gray); margin-top: 2px; }
-
-    /* Footer */
-    .page-footer {
-      position: absolute; bottom: 22pt; left: 42pt; right: 42pt;
-      display: flex; justify-content: space-between;
-      font-size: 7.2pt; letter-spacing: 0.1em; color: var(--gray);
-    }
-    .page-footer.dark { color: var(--goldsoft); }
-  </style>
-</head>
-<body>
-  ${pages.join('\n')}
-  <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 400); };<\/script>
-</body>
-</html>`);
-  printWin.document.close();
-}
-
-function presCoverPage(co, forClient, dateStr, totalPages) {
-  const nameParts = (co.name || 'MEDICANO RESOURCES LIMITED').split(/\s+/);
-  const mainName = nameParts[0] || 'MEDICANO';
-  const subName = nameParts.slice(1).join(' ') || 'RESOURCES LIMITED';
-  return `
-  <div class="page cover">
-    <div class="cover-frame"></div>
-    <div class="cover-inner">
-      <div class="cover-kicker">Client Presentation</div>
-      <div class="cover-center">
-        <div class="cover-name">${escHtml(mainName.toUpperCase())}</div>
-        <div class="cover-sub">${escHtml(subName.toUpperCase())}</div>
-        <div class="cover-rule"></div>
-        <div class="cover-title">Medical Equipment Proposal</div>
-        <div class="cover-for">Prepared for ${escHtml(forClient)}</div>
-        <div class="cover-date">${escHtml(dateStr)}</div>
-      </div>
-      <div class="cover-bottom">
-        <div>
-          <div>${escHtml(co.address || '')}</div>
-          <div style="margin-top:4px">${escHtml(co.phone1 || '')}${co.phone2 ? '  |  ' + escHtml(co.phone2) : ''}  |  ${escHtml(co.email || '')}</div>
-        </div>
-        <div class="pg">01 / ${String(totalPages).padStart(2, '0')}</div>
-      </div>
-    </div>
-  </div>`;
-}
-
-function presAboutPage(co, totalPages) {
-  return `
-  <div class="page">
-    <div class="about">
-      <div class="about-left">
-        <div class="kicker">Company Profile</div>
-        <div class="about-h">About ${(co.name || 'Medicano').split(' ')[0]}</div>
-        <div class="about-h" style="margin-top:0">Resources Limited</div>
-        <div class="gold-rule"></div>
-        <p class="about-body">
-          ${(co.name || 'Medicano Resources Limited')} supplies and supports advanced medical
-          equipment for hospitals, diagnostic centres, and specialist clinics across Nigeria.
-          We partner with leading manufacturers to bring reliable, serviceable systems to
-          healthcare providers, backed by local installation, training, and after-sales support.
-        </p>
-        <div class="about-h3">What We Offer</div>
-        <ul class="offer-list">
-          <li>Certified new and pre-owned diagnostic & clinical systems</li>
-          <li>Site planning, installation, and commissioning</li>
-          <li>Preventive maintenance and engineer support contracts</li>
-          <li>Staff training and clinical workflow onboarding</li>
-          <li>Flexible procurement and equipment supply options</li>
-        </ul>
-        <div class="gold-rule" style="margin-top:28px"></div>
-        <div class="about-h3">Why Hospitals Choose Us</div>
-        <p class="about-body">
-          From procurement through commissioning, our team stays involved long after delivery —
-          so your equipment keeps running at the standard your patients and clinicians expect.
-        </p>
-        <div class="detail-cards">
-          <div class="detail-card">
-            <div class="bar"></div>
-            <div class="lab">Registered Office</div>
-            <div class="val">${escHtml(co.address || '')}</div>
-          </div>
-          <div class="detail-card">
-            <div class="bar"></div>
-            <div class="lab">Direct Line</div>
-            <div class="val">${escHtml(co.phone1 || '')}${co.phone2 ? '<br>' + escHtml(co.phone2) : ''}</div>
-          </div>
-          <div class="detail-card">
-            <div class="bar"></div>
-            <div class="lab">Correspondence</div>
-            <div class="val">${escHtml(co.email || '')}</div>
-          </div>
-        </div>
-      </div>
-      <div class="about-right">
-        <div class="brand">PRECISION</div>
-        <div class="brand-lines">EQUIPMENT, BUILT<br>FOR AFRICAN<br>HEALTHCARE.</div>
-        <div class="contact">
-          ${escHtml(co.phone1 || '')}<br>
-          ${escHtml(co.email || '')}
-        </div>
-      </div>
-    </div>
-    <div class="page-footer">
-      <span>${escHtml((co.name || '').toUpperCase())}</span>
-      <span>02 / ${String(totalPages).padStart(2, '0')}</span>
-    </div>
-  </div>`;
-}
-
-function presMachineCard(p) {
-  const features = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).slice(0, 6);
-  const priceNgn = toNGN(p.price, p.currency);
-  const img = p.image ? `<img src="${p.image}" alt="" />` : `<span class="ph">🏥</span>`;
-  const specs = features.length
-    ? `<ul class="specs">${features.map(f => `<li>${escHtml(f)}</li>`).join('')}</ul>`
-    : '';
-  return `
-    <div class="machine-card">
-      <div class="img">${img}</div>
-      <div class="txt">
-        <div class="tag">${escHtml((p.category || 'Medical Equipment').toUpperCase())}</div>
-        <div class="name">${escHtml(p.name)}</div>
-        <div class="uline"></div>
-        ${p.description ? `<p class="desc">${escHtml(p.description)}</p>` : ''}
-        ${specs}
-        <div class="price-block">
-          <div class="lab">Price</div>
-          <div class="amt">${formatNairaPlain(priceNgn)}</div>
-        </div>
-      </div>
-    </div>`;
-}
-
-function presPricingSummaryHtml(allProducts) {
-  const rows = allProducts.map(p => {
-    const ngn = toNGN(p.price, p.currency);
-    return `<div class="summary-row"><span>${escHtml(p.name)}</span><span>${formatNairaPlain(ngn)}</span></div>`;
-  }).join('');
-  const total = allProducts.reduce((s, p) => s + toNGN(p.price, p.currency), 0);
-  return `
-    <div class="summary">
-      <div class="sk">Pricing Summary</div>
-      <div style="margin-top:14px">${rows}</div>
-      <div class="summary-divider"></div>
-      <div class="summary-total">
-        <span>TOTAL PROPOSAL VALUE</span>
-        <span class="amt">${formatNairaPlain(total)}</span>
-      </div>
-      <div class="summary-note">Prices are indicative and exclude installation, freight, and applicable duties.</div>
-    </div>`;
-}
-
-function presCataloguePage(co, pack, allProducts, pageNo, totalPages, isFirst, isLast, center, includeSummary) {
-  const cards = pack.items.map(it => presMachineCard(it.p)).join('');
-  const startIdx = pack.startIdx;
-  const totalMachines = allProducts.length;
-  const summary = includeSummary ? presPricingSummaryHtml(allProducts) : '';
-
-  const continued = isFirst ? '' : '<span style="font-weight:300;color:var(--gray);font-size:10pt;float:right;margin-top:8px">continued</span>';
-  const header = `
-    <div class="cat-header">
-      <h1>Equipment Catalogue</h1>
-      ${continued}
-      <div class="sub">${isFirst ? 'Selected for your facility, with indicative pricing in Naira.' : '&nbsp;'}</div>
-      <div class="count">
-        <div class="big">${String(startIdx + 1).padStart(2, '0')}</div>
-        <div class="small">of ${String(totalMachines).padStart(2, '0')} systems</div>
-      </div>
-      <div class="gold-rule"></div>
-    </div>`;
-
-  return `
-  <div class="page">
-    ${header}
-    <div class="cat-body${includeSummary ? ' has-summary' : ''}">
-      <div class="cat-cards">${cards}</div>
-      ${summary}
-    </div>
-    <div class="page-footer">
-      <span>${escHtml((co.name || '').toUpperCase())}</span>
-      <span>${String(pageNo).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}</span>
-    </div>
-  </div>`;
-}
-
-function presSummaryOnlyPage(co, allProducts, pageNo, totalPages) {
-  return `
-  <div class="page">
-    <div class="cat-header light">
-      <div class="kicker">Investment</div>
-      <h1 style="font-size:20pt">Pricing Summary</h1>
-      <div class="gold-rule"></div>
-    </div>
-    <div class="cat-body">
-      ${presPricingSummaryHtml(allProducts)}
-    </div>
-    <div class="page-footer">
-      <span>${escHtml((co.name || '').toUpperCase())}</span>
-      <span>${String(pageNo).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}</span>
-    </div>
-  </div>`;
-}
-
-function presTermsPage(co, pageNo, totalPages) {
+  // ---- TERMS ----
+  doc.addPage();
+  setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+  doc.text('COMMERCIAL TERMS', M, 50);
+  setCol(NAVY); doc.setFontSize(18);
+  doc.text('Terms and Conditions', M, 74);
+  setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 88, M + 54, 88);
   const terms = [
-    ['Quote Validity', 'Quotation is only stated as at Today’s Exchange Rate, which is subject to change at any time based on the exchange rate fluctuations. This is valid for 30 days from the date stated on this invoice after which reconfirmation of rates would be necessary.'],
+    ['Quote Validity', "Quotation is only stated as at Today's Exchange Rate, which is subject to change at any time based on exchange rate fluctuations. Valid for 30 days from the date stated, after which reconfirmation of rates would be necessary."],
     ['Origin', 'As indicated.'],
     ['Estimated Delivery', 'Within 3–4 weeks from the date of the receipt of the confirmed order and pre-order payment.'],
     ['Payment Terms', 'Our standard payment term is 70% Mobilization payment to commence, 10% on arrival at the Nigerian Cargo session, 20% balance payment on delivery and installation (or as proposed and agreed with the hospital).'],
-    ['Repayment Penalty', 'This is allowed within the tenor of this offer without penalty. Payment outside the tenor period attracts additional charge of 3.5% flat per month and will result in repossession of the machine if payment isn’t made; this would be withheld until full payment is made.'],
+    ['Repayment Penalty', 'Allowed within the tenor of this offer without penalty. Payment outside the tenor period attracts additional charge of 3.5% flat per month and may result in repossession if payment is not made.'],
     ['Comfort', 'Duly signed Letter of Award / PO stating the agreed payment terms.'],
     ['Warranty', '12 months manufacturers warranty.'],
-    ['Carriage', 'Inland Carriage, Freight and other associated port charges are included within our quotation. It is based on routings via our freight forwarders.'],
-    ['Manuals & Spare Parts', 'Spare parts will be detailed within the operator’s manuals for all equipment supplied complete with drawings, fault finding etc. (where applicable).'],
-    ['Preventive Maintenance', 'After the warranty elapses, we strongly recommend quarterly “After sales services” agreement at a fixed mutually agreeable fee. To this end, Medicano Resources Limited will be committed to keeping its appointment to have its trained bio-engineer visit the hospital every quarter for a routine machine check to avoid breakdown. This we term preventive maintenance services.']
+    ['Carriage', 'Inland Carriage, Freight and other associated port charges are included within our quotation, based on routings via our freight forwarders.'],
+    ['Manuals & Spare Parts', "Spare parts will be detailed within the operator's manuals for all equipment supplied complete with drawings, fault finding etc. (where applicable)."],
+    ['Preventive Maintenance', 'After the warranty elapses, we strongly recommend quarterly After Sales Services agreement at a fixed mutually agreeable fee. Medicano Resources Limited will schedule trained bio-engineers for routine quarterly machine checks.']
   ];
-  const items = terms.map(([lab, val]) => `
-    <div class="terms-item">
-      <div class="lab">${escHtml(lab)}</div>
-      <div class="val">${escHtml(val)}</div>
-    </div>`).join('');
+  let ty = 110;
+  terms.forEach(([lab, val]) => {
+    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+    doc.text(lab.toUpperCase(), M, ty); ty += 12;
+    setCol([71, 72, 79]); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    wrap(val, 8.5, W - 2 * M).forEach(ln => { doc.text(ln, M, ty); ty += 11; });
+    ty += 8;
+  });
+  footer(pageNo, totalPages);
+  pageNo++;
 
-  return `
-  <div class="page">
-    <div class="terms-wrap">
-      <div class="kicker">Commercial Terms</div>
-      <h1>Terms and Conditions</h1>
-      <div class="gold-rule"></div>
-      ${items}
-    </div>
-    <div class="page-footer">
-      <span>${escHtml((co.name || '').toUpperCase())}</span>
-      <span>${String(pageNo).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}</span>
-    </div>
-  </div>`;
-}
+  // ---- CLOSING ----
+  doc.addPage();
+  setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+  doc.text('NEXT STEPS', M, 50);
+  setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 66, M + 54, 66);
+  let cy = 100;
+  setCol(INK); doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+  wrap('Thank you for doing business with us while we look forward to receiving the confirmation of your order.', 11, W - 2 * M - 80).forEach(ln => { doc.text(ln, M, cy); cy += 16; });
+  cy += 10;
+  doc.setFontSize(10.5);
+  wrap('For further information or any clarification, please contact us the undersigned on Tel. 09099995426 or call Francis on 08023203522. E-mail: enquiries@medicanoresources.com', 10.5, W - 2 * M - 80).forEach(ln => { doc.text(ln, M, cy); cy += 15; });
+  cy += 28;
+  doc.setFontSize(11); doc.text('Yours faithfully,', M, cy);
+  cy += 36;
+  setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
+  doc.text('FOR: ' + (co.name || 'Medicano Resources Limited'), M, cy);
+  cy += 40;
+  doc.setFontSize(12); doc.text('Francis Opara', M, cy);
+  setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  doc.text('CEO', M, cy + 16);
+  footer(pageNo, totalPages);
 
-function presClosingPage(co, forClient, pageNo, totalPages) {
-  return `
-  <div class="page">
-    <div class="closing-wrap">
-      <div class="kicker">Next Steps</div>
-      <div class="gold-rule"></div>
-      <p>Thank you for doing business with us while we look forward to receiving the confirmation of your order.</p>
-      <p>For further information or any clarification, please contact us the undersigned on Tel. <strong>09099995426</strong> or call Francis on <strong>08023203522</strong>. E-mail: <strong>enquiries@medicanoresources.com</strong></p>
-      <div class="closing-sign">
-        <div class="yours">Yours faithfully,</div>
-        <div class="for">FOR: ${escHtml(co.name || 'Medicano Resources Limited')}</div>
-        <div class="name">Francis Opara</div>
-        <div class="role">CEO</div>
-      </div>
-    </div>
-    <div class="page-footer">
-      <span>${escHtml((co.name || '').toUpperCase())}</span>
-      <span>${String(pageNo).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}</span>
-    </div>
-  </div>`;
+  const safe = (title || 'Presentation').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 50);
+  doc.save(safe + ' - ' + (forClient || 'Client').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 30) + '.pdf');
 }
 
 function escHtml(s) {
