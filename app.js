@@ -28,6 +28,18 @@ const DEFAULT_DATA = {
     'Physiotherapy',
     'Hospital Furniture'
   ],
+  terms: [
+    { title: 'Quote Validity', body: "Quotation is only stated as at Today's Exchange Rate, which is subject to change at any time based on the exchange rate fluctuations. This is valid for 30 days from the date stated on this invoice after which reconfirmation of rates would be necessary." },
+    { title: 'Origin', body: 'As indicated.' },
+    { title: 'Estimated Delivery', body: 'Within 3–4 weeks from the date of the receipt of the confirmed order and pre-order payment.' },
+    { title: 'Payment Terms', body: 'Our standard payment term is 70% Mobilization payment to commence, 10% on arrival at the Nigerian Cargo session, 20% balance payment on delivery and installation (or as proposed and agreed with the hospital).' },
+    { title: 'Repayment Penalty', body: 'This is allowed within the tenor of this offer without penalty. Payment outside the tenor period attracts additional charge of 3.5% flat per month and will result in repossession of the machine if payment isn’t made; this would be withheld until full payment is made.' },
+    { title: 'Comfort', body: 'Duly signed Letter of Award / PO stating the agreed payment terms.' },
+    { title: 'Warranty', body: '12 months manufacturers warranty.' },
+    { title: 'Carriage', body: 'Inland Carriage, Freight and other associated port charges are included within our quotation. It is based on routings via our freight forwarders.' },
+    { title: 'Manuals & Spare Parts', body: "Spare parts will be detailed within the operator’s manuals for all equipment supplied complete with drawings, fault finding etc. (where applicable)." },
+    { title: 'Preventive Maintenance', body: 'After the warranty elapses, we strongly recommend quarterly “After sales services” agreement at a fixed mutually agreeable fee. To this end, Medicano Resources Limited will be committed to keeping its appointment to have its trained bio-engineer visit the hospital every quarter for a routine machine check to avoid breakdown. This we term preventive maintenance services.' }
+  ],
   products: [
     {
       id: 'p1',
@@ -238,6 +250,9 @@ function loadData() {
         // Seed from existing products + defaults
         const fromProducts = [...new Set(data.products.map(p => p.category).filter(Boolean))];
         data.categories = [...new Set([...(DEFAULT_DATA.categories || []), ...fromProducts])].sort();
+      }
+      if (!data.terms || !Array.isArray(data.terms) || data.terms.length === 0) {
+        data.terms = JSON.parse(JSON.stringify(DEFAULT_DATA.terms));
       }
     } else {
       data = JSON.parse(JSON.stringify(DEFAULT_DATA));
@@ -1061,6 +1076,60 @@ function renderSettings() {
   document.getElementById('set-phone1').value = c.phone1;
   document.getElementById('set-phone2').value = c.phone2;
   renderCategoriesList();
+  renderTermsEditor();
+}
+
+function renderTermsEditor() {
+  const box = document.getElementById('terms-editor');
+  if (!box) return;
+  if (!data.terms || !data.terms.length) {
+    data.terms = JSON.parse(JSON.stringify(DEFAULT_DATA.terms));
+  }
+  box.innerHTML = data.terms.map((t, i) => `
+    <div class="border border-slate-200 rounded-lg p-3 space-y-2" data-term-idx="${i}">
+      <div class="flex justify-between items-center gap-2">
+        <label class="text-xs font-medium text-slate-500">Heading</label>
+        <button type="button" onclick="removeTermRow(${i})" class="text-xs text-red-500 hover:underline">Remove</button>
+      </div>
+      <input type="text" class="term-title w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium" value="${escHtml(t.title || '')}" />
+      <label class="text-xs font-medium text-slate-500">Body text</label>
+      <textarea class="term-body w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" rows="3">${escHtml(t.body || '')}</textarea>
+    </div>
+  `).join('');
+}
+
+function addTermRow() {
+  if (!data.terms) data.terms = [];
+  data.terms.push({ title: 'New clause', body: '' });
+  renderTermsEditor();
+}
+
+function removeTermRow(idx) {
+  if (!data.terms) return;
+  data.terms.splice(idx, 1);
+  renderTermsEditor();
+}
+
+function saveTerms() {
+  const box = document.getElementById('terms-editor');
+  if (!box) return;
+  const rows = [...box.querySelectorAll('[data-term-idx]')];
+  data.terms = rows.map(row => ({
+    title: row.querySelector('.term-title')?.value.trim() || '',
+    body: row.querySelector('.term-body')?.value.trim() || ''
+  })).filter(t => t.title || t.body);
+  if (!data.terms.length) {
+    data.terms = JSON.parse(JSON.stringify(DEFAULT_DATA.terms));
+  }
+  saveData();
+  alert('Terms & Conditions saved. They will appear on the next presentation PDF.');
+}
+
+function resetTerms() {
+  data.terms = JSON.parse(JSON.stringify(DEFAULT_DATA.terms));
+  saveData();
+  renderTermsEditor();
+  alert('Terms reset to defaults.');
 }
 
 function saveSettings() {
@@ -1812,34 +1881,39 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   // ---- TERMS ----
   doc.addPage();
   setFill(CREAM); doc.rect(0, 0, W, H, 'F');
-  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
-  doc.text('COMMERCIAL TERMS', M, 48);
-  setCol(NAVY); doc.setFontSize(20);
+  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+  doc.text('COMMERCIAL TERMS', M, 46);
+  setCol(NAVY); doc.setFontSize(22);
   doc.text('Terms and Conditions', M, 74);
   setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 90, M + 54, 90);
-  const terms = [
-    ['Quote Validity', "Quotation is only stated as at Today's Exchange Rate, which is subject to change at any time based on exchange rate fluctuations. Valid for 30 days from the date stated, after which reconfirmation of rates would be necessary."],
-    ['Origin', 'As indicated.'],
-    ['Estimated Delivery', 'Within 3–4 weeks from the date of the receipt of the confirmed order and pre-order payment.'],
-    ['Payment Terms', 'Our standard payment term is 70% Mobilization payment to commence, 10% on arrival at the Nigerian Cargo session, 20% balance payment on delivery and installation (or as proposed and agreed with the hospital).'],
-    ['Repayment Penalty', 'Allowed within the tenor of this offer without penalty. Payment outside the tenor period attracts additional charge of 3.5% flat per month and may result in repossession if payment is not made.'],
-    ['Comfort', 'Duly signed Letter of Award / PO stating the agreed payment terms.'],
-    ['Warranty', '12 months manufacturers warranty.'],
-    ['Carriage', 'Inland Carriage, Freight and other associated port charges are included within our quotation, based on routings via our freight forwarders.'],
-    ['Manuals & Spare Parts', "Spare parts will be detailed within the operator's manuals for all equipment supplied complete with drawings, fault finding etc. (where applicable)."],
-    ['Preventive Maintenance', 'After the warranty elapses, we strongly recommend quarterly After Sales Services agreement at a fixed mutually agreeable fee. Medicano Resources Limited will schedule trained bio-engineers for routine quarterly machine checks.']
-  ];
-  // Larger type + spacing so the page fills cleanly
-  let ty = 112;
-  const termBodySize = 10;
-  const termBodyLead = 14;
-  const termGap = 12;
-  terms.forEach(([lab, val]) => {
-    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
-    doc.text(lab.toUpperCase(), M, ty); ty += 14;
-    setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(termBodySize);
+  const termsList = (data.terms && data.terms.length)
+    ? data.terms
+    : DEFAULT_DATA.terms;
+  // Headings clearly larger than body; generous spacing
+  let ty = 114;
+  const termHeadSize = 12;
+  const termBodySize = 10.5;
+  const termBodyLead = 15;
+  const termGap = 14;
+  termsList.forEach((t) => {
+    const lab = t.title || t[0] || '';
+    const val = t.body || t[1] || '';
+    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(termHeadSize);
+    doc.text(String(lab).toUpperCase(), M, ty); ty += 16;
+    setCol([50, 51, 55]); doc.setFont('helvetica', 'normal'); doc.setFontSize(termBodySize);
     wrap(val, termBodySize, W - 2 * M).forEach(ln => { doc.text(ln, M, ty); ty += termBodyLead; });
     ty += termGap;
+    // New page if running out of room
+    if (ty > H - 60) {
+      footer(pageNo, totalPages);
+      pageNo++;
+      doc.addPage();
+      setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+      setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+      doc.text('Terms and Conditions (continued)', M, 48);
+      setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 58, M + 54, 58);
+      ty = 78;
+    }
   });
   footer(pageNo, totalPages);
   pageNo++;
