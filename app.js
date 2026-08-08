@@ -1661,56 +1661,97 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   setFill(NAVY); doc.rect(0, 0, W, H, 'F');
   setDraw([56, 77, 102]); doc.setLineWidth(0.75);
   doc.rect(26, 26, W - 52, H - 52);
-  setCol([184, 191, 204]); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
-  doc.text('CLIENT PRESENTATION', M, 60);
   const nameParts = (co.name || 'MEDICANO RESOURCES LIMITED').split(/\s+/);
   const main = (nameParts[0] || 'MEDICANO').toUpperCase();
   const sub = (nameParts.slice(1).join(' ') || 'RESOURCES LIMITED').toUpperCase();
-  setCol(CREAM); doc.setFont('helvetica', 'bold'); doc.setFontSize(34);
-  doc.text(main, W / 2, H * 0.48, { align: 'center' });
-  setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(12);
-  doc.text(sub, W / 2, H * 0.48 + 22, { align: 'center' });
-  setDraw(GOLD); doc.setLineWidth(1.4);
-  doc.line(W / 2 - 27, H * 0.48 + 38, W / 2 + 27, H * 0.48 + 38);
-  setCol(CREAM); doc.setFontSize(14); doc.text('Medical Equipment Proposal', W / 2, H * 0.48 + 60, { align: 'center' });
-  setCol([184, 191, 204]); doc.setFontSize(10.5);
-  doc.text('Prepared for ' + forClient, W / 2, H * 0.48 + 80, { align: 'center' });
-  doc.text(dateStr, W / 2, H * 0.48 + 96, { align: 'center' });
-  setDraw([56, 77, 102]); doc.setLineWidth(0.75); doc.line(M, 96, W - M, 96);
-  setCol([191, 199, 212]); doc.setFontSize(7.8);
-  doc.text(co.address || '', M, 74);
-  doc.text([co.phone1, co.phone2, co.email].filter(Boolean).join('  |  '), M, 58);
-  setCol(GOLDSOFT); doc.text('01 / ' + String(totalPages).padStart(2, '0'), W - M, 58, { align: 'right' });
+  // Centered brand block
+  setCol(CREAM); doc.setFont('helvetica', 'bold'); doc.setFontSize(36);
+  doc.text(main, W / 2, H * 0.42, { align: 'center' });
+  setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(13);
+  doc.text(sub, W / 2, H * 0.42 + 24, { align: 'center' });
+  setDraw(GOLD); doc.setLineWidth(1.5);
+  doc.line(W / 2 - 30, H * 0.42 + 42, W / 2 + 30, H * 0.42 + 42);
+  setCol(CREAM); doc.setFontSize(15); doc.text('Medical Equipment Proposal', W / 2, H * 0.42 + 68, { align: 'center' });
+  setCol([184, 191, 204]); doc.setFontSize(11.5);
+  doc.text('Prepared for ' + forClient, W / 2, H * 0.42 + 92, { align: 'center' });
+  doc.text(dateStr, W / 2, H * 0.42 + 110, { align: 'center' });
+  // Bottom company details — legible & organised (near page bottom)
+  setDraw([56, 77, 102]); doc.setLineWidth(0.75);
+  doc.line(M, H - 110, W - M, H - 110);
+  setCol([210, 216, 224]); doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+  const addrLines = wrap(co.address || '', 9.5, W - 2 * M - 80);
+  let by = H - 92;
+  addrLines.forEach(ln => { doc.text(ln, M, by); by += 13; });
+  by += 4;
+  doc.setFontSize(9.5);
+  if (co.phone1 || co.phone2) {
+    doc.text('Tel: ' + [co.phone1, co.phone2].filter(Boolean).join('  |  '), M, by);
+    by += 13;
+  }
+  if (co.email) doc.text('Email: ' + co.email, M, by);
+  setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  doc.text('01 / ' + String(totalPages).padStart(2, '0'), W - M, H - 48, { align: 'right' });
 
   // ---- ABOUT ----
   doc.addPage();
   setFill(CREAM); doc.rect(0, 0, W, H, 'F');
   const panelW = 170;
   setFill(NAVY); doc.rect(W - panelW, 0, panelW, H, 'F');
-  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-  doc.text('PRECISION', W - panelW + 20, 80);
-  setCol(CREAM2); doc.text('EQUIPMENT, BUILT', W - panelW + 20, 96);
-  doc.text('FOR AFRICAN', W - panelW + 20, 110);
-  doc.text('HEALTHCARE.', W - panelW + 20, 124);
-  setCol([200, 205, 215]); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
-  doc.text(co.phone1 || '', W - panelW + 20, H - 48);
-  doc.text(co.email || '', W - panelW + 20, H - 34);
-  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
-  doc.text('COMPANY PROFILE', M, 70);
-  setCol(NAVY); doc.setFontSize(22);
-  doc.text('About ' + (nameParts[0] || 'Medicano'), M, 100);
-  doc.text('Resources Limited', M, 124);
-  setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 140, M + 54, 140);
+  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+  doc.text('PRECISION', W - panelW + 18, 90);
+  setCol(CREAM2); doc.setFontSize(10);
+  doc.text('EQUIPMENT, BUILT', W - panelW + 18, 110);
+  doc.text('FOR AFRICAN', W - panelW + 18, 128);
+  doc.text('HEALTHCARE.', W - panelW + 18, 146);
+  // Right panel contact
+  setDraw([56, 77, 102]); doc.setLineWidth(0.75);
+  doc.line(W - panelW + 18, H - 90, W - 24, H - 90);
+  setCol([200, 205, 215]); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  doc.text(co.phone1 || '', W - panelW + 18, H - 70);
+  if (co.phone2) doc.text(co.phone2, W - panelW + 18, H - 56);
+  doc.text(co.email || '', W - panelW + 18, H - 40);
+
+  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+  doc.text('COMPANY PROFILE', M, 58);
+  setCol(NAVY); doc.setFontSize(24);
+  doc.text('About ' + (nameParts[0] || 'Medicano'), M, 92);
+  doc.text('Resources Limited', M, 120);
+  setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 138, M + 54, 138);
   const about = (co.name || 'Medicano Resources Limited') + ' supplies and supports advanced medical equipment for hospitals, diagnostic centres, and specialist clinics across Nigeria. We partner with leading manufacturers to bring reliable systems backed by local installation, training, and after-sales support.';
-  setCol([71, 72, 79]); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
   let ay = 168;
-  wrap(about, 10, W - panelW - M - 28).forEach(ln => { doc.text(ln, M, ay); ay += 14; });
-  ay += 16; setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-  doc.text('What We Offer', M, ay); ay += 18;
+  wrap(about, 11, W - panelW - M - 28).forEach(ln => { doc.text(ln, M, ay); ay += 17; });
+  ay += 22;
+  setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+  doc.text('What We Offer', M, ay); ay += 22;
   ['Certified new and pre-owned clinical systems', 'Site planning, installation, and commissioning', 'Preventive maintenance and engineer support', 'Staff training and clinical workflow onboarding', 'Flexible procurement and supply options'].forEach(item => {
-    setFill(GOLD); doc.circle(M + 3, ay - 3, 1.6, 'F');
-    setCol([71, 72, 79]); doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
-    doc.text(item, M + 12, ay); ay += 16;
+    setFill(GOLD); doc.circle(M + 4, ay - 3, 2, 'F');
+    setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+    doc.text(item, M + 14, ay); ay += 20;
+  });
+  // Detail cards: address / phone / email
+  ay += 28;
+  const cardGap = 12;
+  const leftW = W - panelW - M - 28;
+  const cardW3 = (leftW - cardGap * 2) / 3;
+  const cardH = 100;
+  const cards = [
+    ['REGISTERED OFFICE', co.address || ''],
+    ['DIRECT LINE', [co.phone1, co.phone2].filter(Boolean).join('\n')],
+    ['CORRESPONDENCE', co.email || '']
+  ];
+  cards.forEach((card, i) => {
+    const cx = M + i * (cardW3 + cardGap);
+    setFill(WHITE); setDraw(LINE); doc.setLineWidth(0.75);
+    doc.roundedRect(cx, ay, cardW3, cardH, 6, 6, 'FD');
+    setDraw(GOLD); doc.setLineWidth(1.6); doc.line(cx + 12, ay + 16, cx + 34, ay + 16);
+    setCol(GRAY); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+    doc.text(card[0], cx + 12, ay + 32);
+    setCol(NAVY); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    let vy = ay + 48;
+    wrap(card[1], 8.5, cardW3 - 22).slice(0, 4).forEach(ln => {
+      doc.text(ln, cx + 12, vy); vy += 12;
+    });
   });
   footer(2, totalPages);
 
@@ -1723,16 +1764,14 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
     doc.text('Equipment Catalogue', M, 48);
     if (pi > 0) {
       setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-      doc.text('continued', W - M, 48, { align: 'right' });
+      doc.text('continued', W - M - 50, 48, { align: 'right' });
     } else {
       setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
       doc.text('Selected for your facility, with indicative pricing in Naira.', M, 66);
     }
-    const startIdx = pack.items[0].idx;
+    // Large page number (not systems counter)
     setCol([115, 128, 140]); doc.setFont('helvetica', 'normal'); doc.setFontSize(22);
-    doc.text(String(startIdx + 1).padStart(2, '0'), W - M, 42, { align: 'right' });
-    setCol(GRAY); doc.setFontSize(7.5);
-    doc.text('of ' + String(products.length).padStart(2, '0') + ' systems', W - M, 56, { align: 'right' });
+    doc.text(String(pageNo).padStart(2, '0'), W - M, 48, { align: 'right' });
     setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 78, M + 54, 78);
 
     const gap = 12;
@@ -1773,11 +1812,11 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   // ---- TERMS ----
   doc.addPage();
   setFill(CREAM); doc.rect(0, 0, W, H, 'F');
-  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
-  doc.text('COMMERCIAL TERMS', M, 50);
-  setCol(NAVY); doc.setFontSize(18);
+  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+  doc.text('COMMERCIAL TERMS', M, 48);
+  setCol(NAVY); doc.setFontSize(20);
   doc.text('Terms and Conditions', M, 74);
-  setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 88, M + 54, 88);
+  setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 90, M + 54, 90);
   const terms = [
     ['Quote Validity', "Quotation is only stated as at Today's Exchange Rate, which is subject to change at any time based on exchange rate fluctuations. Valid for 30 days from the date stated, after which reconfirmation of rates would be necessary."],
     ['Origin', 'As indicated.'],
@@ -1790,13 +1829,17 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
     ['Manuals & Spare Parts', "Spare parts will be detailed within the operator's manuals for all equipment supplied complete with drawings, fault finding etc. (where applicable)."],
     ['Preventive Maintenance', 'After the warranty elapses, we strongly recommend quarterly After Sales Services agreement at a fixed mutually agreeable fee. Medicano Resources Limited will schedule trained bio-engineers for routine quarterly machine checks.']
   ];
-  let ty = 110;
+  // Larger type + spacing so the page fills cleanly
+  let ty = 112;
+  const termBodySize = 10;
+  const termBodyLead = 14;
+  const termGap = 12;
   terms.forEach(([lab, val]) => {
-    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-    doc.text(lab.toUpperCase(), M, ty); ty += 12;
-    setCol([71, 72, 79]); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-    wrap(val, 8.5, W - 2 * M).forEach(ln => { doc.text(ln, M, ty); ty += 11; });
-    ty += 8;
+    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+    doc.text(lab.toUpperCase(), M, ty); ty += 14;
+    setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(termBodySize);
+    wrap(val, termBodySize, W - 2 * M).forEach(ln => { doc.text(ln, M, ty); ty += termBodyLead; });
+    ty += termGap;
   });
   footer(pageNo, totalPages);
   pageNo++;
