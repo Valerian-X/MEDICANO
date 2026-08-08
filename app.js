@@ -1491,25 +1491,23 @@ function generatePresentation() {
   const co = data.company;
   const dateStr = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
-  // Flexible packing: estimate card height and fill each page
-  const GAP = 14;
+  // Flexible packing: 1–3 cards per page based on how much detail each card has
+  const GAP = 12;
   const SUMMARY_H = 28 + products.length * 22 + 70;
-  const firstUsable = layout === 'detailed' ? 520 : 540;
-  const nextUsable = layout === 'detailed' ? 560 : 580;
+  const firstUsable = 500;
+  const nextUsable = 560;
 
   function estimateCardHeight(p) {
     const feats = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).length;
     const descLen = (p.description || '').length;
-    const descLines = Math.max(1, Math.ceil(descLen / 70));
-    // base image+pad ~170, tag+title ~40, desc, bullets, price ~30
-    let h = 170 + 40 + descLines * 13 + Math.max(feats, 1) * 16 + 36;
-    if (layout === 'detailed') h = Math.max(h, 210);
-    else h = Math.max(h, 160);
-    return Math.min(h, 320);
+    const descLines = Math.max(0, Math.ceil(descLen / 85));
+    let h = 118 + descLines * 12 + Math.max(feats, 0) * 14 + 28;
+    h = Math.max(h, 130);
+    return Math.min(h, 280);
   }
 
   const heights = products.map(estimateCardHeight);
-  const packs = []; // { items: [{p, idx, h}], startIdx, usedH }
+  const packs = [];
   let i = 0;
   while (i < products.length) {
     const usable = packs.length === 0 ? firstUsable : nextUsable;
@@ -1518,23 +1516,15 @@ function generatePresentation() {
     while (i < products.length) {
       const h = heights[i];
       const need = items.length === 0 ? h : h + GAP;
-      // reserve summary space only on potential last pack
-      const remainingAfter = products.length - i - 1;
-      const reserve = remainingAfter === 0 ? Math.min(SUMMARY_H + 12, 160) : 0;
-      if (used + need + (remainingAfter === 0 ? 0 : 0) > usable && items.length > 0) break;
-      // if single card is huge, still place it
       if (items.length > 0 && used + need > usable) break;
       items.push({ p: products[i], idx: i, h });
       used += need;
       i++;
-      // detailed prefers fewer per page if very tall
-      if (layout === 'detailed' && items.length >= 2 && used > usable * 0.85) break;
-      if (layout === 'brochure' && items.length >= 4) break;
+      if (items.length >= 3) break; // max 3 full-width cards per page
     }
     packs.push({ items, startIdx: items[0].idx, usedH: used, usable });
   }
 
-  // Try attach summary to last pack if space allows
   let summaryOwnPage = false;
   if (packs.length) {
     const last = packs[packs.length - 1];
@@ -1554,9 +1544,9 @@ function generatePresentation() {
     const pageNo = 3 + pi;
     const isFirstCat = pi === 0;
     const isLastCat = pi === packs.length - 1 && !summaryOwnPage;
-    const center = pack.usedH < pack.usable * 0.72; // balance sparse pages
+    // Always vertically center card stack to balance space above and below
     pages.push(presCataloguePage(
-      co, pack, products, pageNo, totalPages, isFirstCat, isLastCat, center, isLastCat
+      co, pack, products, pageNo, totalPages, isFirstCat, isLastCat, true, isLastCat
     ));
   });
 
@@ -1689,22 +1679,22 @@ function generatePresentation() {
     .cat-header .count { float: right; text-align: right; margin-top: -40px; }
     .cat-header .count .big { font-size: 28pt; font-weight: 300; color: rgba(80,100,120,0.7); }
     .cat-header .count .small { font-size: 8pt; color: rgba(150,160,175,0.9); }
-    .cat-body { padding: 24px 42px 48px; min-height: 520px; display: flex; flex-direction: column; }
+    .cat-body { padding: 20px 42px 52px; min-height: 540px; display: flex; flex-direction: column; }
     .cat-body.center-cards { justify-content: center; }
-    .cat-cards { display: flex; flex-direction: column; gap: 14pt; }
+    .cat-cards { display: flex; flex-direction: column; gap: 12pt; width: 100%; }
     .machine-card {
       background: #fff; border: 0.75pt solid var(--line); border-radius: 8pt;
-      padding: 18pt; display: flex; gap: 20pt;
+      padding: 14pt 16pt; display: flex; gap: 16pt; width: 100%;
       page-break-inside: avoid;
     }
     .machine-card .img {
-      width: 150pt; min-height: 150pt; flex-shrink: 0;
+      width: 120pt; min-height: 110pt; max-height: 140pt; flex-shrink: 0;
       border: 1pt solid var(--gold); border-radius: 4pt; overflow: hidden;
       background: linear-gradient(145deg, #182C44, #0B1626);
       display: flex; align-items: center; justify-content: center;
     }
-    .machine-card .img img { width: 100%; height: 100%; object-fit: cover; display: block; min-height: 150pt; }
-    .machine-card .img .ph { font-size: 36pt; opacity: 0.5; }
+    .machine-card .img img { width: 100%; height: 100%; object-fit: cover; display: block; min-height: 110pt; max-height: 140pt; }
+    .machine-card .img .ph { font-size: 32pt; opacity: 0.5; }
     .machine-card .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
     .machine-card .tag {
       font-size: 7.6pt; font-weight: 500; letter-spacing: 0.14em;
@@ -1922,14 +1912,12 @@ function presCataloguePage(co, pack, allProducts, pageNo, totalPages, isFirst, i
 
   const header = isFirst
     ? `<div class="cat-header">
-         <div class="kicker" style="color:var(--gold)">Equipment Catalogue</div>
-         <h1>Selected Systems</h1>
+         <h1 style="font-size:24pt;font-weight:700;margin-top:4px">Equipment Catalogue</h1>
          <div class="sub">Selected for your facility, with indicative pricing in Naira.</div>
          <div class="count"><div class="big">${String(startIdx + 1).padStart(2, '0')}</div><div class="small">of ${String(totalMachines).padStart(2, '0')} systems</div></div>
        </div>`
     : `<div class="cat-header light">
-         <div class="kicker">Equipment Catalogue</div>
-         <h1 style="font-size:20pt">Selected Systems</h1>
+         <h1 style="font-size:22pt;font-weight:700">Equipment Catalogue</h1>
          <div class="sub" style="float:right;margin-top:-28px">continued</div>
          <div class="gold-rule"></div>
        </div>`;
