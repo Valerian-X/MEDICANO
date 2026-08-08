@@ -1079,6 +1079,12 @@ function renderSettings() {
   renderTermsEditor();
 }
 
+function toggleSettingsPanel(id) {
+  const panel = document.querySelector('.settings-panel[data-panel="' + id + '"]');
+  if (!panel) return;
+  panel.classList.toggle('collapsed');
+}
+
 function renderTermsEditor() {
   const box = document.getElementById('terms-editor');
   if (!box) return;
@@ -1718,7 +1724,7 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
 
     let ry = panelY + padY + headerBand + 8;
     list.forEach(p => {
-      setCol(CREAM2); doc.setFont('helvetica', 'normal'); doc.setFontSize(16);
+      setCol(CREAM2); doc.setFont('helvetica', 'normal'); doc.setFontSize(14);
       const name = String(p.name || '').substring(0, 42);
       doc.text(name, M + 28, ry);
       doc.setFont('helvetica', 'bold');
@@ -1886,64 +1892,58 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   drawSummaryPage(products, pageNo, totalPages);
   pageNo++;
 
-  // ---- TERMS ----
-  // Fonts +2pt from previous (head 14, body 12.5); group vertically centered
-  const termHeadSize = 14;
-  const termBodySize = 12.5;
-  const termBodyLead = 17;
-  const termGap = 16;
-  const termHeadLead = 18;
+  // ---- TERMS (always ONE page — auto-fit spacing so nothing spills) ----
+  let termHeadSize = 14;
+  let termBodySize = 12.5;
+  let termBodyLead = 17;
+  let termGap = 16;
+  let termHeadLead = 18;
   const termsList = (data.terms && data.terms.length) ? data.terms : DEFAULT_DATA.terms;
 
-  function measureTermsBlock(list) {
+  function measureTermsBlock(list, bodySize, bodyLead, headLead, gap) {
     let h = 0;
     list.forEach((t) => {
       const val = t.body || t[1] || '';
-      h += termHeadLead;
-      h += wrap(val, termBodySize, W - 2 * M).length * termBodyLead;
-      h += termGap;
+      h += headLead;
+      h += wrap(val, bodySize, W - 2 * M).length * bodyLead;
+      h += gap;
     });
     return h;
   }
 
-  function drawTermsHeader(continued) {
-    setFill(CREAM); doc.rect(0, 0, W, H, 'F');
-    if (continued) {
-      setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
-      doc.text('Terms and Conditions (continued)', M, 48);
-      setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 60, M + 54, 60);
-      return 78;
+  doc.addPage();
+  setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+  doc.text('COMMERCIAL TERMS', M, 46);
+  setCol(NAVY); doc.setFontSize(22);
+  doc.text('Terms and Conditions', M, 74);
+  setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 90, M + 54, 90);
+
+  const usableTop = 110;
+  const usableBottom = H - 48;
+  const usableH = usableBottom - usableTop;
+
+  let blockH = measureTermsBlock(termsList, termBodySize, termBodyLead, termHeadLead, termGap);
+  let guard = 0;
+  while (blockH > usableH && guard < 14) {
+    termBodyLead = Math.max(13, termBodyLead - 0.5);
+    termGap = Math.max(7, termGap - 0.8);
+    termHeadLead = Math.max(14, termHeadLead - 0.4);
+    if (guard > 5) {
+      termBodySize = Math.max(10.5, termBodySize - 0.25);
+      termHeadSize = Math.max(12, termHeadSize - 0.25);
     }
-    setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-    doc.text('COMMERCIAL TERMS', M, 46);
-    setCol(NAVY); doc.setFontSize(22);
-    doc.text('Terms and Conditions', M, 74);
-    setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 90, M + 54, 90);
-    return 114;
+    blockH = measureTermsBlock(termsList, termBodySize, termBodyLead, termHeadLead, termGap);
+    guard++;
   }
 
-  doc.addPage();
-  let contentTop = drawTermsHeader(false);
-  const blockH = measureTermsBlock(termsList);
-  const usableTop = contentTop;
-  const usableBottom = H - 50;
-  const usableH = usableBottom - usableTop;
-  // Center the whole terms group if it fits on one page
-  let ty = (blockH < usableH)
-    ? usableTop + (usableH - blockH) / 2
-    : usableTop;
+  // Vertically center the full T&C group on this single page
+  let ty = usableTop + Math.max(0, (usableH - blockH) / 2);
 
   termsList.forEach((t) => {
     const lab = t.title || t[0] || '';
     const val = t.body || t[1] || '';
     const lines = wrap(val, termBodySize, W - 2 * M);
-    const need = termHeadLead + lines.length * termBodyLead + termGap;
-    if (ty + need > H - 50) {
-      footer(pageNo, totalPages);
-      pageNo++;
-      doc.addPage();
-      ty = drawTermsHeader(true);
-    }
     setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(termHeadSize);
     doc.text(String(lab).toUpperCase(), M, ty); ty += termHeadLead;
     setCol([50, 51, 55]); doc.setFont('helvetica', 'normal'); doc.setFontSize(termBodySize);

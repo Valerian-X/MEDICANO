@@ -437,6 +437,12 @@ html.dark .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
 
 </style>
   <link rel="stylesheet" href="styles.css" />
+<style>
+.settings-panel.collapsed .settings-panel-body{display:none}
+.settings-panel.collapsed .settings-chevron{transform:rotate(-90deg)}
+.settings-panel .settings-chevron{display:inline-block;transition:transform .15s ease}
+.settings-panel-toggle{cursor:pointer;background:transparent;border:none;width:100%}
+</style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
   <!-- Mobile sidebar overlay -->
@@ -843,76 +849,100 @@ html.dark .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
 
         <!-- SETTINGS -->
         <section id="page-settings" class="page hidden">
-          <div class="max-w-2xl space-y-6">
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-              <h3 class="font-semibold text-lg mb-4">Company Information</h3>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <label class="block text-slate-500 mb-1">Company Name</label>
-                  <input id="set-company" type="text" class="w-full px-3 py-2 border rounded-lg" value="Medicano Resources Limited" />
+          <div class="max-w-2xl space-y-3">
+            <!-- Company -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden settings-panel" data-panel="company">
+              <button type="button" class="settings-panel-toggle w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50" onclick="toggleSettingsPanel('company')">
+                <span class="font-semibold text-lg">Company Information</span>
+                <span class="settings-chevron text-slate-400 text-sm transition-transform">▼</span>
+              </button>
+              <div class="settings-panel-body px-5 pb-5 border-t border-slate-100">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm pt-4">
+                  <div>
+                    <label class="block text-slate-500 mb-1">Company Name</label>
+                    <input id="set-company" type="text" class="w-full px-3 py-2 border rounded-lg" value="Medicano Resources Limited" />
+                  </div>
+                  <div>
+                    <label class="block text-slate-500 mb-1">Email</label>
+                    <input id="set-email" type="email" class="w-full px-3 py-2 border rounded-lg" value="enquiries@medicanoresources.com" />
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label class="block text-slate-500 mb-1">Address</label>
+                    <input id="set-address" type="text" class="w-full px-3 py-2 border rounded-lg" value="6, Ojulari Street, Off Kunsela Road, Chisco Bus Stop, Ikate Elegushi, Lekki Expressway" />
+                  </div>
+                  <div>
+                    <label class="block text-slate-500 mb-1">Phone 1</label>
+                    <input id="set-phone1" type="text" class="w-full px-3 py-2 border rounded-lg" value="08023203522" />
+                  </div>
+                  <div>
+                    <label class="block text-slate-500 mb-1">Phone 2</label>
+                    <input id="set-phone2" type="text" class="w-full px-3 py-2 border rounded-lg" value="07045763887" />
+                  </div>
                 </div>
-                <div>
-                  <label class="block text-slate-500 mb-1">Email</label>
-                  <input id="set-email" type="email" class="w-full px-3 py-2 border rounded-lg" value="enquiries@medicanoresources.com" />
-                </div>
-                <div class="sm:col-span-2">
-                  <label class="block text-slate-500 mb-1">Address</label>
-                  <input id="set-address" type="text" class="w-full px-3 py-2 border rounded-lg" value="6, Ojulari Street, Off Kunsela Road, Chisco Bus Stop, Ikate Elegushi, Lekki Expressway" />
-                </div>
-                <div>
-                  <label class="block text-slate-500 mb-1">Phone 1</label>
-                  <input id="set-phone1" type="text" class="w-full px-3 py-2 border rounded-lg" value="08023203522" />
-                </div>
-                <div>
-                  <label class="block text-slate-500 mb-1">Phone 2</label>
-                  <input id="set-phone2" type="text" class="w-full px-3 py-2 border rounded-lg" value="07045763887" />
-                </div>
-              </div>
-              <button onclick="saveSettings()" class="mt-4 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm">Save Settings</button>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-              <h3 class="font-semibold text-lg mb-1">Equipment Categories</h3>
-              <p class="text-sm text-slate-500 mb-4">Manage categories used in the equipment dropdown when adding machines.</p>
-              <div class="flex gap-2 mb-3">
-                <input id="new-category" type="text" placeholder="New category name..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-                <button onclick="addCategory()" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium whitespace-nowrap">Add</button>
-              </div>
-              <ul id="categories-list" class="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden text-sm">
-                <!-- filled by JS -->
-              </ul>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-              <h3 class="font-semibold text-lg mb-1">Terms &amp; Conditions</h3>
-              <p class="text-sm text-slate-500 mb-4">Edit the clauses used on Client Presentation PDFs. Changes are saved on this device.</p>
-              <div id="terms-editor" class="space-y-4">
-                <!-- filled by JS -->
-              </div>
-              <div class="flex flex-wrap gap-2 mt-4">
-                <button type="button" onclick="addTermRow()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium">+ Add clause</button>
-                <button type="button" onclick="saveTerms()" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium">Save Terms</button>
-                <button type="button" onclick="if(confirm('Reset terms to default text?')) resetTerms()" class="px-4 py-2 text-slate-600 border border-slate-200 rounded-lg text-sm">Reset defaults</button>
+                <button onclick="saveSettings()" class="mt-4 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm">Save Settings</button>
               </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-              <h3 class="font-semibold text-lg mb-2">Data Management</h3>
-              <p class="text-sm text-slate-500 mb-4">All data is stored locally in this browser (offline-first). Export/import to backup or move between devices.</p>
-              <div class="flex flex-wrap gap-3">
-                <button onclick="exportData()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export All Data (JSON)</button>
-                <button onclick="exportProductsExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export Equipment (Excel)</button>
-                <button onclick="exportQuotesExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export Quotes (Excel)</button>
-                <button onclick="downloadEquipmentTemplate()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm">Equipment Template</button>
-                <label class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm cursor-pointer" style="background:#0d9488">
-                  Import Equipment Spreadsheet
-                  <input type="file" accept=".csv,text/csv" class="hidden" onchange="onImportProductsFile(event)" />
-                </label>
-                <label class="px-4 py-2 bg-brand-100 text-brand-800 rounded-lg text-sm cursor-pointer hover:bg-brand-200">
-                  Import Data (JSON backup)
-                  <input type="file" accept=".json" class="hidden" onchange="importData(event)" />
-                </label>
-                <button onclick="if(confirm('This will erase ALL local data. Continue?')) resetData()" class="px-4 py-2 text-red-600 border border-red-200 rounded-lg text-sm hover:bg-red-50">Reset All Data</button>
+            <!-- Categories -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden settings-panel collapsed" data-panel="categories">
+              <button type="button" class="settings-panel-toggle w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50" onclick="toggleSettingsPanel('categories')">
+                <span class="font-semibold text-lg">Equipment Categories</span>
+                <span class="settings-chevron text-slate-400 text-sm transition-transform">▼</span>
+              </button>
+              <div class="settings-panel-body px-5 pb-5 border-t border-slate-100">
+                <p class="text-sm text-slate-500 mb-4 pt-3">Manage categories used in the equipment dropdown when adding machines.</p>
+                <div class="flex gap-2 mb-3">
+                  <input id="new-category" type="text" placeholder="New category name..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                  <button onclick="addCategory()" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium whitespace-nowrap">Add</button>
+                </div>
+                <ul id="categories-list" class="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden text-sm">
+                  <!-- filled by JS -->
+                </ul>
+              </div>
+            </div>
+
+            <!-- Terms -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden settings-panel collapsed" data-panel="terms">
+              <button type="button" class="settings-panel-toggle w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50" onclick="toggleSettingsPanel('terms')">
+                <span class="font-semibold text-lg">Terms &amp; Conditions</span>
+                <span class="settings-chevron text-slate-400 text-sm transition-transform">▼</span>
+              </button>
+              <div class="settings-panel-body px-5 pb-5 border-t border-slate-100">
+                <p class="text-sm text-slate-500 mb-4 pt-3">Edit the clauses used on Client Presentation PDFs. Changes are saved on this device.</p>
+                <div id="terms-editor" class="space-y-4">
+                  <!-- filled by JS -->
+                </div>
+                <div class="flex flex-wrap gap-2 mt-4">
+                  <button type="button" onclick="addTermRow()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium">+ Add clause</button>
+                  <button type="button" onclick="saveTerms()" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium">Save Terms</button>
+                  <button type="button" onclick="if(confirm('Reset terms to default text?')) resetTerms()" class="px-4 py-2 text-slate-600 border border-slate-200 rounded-lg text-sm">Reset defaults</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Data -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden settings-panel collapsed" data-panel="data">
+              <button type="button" class="settings-panel-toggle w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50" onclick="toggleSettingsPanel('data')">
+                <span class="font-semibold text-lg">Data Management</span>
+                <span class="settings-chevron text-slate-400 text-sm transition-transform">▼</span>
+              </button>
+              <div class="settings-panel-body px-5 pb-5 border-t border-slate-100">
+                <p class="text-sm text-slate-500 mb-4 pt-3">All data is stored locally in this browser (offline-first). Export/import to backup or move between devices.</p>
+                <div class="flex flex-wrap gap-3">
+                  <button onclick="exportData()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export All Data (JSON)</button>
+                  <button onclick="exportProductsExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export Equipment (Excel)</button>
+                  <button onclick="exportQuotesExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export Quotes (Excel)</button>
+                  <button onclick="downloadEquipmentTemplate()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm">Equipment Template</button>
+                  <label class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm cursor-pointer" style="background:#0d9488">
+                    Import Equipment Spreadsheet
+                    <input type="file" accept=".csv,text/csv" class="hidden" onchange="onImportProductsFile(event)" />
+                  </label>
+                  <label class="px-4 py-2 bg-brand-100 text-brand-800 rounded-lg text-sm cursor-pointer hover:bg-brand-200">
+                    Import Data (JSON backup)
+                    <input type="file" accept=".json" class="hidden" onchange="importData(event)" />
+                  </label>
+                  <button onclick="if(confirm('This will erase ALL local data. Continue?')) resetData()" class="px-4 py-2 text-red-600 border border-red-200 rounded-lg text-sm hover:bg-red-50">Reset All Data</button>
+                </div>
               </div>
             </div>
           </div>
