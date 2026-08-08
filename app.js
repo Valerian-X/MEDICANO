@@ -1879,66 +1879,98 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   }
 
   // ---- TERMS ----
+  // Fonts +2pt from previous (head 14, body 12.5); group vertically centered
+  const termHeadSize = 14;
+  const termBodySize = 12.5;
+  const termBodyLead = 17;
+  const termGap = 16;
+  const termHeadLead = 18;
+  const termsList = (data.terms && data.terms.length) ? data.terms : DEFAULT_DATA.terms;
+
+  function measureTermsBlock(list) {
+    let h = 0;
+    list.forEach((t) => {
+      const val = t.body || t[1] || '';
+      h += termHeadLead;
+      h += wrap(val, termBodySize, W - 2 * M).length * termBodyLead;
+      h += termGap;
+    });
+    return h;
+  }
+
+  function drawTermsHeader(continued) {
+    setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+    if (continued) {
+      setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+      doc.text('Terms and Conditions (continued)', M, 48);
+      setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 60, M + 54, 60);
+      return 78;
+    }
+    setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+    doc.text('COMMERCIAL TERMS', M, 46);
+    setCol(NAVY); doc.setFontSize(22);
+    doc.text('Terms and Conditions', M, 74);
+    setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 90, M + 54, 90);
+    return 114;
+  }
+
   doc.addPage();
-  setFill(CREAM); doc.rect(0, 0, W, H, 'F');
-  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-  doc.text('COMMERCIAL TERMS', M, 46);
-  setCol(NAVY); doc.setFontSize(22);
-  doc.text('Terms and Conditions', M, 74);
-  setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 90, M + 54, 90);
-  const termsList = (data.terms && data.terms.length)
-    ? data.terms
-    : DEFAULT_DATA.terms;
-  // Headings clearly larger than body; generous spacing
-  let ty = 114;
-  const termHeadSize = 12;
-  const termBodySize = 10.5;
-  const termBodyLead = 15;
-  const termGap = 14;
+  let contentTop = drawTermsHeader(false);
+  const blockH = measureTermsBlock(termsList);
+  const usableTop = contentTop;
+  const usableBottom = H - 50;
+  const usableH = usableBottom - usableTop;
+  // Center the whole terms group if it fits on one page
+  let ty = (blockH < usableH)
+    ? usableTop + (usableH - blockH) / 2
+    : usableTop;
+
   termsList.forEach((t) => {
     const lab = t.title || t[0] || '';
     const val = t.body || t[1] || '';
-    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(termHeadSize);
-    doc.text(String(lab).toUpperCase(), M, ty); ty += 16;
-    setCol([50, 51, 55]); doc.setFont('helvetica', 'normal'); doc.setFontSize(termBodySize);
-    wrap(val, termBodySize, W - 2 * M).forEach(ln => { doc.text(ln, M, ty); ty += termBodyLead; });
-    ty += termGap;
-    // New page if running out of room
-    if (ty > H - 60) {
+    const lines = wrap(val, termBodySize, W - 2 * M);
+    const need = termHeadLead + lines.length * termBodyLead + termGap;
+    if (ty + need > H - 50) {
       footer(pageNo, totalPages);
       pageNo++;
       doc.addPage();
-      setFill(CREAM); doc.rect(0, 0, W, H, 'F');
-      setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
-      doc.text('Terms and Conditions (continued)', M, 48);
-      setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 58, M + 54, 58);
-      ty = 78;
+      ty = drawTermsHeader(true);
     }
+    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(termHeadSize);
+    doc.text(String(lab).toUpperCase(), M, ty); ty += termHeadLead;
+    setCol([50, 51, 55]); doc.setFont('helvetica', 'normal'); doc.setFontSize(termBodySize);
+    lines.forEach(ln => { doc.text(ln, M, ty); ty += termBodyLead; });
+    ty += termGap;
   });
   footer(pageNo, totalPages);
   pageNo++;
 
-  // ---- CLOSING ----
+  // ---- CLOSING (same font units as T&C) ----
   doc.addPage();
   setFill(CREAM); doc.rect(0, 0, W, H, 'F');
-  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
-  doc.text('NEXT STEPS', M, 50);
-  setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 66, M + 54, 66);
-  let cy = 100;
-  setCol(INK); doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
-  wrap('Thank you for doing business with us while we look forward to receiving the confirmation of your order.', 11, W - 2 * M - 80).forEach(ln => { doc.text(ln, M, cy); cy += 16; });
-  cy += 10;
-  doc.setFontSize(10.5);
-  wrap('For further information or any clarification, please contact us the undersigned on Tel. 09099995426 or call Francis on 08023203522. E-mail: enquiries@medicanoresources.com', 10.5, W - 2 * M - 80).forEach(ln => { doc.text(ln, M, cy); cy += 15; });
+  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+  doc.text('NEXT STEPS', M, 48);
+  setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 64, M + 54, 64);
+
+  // Measure closing block then center vertically
+  const closeLines1 = wrap('Thank you for doing business with us while we look forward to receiving the confirmation of your order.', termBodySize, W - 2 * M - 40);
+  const closeLines2 = wrap('For further information or any clarification, please contact us the undersigned on Tel. 09099995426 or call Francis on 08023203522. E-mail: enquiries@medicanoresources.com', termBodySize, W - 2 * M - 40);
+  const closeBlockH = closeLines1.length * termBodyLead + 14 + closeLines2.length * termBodyLead + 28 + termBodyLead + 36 + termHeadLead + 40 + termBodyLead;
+  let cy = 80 + Math.max(0, (H - 80 - 50 - closeBlockH) / 2);
+
+  setCol(INK); doc.setFont('helvetica', 'normal'); doc.setFontSize(termBodySize);
+  closeLines1.forEach(ln => { doc.text(ln, M, cy); cy += termBodyLead; });
+  cy += 14;
+  closeLines2.forEach(ln => { doc.text(ln, M, cy); cy += termBodyLead; });
   cy += 28;
-  doc.setFontSize(11); doc.text('Yours faithfully,', M, cy);
+  doc.setFontSize(termBodySize); doc.text('Yours faithfully,', M, cy);
   cy += 36;
-  setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
+  setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(termHeadSize);
   doc.text('FOR: ' + (co.name || 'Medicano Resources Limited'), M, cy);
   cy += 40;
-  doc.setFontSize(12); doc.text('Francis Opara', M, cy);
-  setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-  doc.text('CEO', M, cy + 16);
+  doc.setFontSize(termHeadSize); doc.text('Francis Opara', M, cy);
+  setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(termBodySize);
+  doc.text('CEO', M, cy + 18);
   footer(pageNo, totalPages);
 
   const safe = (title || 'Presentation').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 50);
