@@ -369,3 +369,57 @@ html.dark .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
 .last\:border-0:last-child { border: none; }
 .has-\[\:checked\]\:border-brand-600:has(:checked) { border-color: #0d9488; }
 .has-\[\:checked\]\:bg-brand-50:has(:checked) { background-color: #f0fdfa; }
+
+/* ===== Mobile quote UI polish ===== */
+@media (max-width: 767px) {
+  #page-quote-editor .grid.lg\:grid-cols-3 {
+    display: flex;
+    flex-direction: column;
+  }
+  #page-quote-editor .sticky {
+    position: static;
+  }
+  #quote-product-picker label {
+    padding: 0.75rem;
+    min-height: 48px;
+  }
+  #quote-product-picker .qp-check {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  #quote-items-tbody select,
+  #quote-items-tbody input {
+    min-height: 44px;
+    font-size: 16px; /* prevents iOS zoom */
+  }
+  #page-quote-editor button,
+  #page-quote-editor .px-3 {
+    min-height: 44px;
+  }
+  #quote-client,
+  #quote-title,
+  #quote-valid,
+  #quote-status,
+  #quote-notes,
+  #quote-discount {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  /* Stack quote picker actions */
+  #page-quote-editor .flex.flex-col.sm\:flex-row {
+    flex-direction: column;
+  }
+  /* Summary card full width on mobile */
+  #page-quote-editor .lg\:col-span-2,
+  #page-quote-editor .space-y-4 {
+    width: 100%;
+  }
+  main {
+    padding: 0.75rem !important;
+  }
+  header .text-lg {
+    font-size: 1rem;
+  }
+}
+
+.bg-blue-600 { background-color: #2563eb !important; }

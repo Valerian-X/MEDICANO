@@ -1,18 +1,21 @@
 {
   "name": "Medicano Resources - Equipment Quoting",
   "short_name": "Medicano",
-  "description": "Medical equipment catalog and quoting system for Medicano Resources Limited",
+  "description": "Medical equipment catalog, quoting and client presentations for Medicano Resources Limited",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0f766e",
   "theme_color": "#0f766e",
   "orientation": "any",
+  "lang": "en",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230f766e' width='100' height='100' rx='20'/><text y='70' x='50' text-anchor='middle' font-size='50'>M</text></svg>",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "categories": ["business", "productivity"]
 }

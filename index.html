@@ -8,6 +8,434 @@
   <title>Medicano Resources | Medical Equipment Quoting</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>" />
+  <style>
+/* Medicano Resources - Offline styles (no CDN required) */
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #f8fafc;
+  color: #1e293b;
+  line-height: 1.5;
+  antialiased: true;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Layout */
+.min-h-screen { min-height: 100vh; }
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.flex-1 { flex: 1 1 0%; }
+.flex-shrink-0 { flex-shrink: 0; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.justify-between { justify-content: space-between; }
+.justify-end { justify-content: flex-end; }
+.justify-center { justify-content: center; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.gap-4 { gap: 1rem; }
+.gap-6 { gap: 1.5rem; }
+.grid { display: grid; }
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.hidden { display: none !important; }
+.fixed { position: fixed; }
+.sticky { position: sticky; }
+.inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+.top-0 { top: 0; }
+.top-20 { top: 5rem; }
+.z-20 { z-index: 20; }
+.z-30 { z-index: 30; }
+.z-40 { z-index: 40; }
+.z-50 { z-index: 50; }
+.w-full { width: 100%; }
+.w-10 { width: 2.5rem; }
+.w-12 { width: 3rem; }
+.w-14 { width: 3.5rem; }
+.w-20 { width: 5rem; }
+.w-64 { width: 16rem; }
+.h-10 { height: 2.5rem; }
+.h-12 { height: 3rem; }
+.h-20 { height: 5rem; }
+.h-full { height: 100%; }
+.max-w-md { max-width: 28rem; }
+.max-w-lg { max-width: 32rem; }
+.max-w-xl { max-width: 36rem; }
+.max-w-2xl { max-width: 42rem; }
+.max-w-4xl { max-width: 56rem; }
+.max-w-xs { max-width: 20rem; }
+.max-h-48 { max-height: 12rem; }
+.max-h-64 { max-height: 16rem; }
+.max-h-\[90vh\] { max-height: 90vh; }
+.min-w-0 { min-width: 0; }
+.overflow-auto { overflow: auto; }
+.overflow-hidden { overflow: hidden; }
+.overflow-x-auto { overflow-x: auto; }
+.overflow-y-auto { overflow-y: auto; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Spacing */
+.p-2 { padding: 0.5rem; }
+.p-3 { padding: 0.75rem; }
+.p-4 { padding: 1rem; }
+.p-5 { padding: 1.25rem; }
+.p-6 { padding: 1.5rem; }
+.px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+.px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+.py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.py-1\.5 { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.py-2\.5 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+.pb-2 { padding-bottom: 0.5rem; }
+.pt-2 { padding-top: 0.5rem; }
+.pr-2 { padding-right: 0.5rem; }
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 0.75rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mb-5 { margin-bottom: 1.25rem; }
+.mb-6 { margin-bottom: 1.5rem; }
+.mt-1 { margin-top: 0.25rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-4 { margin-top: 1rem; }
+.mt-5 { margin-top: 1.25rem; }
+.mt-6 { margin-top: 1.5rem; }
+.mr-2 { margin-right: 0.5rem; }
+.ml-64 { margin-left: 0; }
+.space-y-1 > * + * { margin-top: 0.25rem; }
+.space-y-2 > * + * { margin-top: 0.5rem; }
+.space-y-3 > * + * { margin-top: 0.75rem; }
+.space-y-4 > * + * { margin-top: 1rem; }
+.space-y-5 > * + * { margin-top: 1.25rem; }
+.space-y-6 > * + * { margin-top: 1.5rem; }
+.divide-y > * + * { border-top: 1px solid #e2e8f0; }
+.divide-slate-100 > * + * { border-top-color: #f1f5f9; }
+
+/* Typography */
+.text-xs { font-size: 0.75rem; line-height: 1rem; }
+.text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+.text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+.text-xl { font-size: 1.25rem; }
+.text-2xl { font-size: 1.5rem; }
+.text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.leading-tight { line-height: 1.25; }
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.uppercase { text-transform: uppercase; }
+.whitespace-nowrap { white-space: nowrap; }
+.antialiased { -webkit-font-smoothing: antialiased; }
+
+/* Colors - text */
+.text-white { color: #fff; }
+.text-slate-300 { color: #cbd5e1; }
+.text-slate-400 { color: #94a3b8; }
+.text-slate-500 { color: #64748b; }
+.text-slate-600 { color: #475569; }
+.text-slate-700 { color: #334155; }
+.text-slate-800 { color: #1e293b; }
+.text-brand-100 { color: #ccfbf1; }
+.text-brand-600 { color: #0d9488; }
+.text-brand-700 { color: #0f766e; }
+.text-brand-800 { color: #115e59; }
+.text-blue-600 { color: #2563eb; }
+.text-blue-800 { color: #1e40af; }
+.text-green-800 { color: #166534; }
+.text-purple-600 { color: #9333ea; }
+.text-amber-600 { color: #d97706; }
+.text-red-400 { color: #f87171; }
+.text-red-500 { color: #ef4444; }
+.text-red-600 { color: #dc2626; }
+
+/* Colors - background */
+.bg-white { background-color: #fff; }
+.bg-black\/40 { background-color: rgba(0,0,0,0.4); }
+.bg-black\/50 { background-color: rgba(0,0,0,0.5); }
+.bg-slate-50 { background-color: #f8fafc; }
+.bg-slate-100 { background-color: #f1f5f9; }
+.bg-slate-700 { background-color: #334155; }
+.bg-slate-800 { background-color: #1e293b; }
+.bg-brand-50 { background-color: #f0fdfa; }
+.bg-brand-100 { background-color: #ccfbf1; }
+.bg-brand-600 { background-color: #0d9488; }
+.bg-brand-700 { background-color: #0f766e; }
+.bg-brand-800 { background-color: #115e59; }
+.bg-green-100 { background-color: #dcfce7; }
+.bg-blue-100 { background-color: #dbeafe; }
+.bg-red-50 { background-color: #fef2f2; }
+.bg-white\/20 { background-color: rgba(255,255,255,0.2); }
+
+/* Borders */
+.border { border-width: 1px; border-style: solid; border-color: #e2e8f0; }
+.border-b { border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #e2e8f0; }
+.border-t { border-top-width: 1px; border-top-style: solid; border-top-color: #e2e8f0; }
+.border-slate-100 { border-color: #f1f5f9; }
+.border-slate-200 { border-color: #e2e8f0; }
+.border-slate-300 { border-color: #cbd5e1; }
+.border-brand-700 { border-color: #0f766e; }
+.border-red-200 { border-color: #fecaca; }
+.rounded { border-radius: 0.25rem; }
+.rounded-lg { border-radius: 0.5rem; }
+.rounded-xl { border-radius: 0.75rem; }
+.rounded-full { border-radius: 9999px; }
+
+/* Effects */
+.shadow-sm { box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
+.shadow-xl { box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); }
+.shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+.opacity-70 { opacity: 0.7; }
+.opacity-80 { opacity: 0.8; }
+.transition { transition: all 0.15s ease; }
+.transition-transform { transition: transform 0.2s ease; }
+.cursor-pointer { cursor: pointer; }
+.outline-none { outline: none; }
+
+/* Transforms - sidebar mobile */
+.transform { }
+.-translate-x-full { transform: translateX(-100%); }
+.translate-x-0 { transform: translateX(0); }
+
+/* Forms */
+input, select, textarea, button {
+  font-family: inherit;
+  font-size: inherit;
+}
+input[type="text"], input[type="email"], input[type="number"], input[type="search"],
+input[type="date"], input[type="password"], select, textarea {
+  appearance: none;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+  color: #1e293b;
+}
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid #14b8a6;
+  outline-offset: 0;
+  border-color: #14b8a6;
+}
+button {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Tables */
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; }
+thead { background: #f8fafc; color: #475569; }
+
+/* Sidebar */
+#sidebar {
+  background: #115e59;
+  color: #fff;
+}
+#sidebar .sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.5rem;
+  color: #fff;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+#sidebar .sidebar-link:hover { background: #0f766e; }
+#sidebar .sidebar-link.active { background: #0f766e; color: #fff; }
+
+/* Cards & surfaces */
+.card, .bg-white.rounded-xl {
+  background: #fff;
+  border-radius: 0.75rem;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* Header */
+header.sticky {
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Buttons */
+.btn-brand, button.bg-brand-600 {
+  background: #0d9488 !important;
+  color: #fff !important;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+}
+.btn-brand:hover, button.bg-brand-600:hover { background: #0f766e !important; }
+button.bg-slate-700 { background: #334155 !important; color: #fff !important; border-radius: 0.5rem; }
+button.bg-slate-700:hover { background: #1e293b !important; }
+button.bg-purple-600 { background: #9333ea !important; color: #fff !important; border-radius: 0.5rem; }
+button.bg-brand-100 { background: #ccfbf1 !important; color: #115e59 !important; border-radius: 0.5rem; }
+button.bg-slate-100 { background: #f1f5f9 !important; color: #334155 !important; border-radius: 0.5rem; }
+
+/* Badges */
+.rounded-full.bg-green-100 { background: #dcfce7; color: #166534; }
+.rounded-full.bg-blue-100 { background: #dbeafe; color: #1e40af; }
+.rounded-full.bg-slate-100 { background: #f1f5f9; color: #475569; }
+
+/* Hover helpers */
+.hover\:bg-slate-50:hover { background-color: #f8fafc; }
+.hover\:bg-slate-100:hover { background-color: #f1f5f9; }
+.hover\:bg-brand-50:hover { background-color: #f0fdfa; }
+.hover\:bg-brand-200:hover { background-color: #99f6e4; }
+.hover\:bg-brand-700:hover { background-color: #0f766e; }
+.hover\:bg-red-50:hover { background-color: #fef2f2; }
+.hover\:underline:hover { text-decoration: underline; }
+.hover\:text-red-600:hover { color: #dc2626; }
+.hover\:text-slate-600:hover { color: #475569; }
+.hover\:border-brand-500:hover { border-color: #14b8a6; }
+
+/* Object fit for images */
+.object-cover { object-fit: cover; }
+
+/* Responsive */
+@media (min-width: 640px) {
+  .sm\:inline { display: inline; }
+  .sm\:flex-row { flex-direction: row; }
+  .sm\:items-center { align-items: center; }
+  .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sm\:col-span-2 { grid-column: span 2 / span 2; }
+  .sm\:w-auto { width: auto; }
+}
+@media (min-width: 768px) {
+  .md\:hidden { display: none !important; }
+  .md\:ml-64 { margin-left: 16rem; }
+  .md\:translate-x-0 { transform: translateX(0) !important; }
+  .md\:p-6 { padding: 1.5rem; }
+}
+@media (min-width: 1024px) {
+  .lg\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .lg\:col-span-2 { grid-column: span 2 / span 2; }
+}
+
+/* Main content offset for sidebar on desktop */
+@media (min-width: 768px) {
+  #app > div.flex-1 { margin-left: 16rem; }
+  #sidebar {
+    transform: translateX(0) !important;
+  }
+}
+
+/* Dark mode */
+html.dark body { background: #0f172a; color: #e2e8f0; }
+html.dark .bg-white { background-color: #1e293b !important; }
+html.dark .bg-slate-50 { background-color: #0f172a !important; }
+html.dark .bg-slate-100 { background-color: #334155 !important; }
+html.dark header.sticky,
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300 { border-color: #334155 !important; }
+html.dark .text-slate-800,
+html.dark .text-slate-700 { color: #e2e8f0 !important; }
+html.dark .text-slate-600,
+html.dark .text-slate-500 { color: #94a3b8 !important; }
+html.dark thead,
+html.dark .bg-slate-50 { background-color: #1e293b !important; }
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+html.dark .hover\:bg-slate-50:hover { background-color: #334155 !important; }
+html.dark .bg-brand-50 { background-color: #134e4a !important; }
+html.dark .text-brand-800,
+html.dark .text-brand-700 { color: #5eead4 !important; }
+html.dark .divide-y > * + * { border-top-color: #334155; }
+html.dark .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+
+/* Print */
+@media print {
+  .no-print { display: none !important; }
+  body * { visibility: hidden; }
+  #print-area, #print-area * { visibility: visible; }
+  #print-area { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
+  body { background: white; }
+}
+.print-only { display: none; }
+
+/* Misc utility from HTML */
+.block { display: block; }
+.inline { display: inline; }
+.last\:border-0:last-child { border: none; }
+.has-\[\:checked\]\:border-brand-600:has(:checked) { border-color: #0d9488; }
+.has-\[\:checked\]\:bg-brand-50:has(:checked) { background-color: #f0fdfa; }
+
+/* ===== Mobile quote UI polish ===== */
+@media (max-width: 767px) {
+  #page-quote-editor .grid.lg\:grid-cols-3 {
+    display: flex;
+    flex-direction: column;
+  }
+  #page-quote-editor .sticky {
+    position: static;
+  }
+  #quote-product-picker label {
+    padding: 0.75rem;
+    min-height: 48px;
+  }
+  #quote-product-picker .qp-check {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  #quote-items-tbody select,
+  #quote-items-tbody input {
+    min-height: 44px;
+    font-size: 16px; /* prevents iOS zoom */
+  }
+  #page-quote-editor button,
+  #page-quote-editor .px-3 {
+    min-height: 44px;
+  }
+  #quote-client,
+  #quote-title,
+  #quote-valid,
+  #quote-status,
+  #quote-notes,
+  #quote-discount {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  /* Stack quote picker actions */
+  #page-quote-editor .flex.flex-col.sm\:flex-row {
+    flex-direction: column;
+  }
+  /* Summary card full width on mobile */
+  #page-quote-editor .lg\:col-span-2,
+  #page-quote-editor .space-y-4 {
+    width: 100%;
+  }
+  main {
+    padding: 0.75rem !important;
+  }
+  header .text-lg {
+    font-size: 1rem;
+  }
+}
+
+.bg-blue-600 { background-color: #2563eb !important; }
+
+</style>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
@@ -123,6 +551,12 @@
                 <option value="">All Categories</option>
               </select>
             </div>
+            <button onclick="downloadEquipmentTemplate()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium">Template</button>
+            <label class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium cursor-pointer" style="display:inline-block">
+              Import Spreadsheet
+              <input type="file" accept=".csv,text/csv" class="hidden" onchange="onImportProductsFile(event)" />
+            </label>
+            <button onclick="exportProductsExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium">Export Excel</button>
             <button onclick="showProductForm()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">+ Add Equipment</button>
           </div>
           <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
@@ -182,6 +616,7 @@
                 <option value="rejected">Rejected</option>
               </select>
             </div>
+            <button onclick="exportQuotesExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium">Export Excel</button>
             <button onclick="showNewQuote()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">+ New Quote / Project</button>
           </div>
           <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
@@ -302,6 +737,7 @@
                 <div class="mt-5 space-y-2">
                   <button onclick="saveQuote()" class="w-full py-2.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium text-sm">Save Quote</button>
                   <button onclick="printQuote()" class="w-full py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-medium text-sm">Print / PDF</button>
+                  <button onclick="emailQuote()" class="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium text-sm" style="background:#2563eb">Email Quote</button>
                   <button onclick="if(confirm('Delete this quote?')) deleteCurrentQuote()" id="btn-delete-quote" class="w-full py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm hidden">Delete</button>
                 </div>
               </div>
@@ -369,8 +805,23 @@
         <!-- RATES -->
         <section id="page-rates" class="page hidden">
           <div class="max-w-xl bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-            <h3 class="font-semibold text-lg mb-1">Exchange Rates (Manual)</h3>
-            <p class="text-sm text-slate-500 mb-6">Update rates used to convert USD / EUR equipment prices into Naira. Architecture is ready for API integration later.</p>
+            <h3 class="font-semibold text-lg mb-1">Exchange Rates</h3>
+            <p class="text-sm text-slate-500 mb-4">Convert USD / EUR equipment prices to Naira. Choose manual entry or auto-fetch from a free FX API.</p>
+
+            <div class="mb-5">
+              <label class="block text-sm font-medium text-slate-700 mb-2">Rate mode</label>
+              <div class="flex flex-wrap gap-3">
+                <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer">
+                  <input type="radio" name="rate-mode" value="manual" checked onchange="onRateModeChange()" />
+                  <span class="text-sm font-medium">Manual</span>
+                </label>
+                <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer">
+                  <input type="radio" name="rate-mode" value="auto" onchange="onRateModeChange()" />
+                  <span class="text-sm font-medium">Auto (free API)</span>
+                </label>
+              </div>
+            </div>
+
             <div class="space-y-4">
               <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">1 USD = ? NGN</label>
@@ -380,8 +831,12 @@
                 <label class="block text-sm font-medium text-slate-700 mb-1">1 EUR = ? NGN</label>
                 <input id="rate-eur" type="number" step="0.01" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
               </div>
-              <button onclick="saveRates()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">Save Rates</button>
+              <div class="flex flex-wrap gap-2">
+                <button onclick="saveRates()" id="btn-save-rates" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium">Save Rates</button>
+                <button onclick="fetchAutoRates()" id="btn-fetch-rates" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hidden">Fetch latest rates</button>
+              </div>
               <p id="rates-updated" class="text-xs text-slate-500 mt-2"></p>
+              <p id="rates-status" class="text-xs text-slate-500"></p>
             </div>
           </div>
         </section>
@@ -433,8 +888,15 @@
               <p class="text-sm text-slate-500 mb-4">All data is stored locally in this browser (offline-first). Export/import to backup or move between devices.</p>
               <div class="flex flex-wrap gap-3">
                 <button onclick="exportData()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export All Data (JSON)</button>
+                <button onclick="exportProductsExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export Equipment (Excel)</button>
+                <button onclick="exportQuotesExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export Quotes (Excel)</button>
+                <button onclick="downloadEquipmentTemplate()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm">Equipment Template</button>
+                <label class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm cursor-pointer" style="background:#0d9488">
+                  Import Equipment Spreadsheet
+                  <input type="file" accept=".csv,text/csv" class="hidden" onchange="onImportProductsFile(event)" />
+                </label>
                 <label class="px-4 py-2 bg-brand-100 text-brand-800 rounded-lg text-sm cursor-pointer hover:bg-brand-200">
-                  Import Data
+                  Import Data (JSON backup)
                   <input type="file" accept=".json" class="hidden" onchange="importData(event)" />
                 </label>
                 <button onclick="if(confirm('This will erase ALL local data. Continue?')) resetData()" class="px-4 py-2 text-red-600 border border-red-200 rounded-lg text-sm hover:bg-red-50">Reset All Data</button>
