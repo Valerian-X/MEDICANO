@@ -40,6 +40,7 @@ const DEFAULT_DATA = {
     { title: 'Manuals & Spare Parts', body: "Spare parts will be detailed within the operator’s manuals for all equipment supplied complete with drawings, fault finding etc. (where applicable)." },
     { title: 'Preventive Maintenance', body: 'After the warranty elapses, we strongly recommend quarterly “After sales services” agreement at a fixed mutually agreeable fee. To this end, Medicano Resources Limited will be committed to keeping its appointment to have its trained bio-engineer visit the hospital every quarter for a routine machine check to avoid breakdown. This we term preventive maintenance services.' }
   ],
+  stockMovements: [],
   products: [
     {
       id: 'p1',
@@ -254,6 +255,14 @@ function loadData() {
       if (!data.terms || !Array.isArray(data.terms) || data.terms.length === 0) {
         data.terms = JSON.parse(JSON.stringify(DEFAULT_DATA.terms));
       }
+      if (!data.stockMovements || !Array.isArray(data.stockMovements)) {
+        data.stockMovements = [];
+      }
+      // Ensure every product has stock / lowStock numbers
+      data.products.forEach(p => {
+        if (typeof p.stock !== 'number' || isNaN(p.stock)) p.stock = 0;
+        if (typeof p.lowStock !== 'number' || isNaN(p.lowStock)) p.lowStock = 1;
+      });
     } else {
       data = JSON.parse(JSON.stringify(DEFAULT_DATA));
       saveData();
@@ -312,6 +321,7 @@ function navigate(page) {
     clients: 'Hospitals / Clients',
     quotes: 'Quotes / Projects',
     'quote-editor': 'Quote Editor',
+    inventory: 'In Stock',
     presentation: 'Client Presentation',
     rates: 'Exchange Rates',
     settings: 'Settings'
@@ -332,6 +342,7 @@ function navigate(page) {
   if (page === 'products') renderProducts();
   if (page === 'clients') renderClients();
   if (page === 'quotes') renderQuotes();
+  if (page === 'inventory') renderInventory();
   if (page === 'presentation') renderPresPicker();
   if (page === 'rates') renderRates();
   if (page === 'settings') renderSettings();
@@ -552,6 +563,215 @@ function deleteProduct(id) {
   saveData();
   renderProducts();
   renderDashboard();
+}
+
+// -------------------- Inventory / In Stock --------------------
+function inventoryPeriodRange() {
+  const mode = document.getElementById('inv-period')?.value || 'month';
+  const now = new Date();
+  let start = null;
+  if (mode === 'week') {
+    start = new Date(now);
+    const day = start.getDay(); // 0 Sun
+    const diff = day === 0 ? 6 : day - 1; // Monday start
+    start.setDate(start.getDate() - diff);
+    start.setHours(0, 0, 0, 0);
+  } else if (mode === 'month') {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  return { mode, start, end: now };
+}
+
+function movementsInPeriod() {
+  const { start } = inventoryPeriodRange();
+  const list = data.stockMovements || [];
+  if (!start) return [...list];
+  return list.filter(m => {
+    const d = new Date(m.date || m.createdAt);
+    return d >= start;
+  });
+}
+
+function renderInventory() {
+  // Default date = today
+  const dateEl = document.getElementById('inv-date');
+  if (dateEl && !dateEl.value) {
+    dateEl.value = new Date().toISOString().slice(0, 10);
+  }
+  // Product dropdown
+  const sel = document.getElementById('inv-product');
+  if (sel) {
+    const cur = sel.value;
+    const opts = data.products
+      .slice()
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      .map(p => `<option value="${p.id}">${escHtml(p.name)} (${p.stock ?? 0} in stock)</option>`)
+      .join('');
+    sel.innerHTML = opts || '<option value="">No equipment yet</option>';
+    if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
+  }
+
+  const periodMoves = movementsInPeriod();
+  let inQty = 0, outQty = 0;
+  periodMoves.forEach(m => {
+    if (m.type === 'in') inQty += Number(m.qty) || 0;
+    if (m.type === 'out') outQty += Number(m.qty) || 0;
+  });
+  const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setText('inv-stat-in', inQty);
+  setText('inv-stat-out', outQty);
+  setText('inv-stat-skus', data.products.filter(p => p.active !== false).length);
+  setText('inv-stat-low', data.products.filter(p => (p.stock ?? 0) <= (p.lowStock ?? 1)).length);
+
+  renderInventoryStock();
+  renderInventoryMovements();
+}
+
+function renderInventoryStock() {
+  const body = document.getElementById('inv-stock-body');
+  if (!body) return;
+  const q = (document.getElementById('inv-search')?.value || '').toLowerCase().trim();
+  let list = data.products.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  if (q) {
+    list = list.filter(p =>
+      (p.name || '').toLowerCase().includes(q) ||
+      (p.sku || '').toLowerCase().includes(q) ||
+      (p.category || '').toLowerCase().includes(q)
+    );
+  }
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">No equipment found.</td></tr>';
+    return;
+  }
+  body.innerHTML = list.map(p => {
+    const stock = Number(p.stock) || 0;
+    const low = Number(p.lowStock) || 1;
+    let status = '<span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-xs font-medium">OK</span>';
+    if (stock <= 0) status = '<span class="text-rose-700 bg-rose-50 px-2 py-0.5 rounded text-xs font-medium">Out of stock</span>';
+    else if (stock <= low) status = '<span class="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-xs font-medium">Low</span>';
+    return `<tr class="hover:bg-slate-50">
+      <td class="px-4 py-2.5 text-slate-500">${escHtml(p.sku || '—')}</td>
+      <td class="px-4 py-2.5 font-medium">${escHtml(p.name || '')}</td>
+      <td class="px-4 py-2.5 text-slate-500">${escHtml(p.category || '—')}</td>
+      <td class="px-4 py-2.5 text-right font-semibold">${stock}</td>
+      <td class="px-4 py-2.5 text-right text-slate-500">${low}</td>
+      <td class="px-4 py-2.5">${status}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderInventoryMovements() {
+  const body = document.getElementById('inv-movements-body');
+  if (!body) return;
+  const moves = movementsInPeriod()
+    .slice()
+    .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+  if (!moves.length) {
+    body.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">No movements in this period.</td></tr>';
+    return;
+  }
+  body.innerHTML = moves.map(m => {
+    const p = getProduct(m.productId);
+    const typeLabel = m.type === 'in' ? 'In' : m.type === 'out' ? 'Out' : 'Adjust';
+    const typeClass = m.type === 'in' ? 'text-emerald-700 bg-emerald-50' : m.type === 'out' ? 'text-rose-700 bg-rose-50' : 'text-slate-700 bg-slate-100';
+    const d = (m.date || '').slice(0, 10);
+    return `<tr class="hover:bg-slate-50">
+      <td class="px-4 py-2.5 whitespace-nowrap">${escHtml(d)}</td>
+      <td class="px-4 py-2.5">${escHtml(p ? p.name : '(deleted item)')}</td>
+      <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-xs font-medium ${typeClass}">${typeLabel}</span></td>
+      <td class="px-4 py-2.5 text-right font-medium">${m.type === 'out' ? '−' : m.type === 'in' ? '+' : ''}${Number(m.qty) || 0}</td>
+      <td class="px-4 py-2.5 text-right text-slate-500">${m.balanceAfter ?? '—'}</td>
+      <td class="px-4 py-2.5 text-slate-500">${escHtml(m.note || '')}</td>
+      <td class="px-4 py-2.5 text-right">
+        <button type="button" onclick="deleteStockMovement('${m.id}')" class="text-xs text-red-500 hover:underline">Delete</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function saveStockMovement() {
+  const productId = document.getElementById('inv-product')?.value;
+  const type = document.getElementById('inv-type')?.value || 'in';
+  const qty = Math.max(0, Math.floor(Number(document.getElementById('inv-qty')?.value) || 0));
+  const date = document.getElementById('inv-date')?.value || new Date().toISOString().slice(0, 10);
+  const note = document.getElementById('inv-note')?.value.trim() || '';
+  const p = getProduct(productId);
+  if (!p) {
+    alert('Please select equipment.');
+    return;
+  }
+  if (type !== 'adjust' && qty <= 0) {
+    alert('Quantity must be greater than zero.');
+    return;
+  }
+  let stock = Number(p.stock) || 0;
+  if (type === 'in') stock += qty;
+  else if (type === 'out') {
+    if (qty > stock) {
+      if (!confirm(`Only ${stock} in stock. Record out of ${qty} anyway (stock will go to zero)?`)) return;
+      stock = Math.max(0, stock - qty);
+    } else {
+      stock -= qty;
+    }
+  } else {
+    // adjust = set absolute balance
+    stock = qty;
+  }
+  p.stock = stock;
+
+  if (!data.stockMovements) data.stockMovements = [];
+  data.stockMovements.push({
+    id: 'sm' + Date.now() + Math.random().toString(36).slice(2, 6),
+    productId,
+    type,
+    qty,
+    date,
+    note,
+    balanceAfter: stock,
+    createdAt: new Date().toISOString()
+  });
+  saveData();
+  const noteEl = document.getElementById('inv-note');
+  if (noteEl) noteEl.value = '';
+  document.getElementById('inv-qty').value = '1';
+  renderInventory();
+  alert('Stock movement saved.');
+}
+
+function deleteStockMovement(id) {
+  if (!confirm('Delete this movement? Stock balance will not be recalculated automatically.')) return;
+  data.stockMovements = (data.stockMovements || []).filter(m => m.id !== id);
+  saveData();
+  renderInventory();
+}
+
+function exportStockMovementsCsv() {
+  const moves = movementsInPeriod()
+    .slice()
+    .sort((a, b) => new Date(a.date || a.createdAt) - new Date(b.date || b.createdAt));
+  const rows = [['Date', 'SKU', 'Equipment', 'Type', 'Qty', 'Balance after', 'Note']];
+  moves.forEach(m => {
+    const p = getProduct(m.productId);
+    rows.push([
+      (m.date || '').slice(0, 10),
+      p ? (p.sku || '') : '',
+      p ? (p.name || '') : '',
+      m.type,
+      m.qty,
+      m.balanceAfter ?? '',
+      m.note || ''
+    ]);
+  });
+  const csv = rows.map(r => r.map(c => {
+    const s = String(c ?? '');
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'stock-movements.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // -------------------- Clients --------------------
@@ -1767,6 +1987,7 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   const totalPages = 2 + catPages + 2;
 
   // ---- COVER ----
+  // Full-page navy (must fill entire page so nothing sits on white)
   setFill(NAVY); doc.rect(0, 0, W, H, 'F');
   setDraw([56, 77, 102]); doc.setLineWidth(0.75);
   doc.rect(26, 26, W - 52, H - 52);
@@ -1775,32 +1996,41 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   const sub = (nameParts.slice(1).join(' ') || 'RESOURCES LIMITED').toUpperCase();
   // Centered brand block
   setCol(CREAM); doc.setFont('helvetica', 'bold'); doc.setFontSize(36);
-  doc.text(main, W / 2, H * 0.42, { align: 'center' });
+  doc.text(main, W / 2, H * 0.40, { align: 'center' });
   setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(13);
-  doc.text(sub, W / 2, H * 0.42 + 24, { align: 'center' });
+  doc.text(sub, W / 2, H * 0.40 + 24, { align: 'center' });
   setDraw(GOLD); doc.setLineWidth(1.5);
-  doc.line(W / 2 - 30, H * 0.42 + 42, W / 2 + 30, H * 0.42 + 42);
-  setCol(CREAM); doc.setFontSize(15); doc.text('Medical Equipment Proposal', W / 2, H * 0.42 + 68, { align: 'center' });
+  doc.line(W / 2 - 30, H * 0.40 + 42, W / 2 + 30, H * 0.40 + 42);
+  setCol(CREAM); doc.setFontSize(15); doc.text('Medical Equipment Proposal', W / 2, H * 0.40 + 68, { align: 'center' });
   setCol([184, 191, 204]); doc.setFontSize(11.5);
-  doc.text('Prepared for ' + forClient, W / 2, H * 0.42 + 92, { align: 'center' });
-  doc.text(dateStr, W / 2, H * 0.42 + 110, { align: 'center' });
-  // Bottom company details — smaller footer type on cover
-  setDraw([56, 77, 102]); doc.setLineWidth(0.75);
-  doc.line(M, H - 100, W - M, H - 100);
+  doc.text('Prepared for ' + forClient, W / 2, H * 0.40 + 92, { align: 'center' });
+  doc.text(dateStr, W / 2, H * 0.40 + 110, { align: 'center' });
+
+  // Footer block — measure first, place fully inside navy (above bottom margin)
   const footSize = 9;
-  const footLead = 12;
-  setCol([210, 216, 224]); doc.setFont('helvetica', 'normal'); doc.setFontSize(footSize);
-  const addrLines = wrap(co.address || '', footSize, W - 2 * M - 90);
-  let by = H - 88;
-  addrLines.forEach(ln => { doc.text(ln, M, by); by += footLead; });
-  by += 2;
-  if (co.phone1 || co.phone2) {
-    doc.text('Tel: ' + [co.phone1, co.phone2].filter(Boolean).join('  |  '), M, by);
+  const footLead = 11;
+  const addrLines = wrap(co.address || '', footSize, W - 2 * M - 100);
+  const telLine = (co.phone1 || co.phone2)
+    ? 'Tel: ' + [co.phone1, co.phone2].filter(Boolean).join('  |  ')
+    : '';
+  const emailLine = co.email ? 'Email: ' + co.email : '';
+  const footLines = [...addrLines];
+  if (telLine) footLines.push(telLine);
+  if (emailLine) footLines.push(emailLine);
+  const footBlockH = footLines.length * footLead + 16; // + space under divider
+  const footBottom = 48; // stay above page edge
+  const dividerY = footBottom + footBlockH;
+  setDraw([56, 77, 102]); doc.setLineWidth(0.75);
+  doc.line(M, dividerY, W - M, dividerY);
+  // Brighter text so it stays readable on navy
+  setCol([220, 226, 234]); doc.setFont('helvetica', 'normal'); doc.setFontSize(footSize);
+  let by = dividerY + 14;
+  footLines.forEach(ln => {
+    doc.text(ln, M, by);
     by += footLead;
-  }
-  if (co.email) doc.text('Email: ' + co.email, M, by);
-  setCol([115, 128, 140]); doc.setFont('helvetica', 'normal'); doc.setFontSize(18);
-  doc.text('01 / ' + String(totalPages).padStart(2, '0'), W - M, H - 40, { align: 'right' });
+  });
+  setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(16);
+  doc.text('01 / ' + String(totalPages).padStart(2, '0'), W - M, footBottom + 4, { align: 'right' });
 
   // ---- ABOUT ----
   doc.addPage();

@@ -472,6 +472,9 @@ html.dark .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
         <a href="#quotes" data-page="quotes" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-brand-700 transition">
           <span>📋</span> Quotes / Projects
         </a>
+        <a href="#inventory" data-page="inventory" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-brand-700 transition">
+          <span>📦</span> In Stock
+        </a>
         <a href="#presentation" data-page="presentation" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-brand-700 transition">
           <span>📑</span> Client Presentation
         </a>
@@ -746,6 +749,124 @@ html.dark .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
                   <button onclick="emailQuote()" class="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium text-sm" style="background:#2563eb">Email Quote</button>
                   <button onclick="if(confirm('Delete this quote?')) deleteCurrentQuote()" id="btn-delete-quote" class="w-full py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm hidden">Delete</button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- IN STOCK / INVENTORY -->
+        <section id="page-inventory" class="page hidden">
+          <div class="space-y-5">
+            <!-- Period filter + stats -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 flex flex-wrap items-end gap-3">
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">Period</label>
+                <select id="inv-period" onchange="renderInventory()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                  <option value="week">This week</option>
+                  <option value="month" selected>This month</option>
+                  <option value="all">All time</option>
+                </select>
+              </div>
+              <div class="flex gap-3 flex-wrap text-sm">
+                <div class="px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-100">
+                  <span class="text-emerald-700 font-medium">In:</span>
+                  <span id="inv-stat-in" class="font-bold text-emerald-800">0</span>
+                </div>
+                <div class="px-3 py-2 rounded-lg bg-rose-50 border border-rose-100">
+                  <span class="text-rose-700 font-medium">Out:</span>
+                  <span id="inv-stat-out" class="font-bold text-rose-800">0</span>
+                </div>
+                <div class="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
+                  <span class="text-slate-600 font-medium">SKUs tracked:</span>
+                  <span id="inv-stat-skus" class="font-bold text-slate-800">0</span>
+                </div>
+                <div class="px-3 py-2 rounded-lg bg-amber-50 border border-amber-100">
+                  <span class="text-amber-700 font-medium">Low stock:</span>
+                  <span id="inv-stat-low" class="font-bold text-amber-800">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Record movement -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+              <h3 class="font-semibold text-lg mb-3">Record stock movement</h3>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-sm">
+                <div class="lg:col-span-2">
+                  <label class="block text-slate-500 mb-1">Equipment</label>
+                  <select id="inv-product" class="w-full px-3 py-2 border border-slate-300 rounded-lg"></select>
+                </div>
+                <div>
+                  <label class="block text-slate-500 mb-1">Type</label>
+                  <select id="inv-type" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+                    <option value="in">Stock In</option>
+                    <option value="out">Stock Out</option>
+                    <option value="adjust">Set balance</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-slate-500 mb-1">Quantity</label>
+                  <input id="inv-qty" type="number" min="0" step="1" value="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                </div>
+                <div>
+                  <label class="block text-slate-500 mb-1">Date</label>
+                  <input id="inv-date" type="date" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                </div>
+                <div class="sm:col-span-2 lg:col-span-3">
+                  <label class="block text-slate-500 mb-1">Note (optional)</label>
+                  <input id="inv-note" type="text" placeholder="e.g. Received from supplier / Issued to LUTH" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                </div>
+                <div class="sm:col-span-2 lg:col-span-2 flex items-end">
+                  <button type="button" onclick="saveStockMovement()" class="w-full px-4 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-medium">Save movement</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Current stock levels -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+              <div class="px-5 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-semibold">Current stock levels</h3>
+                <input id="inv-search" type="search" placeholder="Search equipment..." oninput="renderInventoryStock()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-full sm:w-56" />
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-slate-50 text-slate-600 text-left">
+                    <tr>
+                      <th class="px-4 py-2.5 font-medium">SKU</th>
+                      <th class="px-4 py-2.5 font-medium">Equipment</th>
+                      <th class="px-4 py-2.5 font-medium">Category</th>
+                      <th class="px-4 py-2.5 font-medium text-right">In stock</th>
+                      <th class="px-4 py-2.5 font-medium text-right">Low at</th>
+                      <th class="px-4 py-2.5 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inv-stock-body" class="divide-y divide-slate-100">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Movement history -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+              <div class="px-5 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-semibold">Stock movements</h3>
+                <button type="button" onclick="exportStockMovementsCsv()" class="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium">Export CSV</button>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-slate-50 text-slate-600 text-left">
+                    <tr>
+                      <th class="px-4 py-2.5 font-medium">Date</th>
+                      <th class="px-4 py-2.5 font-medium">Equipment</th>
+                      <th class="px-4 py-2.5 font-medium">Type</th>
+                      <th class="px-4 py-2.5 font-medium text-right">Qty</th>
+                      <th class="px-4 py-2.5 font-medium text-right">Balance after</th>
+                      <th class="px-4 py-2.5 font-medium">Note</th>
+                      <th class="px-4 py-2.5 font-medium"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="inv-movements-body" class="divide-y divide-slate-100">
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
