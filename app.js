@@ -1596,29 +1596,61 @@ function generateInvoicePdf(inv) {
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, W, H, 'F');
 
-    // --- Header: logo + company left, INVOICE meta right ---
-    let y = 40;
+    // --- Header only: larger logo left, INVOICE / date / status right (unchanged meta) ---
+    const logoW = 210;
+    const logoH = 42;
+    const headerTop = 36;
     try {
-      if (logo) doc.addImage(logo, 'PNG', M, y, 130, 26);
+      if (logo) doc.addImage(logo, 'PNG', M, headerTop, logoW, logoH);
     } catch (e) { /* ignore */ }
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(20);
     doc.setTextColor(...TEAL);
-    doc.text('INVOICE', W - M, y + 12, { align: 'right' });
+    doc.text('INVOICE', W - M, headerTop + 14, { align: 'right' });
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(...INK);
-    doc.text(String(invNum), W - M, y + 28, { align: 'right' });
+    doc.text(String(invNum), W - M, headerTop + 30, { align: 'right' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.setTextColor(...GRAY);
-    doc.text('Date: ' + dateStr, W - M, y + 42, { align: 'right' });
-    if (dueStr) doc.text('Due date: ' + dueStr, W - M, y + 54, { align: 'right' });
+    doc.text('Date: ' + dateStr, W - M, headerTop + 44, { align: 'right' });
+    if (dueStr) doc.text('Due date: ' + dueStr, W - M, headerTop + 56, { align: 'right' });
     doc.setTextColor(...INK);
-    doc.text('Status: ' + status, W - M, y + 66, { align: 'right' });
+    doc.text('Status: ' + status, W - M, headerTop + 68, { align: 'right' });
 
-    y = 78;
+    // Divider under header
+    const headerBottom = Math.max(headerTop + logoH, headerTop + 72) + 16;
+    doc.setDrawColor(...TEAL);
+    doc.setLineWidth(2.5);
+    doc.line(M, headerBottom, W - M, headerBottom);
+
+    // Estimate body height so the text group sits balanced in the middle of the page
+    const addrLines = co.address ? doc.splitTextToSize(co.address, W * 0.7).length : 0;
+    const clientAddrLines = (client && client.address) ? doc.splitTextToSize(client.address, W - 2 * M).length : 0;
+    const noteLines = inv.notes ? doc.splitTextToSize(String(inv.notes), W - 2 * M - 24).length : 0;
+    let bankLines = 0;
+    if (hasBank) {
+      bankLines = [bankName, accountName, accountNumber, bankCode].filter(Boolean).length;
+    }
+    const itemCount = Math.max(items.length, 1);
+    let estBody = 0;
+    estBody += 14 + addrLines * 12 + 24; // company block
+    estBody += 14 + 14 + (client && client.contact ? 12 : 0) + clientAddrLines * 12 + 40; // bill to
+    estBody += 20 + (inv.quoteRef ? 14 : 0); // title
+    estBody += 22 + itemCount * 28 + 20; // table
+    estBody += 50 + (discount > 0 ? 16 : 0); // totals
+    estBody += hasBank ? (32 + bankLines * 14 + 16) : 20;
+    estBody += inv.notes ? (28 + noteLines * 13 + 16) : 0;
+    estBody += 50; // footer
+
+    const usableTop = headerBottom + 20;
+    const usableBottom = H - 40;
+    const usableH = usableBottom - usableTop;
+    let y = usableTop + Math.max(12, (usableH - estBody) / 2);
+
+    // Company block (part of centered group)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.setTextColor(...TEAL);
@@ -1628,17 +1660,12 @@ function generateInvoicePdf(inv) {
     doc.setFontSize(9.5);
     doc.setTextColor(...GRAY);
     if (co.address) {
-      doc.splitTextToSize(co.address, W * 0.55).forEach(ln => { doc.text(ln, M, y); y += 12; });
+      doc.splitTextToSize(co.address, W * 0.7).forEach(ln => { doc.text(ln, M, y); y += 12; });
     }
     const tel = [co.phone1, co.phone2].filter(Boolean).join(' | ');
     if (tel) { doc.text('Tel: ' + tel, M, y); y += 12; }
     if (co.email) { doc.text(co.email, M, y); y += 12; }
-
-    y = Math.max(y, 130) + 8;
-    doc.setDrawColor(...TEAL);
-    doc.setLineWidth(2.5);
-    doc.line(M, y, W - M, y);
-    y += 22;
+    y += 16;
 
     // Bill To
     doc.setFont('helvetica', 'normal');
