@@ -1520,7 +1520,6 @@ function createInvoiceFromQuote(quoteId) {
 }
 
 function printInvoice() {
-  // Prefer saved invoice; otherwise use form (same pattern as quote)
   let inv = currentInvoiceId ? (data.invoices || []).find(x => x.id === currentInvoiceId) : null;
   if (!inv) {
     const items = collectInvoiceItems();
@@ -1542,151 +1541,289 @@ function printInvoice() {
       showFooter: document.getElementById('inv-show-footer')?.checked !== false,
       discount, items, subtotalNgn: sub, totalNgn: total
     };
+  } else {
+    // Merge latest form bank fields if editor is open
+    const bn = document.getElementById('inv-bank-name');
+    if (bn) {
+      inv = {
+        ...inv,
+        bankName: (document.getElementById('inv-bank-name')?.value || '').trim() || inv.bankName,
+        accountName: (document.getElementById('inv-account-name')?.value || '').trim() || inv.accountName,
+        accountNumber: (document.getElementById('inv-account-number')?.value || '').trim() || inv.accountNumber,
+        bankCode: (document.getElementById('inv-bank-code')?.value || '').trim() || inv.bankCode,
+        notes: document.getElementById('inv-notes')?.value ?? inv.notes
+      };
+    }
   }
   generateInvoicePdf(inv);
 }
 
-/** Invoice PDF — teal header layout (browser print / Save as PDF) */
+/** Invoice PDF — jsPDF file download (same method as Client Presentation) */
 function generateInvoicePdf(inv) {
   const co = data.company || {};
   const client = getClient(inv.clientId);
-  const logo = (typeof COMPANY_LOGO_DATAURL !== 'undefined') ? COMPANY_LOGO_DATAURL : 'logo.png';
-  const discount = inv.discount || 0;
-  const subtotal = inv.subtotalNgn != null ? inv.subtotalNgn : (inv.items || []).reduce((s, it) => s + (it.lineNgn != null ? it.lineNgn : (it.qty || 0) * (it.unitNgn || 0)), 0);
+  const logo = (typeof COMPANY_LOGO_DATAURL !== 'undefined') ? COMPANY_LOGO_DATAURL : null;
+  const discount = Number(inv.discount) || 0;
+  const items = inv.items || [];
+  const subtotal = inv.subtotalNgn != null
+    ? inv.subtotalNgn
+    : items.reduce((s, it) => s + (it.lineNgn != null ? it.lineNgn : (it.qty || 0) * (it.unitNgn || 0)), 0);
   const total = inv.totalNgn != null ? inv.totalNgn : subtotal * (1 - discount / 100);
   const invNum = inv.invoiceNumber || 'DRAFT';
   const status = (inv.status || 'draft').toUpperCase();
   const dateStr = inv.date ? new Date(inv.date).toLocaleDateString() : new Date().toLocaleDateString();
   const dueStr = inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '';
-  const bankName = (inv.bankName || co.bankName || '').trim();
-  const accountName = (inv.accountName || co.accountName || '').trim();
-  const accountNumber = (inv.accountNumber || co.accountNumber || '').trim();
-  const bankCode = (inv.bankCode || co.bankCode || '').trim();
-  let bankBlock = '';
-  if (bankName || accountName || accountNumber || bankCode) {
-    bankBlock = `<div style="margin-top:28px;padding:14px 16px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;font-size:12px;">
-      <p style="margin:0 0 8px;font-weight:700;color:#0f766e;text-transform:uppercase;font-size:11px;letter-spacing:0.04em;">Payment / Bank details</p>
-      ${bankName ? `<p style="margin:2px 0;"><strong>Bank:</strong> ${escHtml(bankName)}</p>` : ''}
-      ${accountName ? `<p style="margin:2px 0;"><strong>Account name:</strong> ${escHtml(accountName)}</p>` : ''}
-      ${accountNumber ? `<p style="margin:2px 0;"><strong>Account number:</strong> ${escHtml(accountNumber)}</p>` : ''}
-      ${bankCode ? `<p style="margin:2px 0;"><strong>Sort / Bank code:</strong> ${escHtml(bankCode)}</p>` : ''}
-    </div>`;
-  }
 
-  let itemsHtml = '';
-  (inv.items || []).forEach(it => {
-    const p = it.productId ? getProduct(it.productId) : null;
-    const line = it.lineNgn != null ? it.lineNgn : (it.qty || 0) * (it.unitNgn || 0);
-    const sku = p ? p.sku : '';
-    const name = it.name || (p ? p.name : 'Item');
-    itemsHtml += `<tr>
-      <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${sku ? escHtml(sku) + '<br>' : ''}<small>${escHtml(name)}</small></td>
-      <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;">${it.qty || 0}</td>
-      <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatNGN(it.unitNgn || 0)}</td>
-      <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatNGN(line)}</td>
-    </tr>`;
-  });
+  // Bank: invoice fields first, then company settings
+  const bankName = String(inv.bankName || co.bankName || '').trim();
+  const accountName = String(inv.accountName || co.accountName || '').trim();
+  const accountNumber = String(inv.accountNumber || co.accountNumber || '').trim();
+  const bankCode = String(inv.bankCode || co.bankCode || '').trim();
+  const hasBank = !!(bankName || accountName || accountNumber || bankCode);
 
-  const html = `
-    <div style="font-family: system-ui, sans-serif; color: #1e293b;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0f766e;padding-bottom:16px;margin-bottom:24px;">
-        <div>
-          <img src="${logo}" alt="Logo" style="height:48px;width:auto;max-width:220px;object-fit:contain;display:block;margin-bottom:8px;" />
-          <h1 style="margin:0;font-size:18px;color:#0f766e;">${escHtml(co.name || 'Medicano Resources Limited')}</h1>
-          <p style="margin:4px 0 0;font-size:12px;color:#64748b;">${escHtml(co.address || '')}</p>
-          <p style="margin:2px 0;font-size:12px;color:#64748b;">Tel: ${escHtml(co.phone1 || '')} | ${escHtml(co.phone2 || '')}</p>
-          <p style="margin:2px 0;font-size:12px;color:#64748b;">${escHtml(co.email || '')}</p>
-        </div>
-        <div style="text-align:right;">
-          <h2 style="margin:0;font-size:20px;color:#0f766e;">INVOICE</h2>
-          <p style="margin:8px 0 0;font-size:13px;"><strong>${escHtml(invNum)}</strong></p>
-          <p style="margin:2px 0;font-size:12px;color:#64748b;">Date: ${escHtml(dateStr)}</p>
-          ${dueStr ? `<p style="margin:2px 0;font-size:12px;color:#64748b;">Due date: ${escHtml(dueStr)}</p>` : ''}
-          <p style="margin:2px 0;font-size:12px;">Status: ${escHtml(status)}</p>
-        </div>
-      </div>
+  loadJsPdf().then(JsPDF => {
+    const doc = new JsPDF({ unit: 'pt', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const M = 42;
+    const TEAL = [15, 118, 110];
+    const GRAY = [100, 116, 139];
+    const INK = [30, 41, 59];
+    const TEAL_BG = [240, 253, 250];
+    const LINE = [226, 232, 240];
+    const LIGHT = [248, 250, 252];
 
-      <div style="margin-bottom:24px;">
-        <p style="margin:0;font-size:11px;color:#64748b;text-transform:uppercase;">Bill To</p>
-        <p style="margin:4px 0 0;font-weight:600;font-size:15px;">${client ? escHtml(client.name) : '—'}</p>
-        ${client && client.contact ? `<p style="margin:2px 0;font-size:13px;">Attn: ${escHtml(client.contact)}</p>` : ''}
-        ${client && client.address ? `<p style="margin:2px 0;font-size:12px;color:#64748b;">${escHtml(client.address)}</p>` : ''}
-        ${client && client.phone ? `<p style="margin:2px 0;font-size:12px;color:#64748b;">${escHtml(client.phone)}</p>` : ''}
-        ${client && client.email ? `<p style="margin:2px 0;font-size:12px;color:#64748b;">${escHtml(client.email)}</p>` : ''}
-      </div>
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, W, H, 'F');
 
-      <p style="font-weight:600;margin-bottom:8px;">Title: ${escHtml(inv.title || 'Invoice')}</p>
-      ${inv.quoteRef ? `<p style="font-size:12px;color:#64748b;margin:-4px 0 12px;">Related quote: ${escHtml(inv.quoteRef)}</p>` : ''}
+    // --- Header: logo + company left, INVOICE meta right ---
+    let y = 40;
+    try {
+      if (logo) doc.addImage(logo, 'PNG', M, y, 130, 26);
+    } catch (e) { /* ignore */ }
 
-      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px;">
-        <thead>
-          <tr style="background:#f0fdfa;text-align:left;">
-            <th style="padding:10px 8px;border-bottom:2px solid #0f766e;">Item</th>
-            <th style="padding:10px 8px;border-bottom:2px solid #0f766e;text-align:center;">Qty</th>
-            <th style="padding:10px 8px;border-bottom:2px solid #0f766e;text-align:right;">Unit (NGN)</th>
-            <th style="padding:10px 8px;border-bottom:2px solid #0f766e;text-align:right;">Line Total (NGN)</th>
-          </tr>
-        </thead>
-        <tbody>${itemsHtml}</tbody>
-      </table>
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(...TEAL);
+    doc.text('INVOICE', W - M, y + 12, { align: 'right' });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...INK);
+    doc.text(String(invNum), W - M, y + 28, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...GRAY);
+    doc.text('Date: ' + dateStr, W - M, y + 42, { align: 'right' });
+    if (dueStr) doc.text('Due date: ' + dueStr, W - M, y + 54, { align: 'right' });
+    doc.setTextColor(...INK);
+    doc.text('Status: ' + status, W - M, y + 66, { align: 'right' });
 
-      <div style="display:flex;justify-content:flex-end;">
-        <div style="width:260px;font-size:13px;">
-          <div style="display:flex;justify-content:space-between;padding:4px 0;">
-            <span>Subtotal</span><span>${formatNGN(subtotal)}</span>
-          </div>
-          ${discount > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Discount (${discount}%)</span><span>-${formatNGN(subtotal * discount / 100)}</span></div>` : ''}
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid #0f766e;font-weight:700;font-size:16px;color:#0f766e;">
-            <span>TOTAL DUE (NGN)</span><span>${formatNGN(total)}</span>
-          </div>
-        </div>
-      </div>
-
-      ${bankBlock}
-      ${inv.notes ? `<div style="margin-top:20px;padding:12px;background:#f8fafc;border-radius:6px;font-size:12px;"><strong>Notes / Payment instructions</strong><br>${escHtml(inv.notes).replace(/\\n/g, '<br>')}</div>` : ''}
-
-      ${(inv.showFooter !== false) ? `<div style="margin-top:48px;font-size:11px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:12px;">
-        <p>This invoice is issued by ${escHtml(co.name || 'Medicano Resources Limited')}. Please make payment by the due date unless otherwise agreed.</p>
-        <p style="margin-top:4px;">Rates reference: 1 USD = ₦${Number(data.rates.USD).toLocaleString()} | 1 EUR = ₦${Number(data.rates.EUR).toLocaleString()}</p>
-        <p style="margin-top:16px;">Thank you for your business.</p>
-      </div>` : `<div style="margin-top:48px;font-size:11px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:12px;">
-        <p>Thank you for your business.</p>
-      </div>`}
-    </div>
-  `;
-
-  const printWin = window.open('', '_blank', 'width=900,height=700');
-  if (!printWin) {
-    alert('Please allow pop-ups to print the invoice.');
-    return;
-  }
-  const clientName = client ? client.name : 'Client';
-  const safeClientName = clientName.replace(/[\\\\/:*?"<>|]/g, ' ').replace(/\\s+/g, ' ').trim();
-  const docTitle = `Invoice ${invNum} - ${safeClientName}`;
-
-  printWin.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${docTitle}</title>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; color: #1e293b; margin: 0; padding: 24px; }
-    @media print {
-      body { padding: 0; }
-      @page { margin: 15mm; }
+    y = 78;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(...TEAL);
+    doc.text(co.name || 'Medicano Resources Limited', M, y);
+    y += 14;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(...GRAY);
+    if (co.address) {
+      doc.splitTextToSize(co.address, W * 0.55).forEach(ln => { doc.text(ln, M, y); y += 12; });
     }
-  </style>
-</head>
-<body>
-  ${html}
-  <script>
-    window.onload = function() {
-      window.print();
-    };
-  <\\/script>
-</body>
-</html>`);
-  printWin.document.close();
+    const tel = [co.phone1, co.phone2].filter(Boolean).join(' | ');
+    if (tel) { doc.text('Tel: ' + tel, M, y); y += 12; }
+    if (co.email) { doc.text(co.email, M, y); y += 12; }
+
+    y = Math.max(y, 130) + 8;
+    doc.setDrawColor(...TEAL);
+    doc.setLineWidth(2.5);
+    doc.line(M, y, W - M, y);
+    y += 22;
+
+    // Bill To
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...GRAY);
+    doc.text('BILL TO', M, y);
+    y += 14;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...INK);
+    doc.text(client ? client.name : '—', M, y);
+    y += 14;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    if (client && client.contact) { doc.text('Attn: ' + client.contact, M, y); y += 12; }
+    doc.setTextColor(...GRAY);
+    if (client && client.address) {
+      doc.splitTextToSize(client.address, W - 2 * M).forEach(ln => { doc.text(ln, M, y); y += 12; });
+    }
+    if (client && client.phone) { doc.text(client.phone, M, y); y += 12; }
+    if (client && client.email) { doc.text(client.email, M, y); y += 12; }
+    y += 14;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...INK);
+    doc.text('Title: ' + (inv.title || 'Invoice'), M, y);
+    y += 14;
+    if (inv.quoteRef) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(...GRAY);
+      doc.text('Related quote: ' + inv.quoteRef, M, y);
+      y += 14;
+    }
+    y += 6;
+
+    // Table header
+    doc.setFillColor(...TEAL_BG);
+    doc.rect(M, y - 12, W - 2 * M, 22, 'F');
+    doc.setDrawColor(...TEAL);
+    doc.setLineWidth(1.5);
+    doc.line(M, y - 12, W - M, y - 12);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...INK);
+    doc.text('Item', M + 8, y);
+    doc.text('Qty', M + 280, y);
+    doc.text('Unit (NGN)', M + 340, y);
+    doc.text('Line Total (NGN)', W - M - 8, y, { align: 'right' });
+    y += 18;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    items.forEach((it) => {
+      if (y > H - 180) { doc.addPage(); y = 50; }
+      const p = it.productId ? getProduct(it.productId) : null;
+      const name = it.name || (p ? p.name : 'Item');
+      const sku = p ? p.sku : '';
+      const line = it.lineNgn != null ? it.lineNgn : (it.qty || 0) * (it.unitNgn || 0);
+      doc.setDrawColor(...LINE);
+      doc.setLineWidth(0.6);
+      doc.line(M, y + 10, W - M, y + 10);
+      doc.setTextColor(...INK);
+      if (sku) {
+        doc.setFontSize(8);
+        doc.setTextColor(...GRAY);
+        doc.text(String(sku), M + 8, y - 2);
+        doc.setFontSize(10);
+        doc.setTextColor(...INK);
+        doc.text(String(name).substring(0, 42), M + 8, y + 10);
+      } else {
+        doc.text(String(name).substring(0, 42), M + 8, y + 6);
+      }
+      doc.text(String(it.qty || 0), M + 280, y + 6);
+      doc.text(formatNairaPlain(it.unitNgn || 0), M + 340, y + 6);
+      doc.text(formatNairaPlain(line), W - M - 8, y + 6, { align: 'right' });
+      y += 28;
+    });
+
+    y += 10;
+    // Totals
+    const tx = W - M - 200;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(...INK);
+    doc.text('Subtotal', tx, y);
+    doc.text(formatNairaPlain(subtotal), W - M, y, { align: 'right' });
+    if (discount > 0) {
+      y += 16;
+      doc.text('Discount (' + discount + '%)', tx, y);
+      doc.text('-' + formatNairaPlain(subtotal * discount / 100), W - M, y, { align: 'right' });
+    }
+    y += 10;
+    doc.setDrawColor(...TEAL);
+    doc.setLineWidth(1.5);
+    doc.line(tx, y, W - M, y);
+    y += 16;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...TEAL);
+    doc.text('TOTAL DUE (NGN)', tx, y);
+    doc.text(formatNairaPlain(total), W - M, y, { align: 'right' });
+    y += 28;
+
+    // Bank details — always reserve space and show clearly
+    if (y > H - 140) { doc.addPage(); y = 50; }
+    if (hasBank) {
+      const lines = [];
+      if (bankName) lines.push('Bank: ' + bankName);
+      if (accountName) lines.push('Account name: ' + accountName);
+      if (accountNumber) lines.push('Account number: ' + accountNumber);
+      if (bankCode) lines.push('Sort / Bank code: ' + bankCode);
+      const boxH = 22 + lines.length * 14 + 10;
+      doc.setFillColor(...TEAL_BG);
+      doc.setDrawColor(153, 246, 228);
+      doc.setLineWidth(1);
+      doc.roundedRect(M, y - 4, W - 2 * M, boxH, 6, 6, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...TEAL);
+      doc.text('PAYMENT / BANK DETAILS', M + 12, y + 12);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(...INK);
+      let by = y + 28;
+      lines.forEach(ln => { doc.text(ln, M + 12, by); by += 14; });
+      y += boxH + 16;
+    } else {
+      // Hint if nothing configured
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...GRAY);
+      doc.text('No bank details set. Add them in Settings → Company, or on this invoice.', M, y);
+      y += 20;
+    }
+
+    // Notes
+    if (inv.notes) {
+      if (y > H - 100) { doc.addPage(); y = 50; }
+      const nlines = doc.splitTextToSize(String(inv.notes), W - 2 * M - 24);
+      const nh = 28 + nlines.length * 13;
+      doc.setFillColor(...LIGHT);
+      doc.roundedRect(M, y - 4, W - 2 * M, nh, 6, 6, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...INK);
+      doc.text('Notes / Payment instructions', M + 12, y + 12);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      let ny = y + 28;
+      nlines.forEach(ln => { doc.text(ln, M + 12, ny); ny += 13; });
+      y += nh + 16;
+    }
+
+    if (y > H - 70) { doc.addPage(); y = 50; }
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.8);
+    doc.line(M, y, W - M, y);
+    y += 14;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...GRAY);
+    if (inv.showFooter !== false) {
+      doc.text('This invoice is issued by ' + (co.name || 'Medicano Resources Limited') + '. Please make payment by the due date unless otherwise agreed.', M, y);
+      y += 12;
+      const rates = data.rates || {};
+      doc.text('Rates reference: 1 USD = NGN ' + Number(rates.USD || 0).toLocaleString() + ' | 1 EUR = NGN ' + Number(rates.EUR || 0).toLocaleString(), M, y);
+      y += 14;
+    }
+    doc.text('Thank you for your business.', M, y);
+
+    // Download file (same as presentation)
+    const sanitize = (s, max) => String(s || '')
+      .replace(/[\\/:*?"<>|]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, max || 50);
+    const clientName = sanitize(client ? client.name : 'Client', 50) || 'Client';
+    const docTitle = sanitize(invNum, 30) || 'Invoice';
+    doc.save(clientName + ' - ' + docTitle + '.pdf');
+  }).catch(err => {
+    console.error(err);
+    alert(err.message || 'Could not generate invoice PDF. Check your connection and try again.');
+  });
 }
 
 
