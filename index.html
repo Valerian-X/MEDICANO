@@ -1094,116 +1094,267 @@ html.dark textarea {
 .dash-tl-meta { font-size: 0.72rem; opacity: 0.7; margin-top: 0.2rem; }
 </style>
 <style id="quote-equip-css">
-.quote-equip-panel {
-  position: relative;
-  z-index: 1;
-  isolation: isolate;
-  margin-bottom: 0.25rem;
-}
-.quote-equip-panel.collapsed .quote-equip-body { display: none; }
-.quote-equip-panel.collapsed .quote-equip-chevron { transform: rotate(-90deg); }
-.quote-equip-chevron { display: inline-block; transition: transform .15s ease; flex-shrink: 0; }
-.quote-equip-toggle {
-  background: transparent !important;
-  border: none !important;
-  cursor: pointer;
-  min-height: auto !important;
+/* Inventory metric cards — equal, professional */
+.inv-metrics {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
   width: 100%;
   box-sizing: border-box;
 }
-.quote-equip-toggle:hover { background: rgba(0,0,0,0.02) !important; }
-.quote-equip-body {
-  box-sizing: border-box;
-  min-width: 0;
-  overflow: hidden;
+@media (min-width: 640px) {
+  .inv-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-#quote-product-picker {
+@media (min-width: 1024px) {
+  .inv-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+.inv-metric-card {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  min-width: 0;
-  max-width: 100%;
+  justify-content: space-between;
+  min-height: 5.5rem;
+  padding: 0.95rem 1.05rem;
+  border-radius: 1.15rem;
   box-sizing: border-box;
+  min-width: 0;
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(26,26,26,0.04);
 }
-.qp-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 0.75rem;
-  row-gap: 0.35rem;
-  padding: 0.75rem 0.85rem;
+.inv-metric-label {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+.inv-metric-value {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.inv-period-select {
+  width: 100% !important;
+  margin-top: 0.15rem;
+  min-height: 2.4rem !important;
+  font-size: 0.9rem !important;
+  font-weight: 600;
+}
+.inv-metric-period { background: var(--cream-2, #efe8de) !important; }
+.inv-metric-in { background: var(--green, #c8e8c0) !important; }
+.inv-metric-out { background: #f8d0d6 !important; }
+.inv-metric-sku { background: var(--blue, #c9daf8) !important; }
+.inv-metric-low { background: var(--yellow, #f5e6a8) !important; }
+
+/* Quote equipment — consistent margins */
+.quote-equip-panel {
+  margin: 0 !important;
+  border-radius: 1.15rem !important;
+  overflow: hidden;
+}
+.quote-equip-toggle {
+  padding: 1rem 1.15rem !important;
+}
+.quote-equip-body {
+  padding: 0 1.15rem 1.15rem !important;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  box-sizing: border-box;
+  min-width: 0;
+}
+.quote-equip-help {
+  margin: 0.85rem 0 0.75rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+.quote-equip-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  min-width: 0;
+}
+@media (min-width: 720px) {
+  .quote-equip-toolbar {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+.quote-equip-search {
+  flex: 1 1 auto;
+  min-width: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+.quote-equip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+.quote-equip-btn {
+  border: none;
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 2.4rem !important;
+}
+.quote-equip-btn.soft { background: var(--cream-2, #efe8de); color: #1a1a1a; }
+.quote-equip-btn.primary { background: #1a1a1a; color: #fff; }
+.quote-product-picker {
+  max-height: 16rem;
+  overflow-y: auto;
+  border: 1px solid #e8e0d6;
+  border-radius: 0.9rem;
+  background: #faf8f5;
   box-sizing: border-box;
   width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  border-bottom: 1px solid #f1f5f9;
 }
-.qp-row:last-child { border-bottom: none; }
-.qp-row:hover { background: rgba(0,0,0,0.02); }
-.qp-check {
-  width: 1.1rem;
-  height: 1.1rem;
-  flex-shrink: 0;
-  margin: 0;
+.qp-row {
+  margin: 0 !important;
+  padding: 0.7rem 0.85rem !important;
+  background: transparent;
 }
-.qp-meta {
-  min-width: 0;
-  overflow: hidden;
-}
-.qp-meta p {
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.qp-meta .text-xs {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.qp-units {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  flex-shrink: 0;
-}
-.qp-qty {
-  width: 3.75rem !important;
-  min-width: 3.75rem;
-  max-width: 4.5rem;
-  min-height: 2.25rem !important;
-  height: 2.25rem;
-  text-align: center;
-  padding: 0.25rem 0.35rem !important;
-  border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
-  font-size: 0.85rem !important;
-  box-sizing: border-box;
-  margin: 0;
-}
-#page-quote-editor .quote-equip-body .flex.flex-col.sm\:flex-row,
-#page-quote-editor .quote-equip-body .flex.gap-2 {
-  min-width: 0;
-  max-width: 100%;
-}
-#page-quote-editor .quote-equip-body button {
-  min-height: 2.5rem;
-  white-space: nowrap;
-}
-@media (max-width: 640px) {
-  .qp-row {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-rows: auto auto;
+.qp-row:nth-child(odd) { background: rgba(255,255,255,0.7); }
+</style>
+<style id="mobile-fix">
+
+/* ===== Mobile-first layout fixes ===== */
+@media (max-width: 767px) {
+  html, body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
   }
-  .qp-units {
-    grid-column: 2;
-    justify-self: start;
-    margin-top: 0.15rem;
+  #app {
+    max-width: 100vw;
+    overflow-x: hidden;
   }
-  .qp-check {
-    grid-row: 1 / span 2;
-    align-self: start;
-    margin-top: 0.2rem;
+  #app > div.flex-1 {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+  }
+  main {
+    padding: 0.75rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+  header.sticky {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  header h2, #page-title {
+    font-size: 1.05rem !important;
+    line-height: 1.3 !important;
+  }
+
+  /* Stack all multi-column grids */
+  .grid.sm\:grid-cols-2,
+  .grid.lg\:grid-cols-2,
+  .grid.lg\:grid-cols-3,
+  .grid.lg\:grid-cols-4,
+  .dash-stats-row,
+  .dash-two-panels,
+  .dash-intel-layout,
+  .qa-grid,
+  .settings-form-grid,
+  .settings-data-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .dash-intel-side {
+    order: -1;
+  }
+
+  /* Cards full width, no overflow */
+  .panel-soft,
+  .settings-card,
+  .stat-card,
+  .bg-white.rounded-xl,
+  .bg-white.rounded-2xl,
+  .quote-equip-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* Tables scroll horizontally instead of crushing */
+  .overflow-x-auto,
+  table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  thead, tbody, tr {
+    width: 100%;
+  }
+  table {
+    min-width: 520px;
+  }
+
+  /* Touch-friendly controls */
+  input, select, textarea, button {
+    font-size: 16px !important; /* no iOS zoom */
+    min-height: 44px !important;
+  }
+  input[type="number"].qp-qty,
+  input.qi-qty,
+  input.qi-markup {
+    min-height: 40px !important;
+    min-width: 3.5rem !important;
+  }
+
+  /* Quote / invoice editors stack */
+  #page-quote-editor .grid.lg\:grid-cols-3,
+  #page-invoice-editor .grid.lg\:grid-cols-3 {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1rem !important;
+  }
+  #page-quote-editor .sticky,
+  #page-invoice-editor .sticky {
+    position: static !important;
+  }
+
+  /* Sidebar drawer full height */
+  #sidebar {
+    width: min(16.5rem, 86vw) !important;
+    border-radius: 0 !important;
+  }
+
+  /* Presentation / settings options stack */
+  #page-presentation .flex.flex-wrap,
+  #page-settings .settings-inline-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  #page-presentation label.flex.items-center {
+    width: 100%;
+  }
+
+  /* Dashboard greeting */
+  .dash-greeting-row {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+
+  /* Action chips wrap cleanly */
+  .action-chip, .qa-btn {
+    width: 100%;
+  }
+  .qa-grid {
+    gap: 0.55rem !important;
   }
 }
 </style>
@@ -1604,17 +1755,17 @@ html.dark textarea {
                   <span class="font-medium">Select Equipment to Add</span>
                   <span class="quote-equip-chevron text-slate-400 text-sm">▼</span>
                 </button>
-                <div class="quote-equip-body px-5 pb-5 border-t border-slate-100">
-                  <p class="text-xs text-slate-500 pt-3 mb-3">Tick items, set units, then tap <strong>Add Selected</strong>. Adjust quantities again in Line Items if needed.</p>
-                  <div class="flex flex-col sm:flex-row gap-2 mb-3">
-                    <input id="quote-product-search" type="search" placeholder="Search tools / equipment..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" oninput="renderQuoteProductPicker()" />
-                    <div class="flex gap-2 flex-wrap">
-                      <button type="button" onclick="selectAllQuoteProducts(true)" class="px-3 py-2 text-sm bg-brand-100 text-brand-800 rounded-lg hover:bg-brand-200">Select All</button>
-                      <button type="button" onclick="selectAllQuoteProducts(false)" class="px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">Clear</button>
-                      <button type="button" onclick="addSelectedProductsToQuote()" class="px-3 py-2 text-sm bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium">Add Selected</button>
+                <div class="quote-equip-body">
+                  <p class="quote-equip-help">Tick items, set units, then tap <strong>Add Selected</strong>. Adjust quantities again in Line Items if needed.</p>
+                  <div class="quote-equip-toolbar">
+                    <input id="quote-product-search" type="search" placeholder="Search tools / equipment..." class="quote-equip-search" oninput="renderQuoteProductPicker()" />
+                    <div class="quote-equip-actions">
+                      <button type="button" onclick="selectAllQuoteProducts(true)" class="quote-equip-btn soft">Select All</button>
+                      <button type="button" onclick="selectAllQuoteProducts(false)" class="quote-equip-btn soft">Clear</button>
+                      <button type="button" onclick="addSelectedProductsToQuote()" class="quote-equip-btn primary">Add Selected</button>
                     </div>
                   </div>
-                  <div id="quote-product-picker" class="max-h-56 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 text-sm">
+                  <div id="quote-product-picker" class="quote-product-picker">
                     <!-- filled by JS -->
                   </div>
                 </div>
@@ -1844,33 +1995,31 @@ html.dark textarea {
         <!-- IN STOCK / INVENTORY -->
         <section id="page-inventory" class="page hidden">
           <div class="space-y-5">
-            <!-- Period filter + stats -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 flex flex-wrap items-end gap-3">
-              <div>
-                <label class="block text-xs text-slate-500 mb-1">Period</label>
-                <select id="inv-period" onchange="renderInventory()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+            <!-- Period filter + equal metric cards -->
+            <div class="inv-metrics">
+              <div class="inv-metric-card inv-metric-period">
+                <p class="inv-metric-label">Period</p>
+                <select id="inv-period" onchange="renderInventory()" class="inv-period-select">
                   <option value="week">This week</option>
                   <option value="month" selected>This month</option>
                   <option value="all">All time</option>
                 </select>
               </div>
-              <div class="flex gap-3 flex-wrap text-sm">
-                <div class="px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-100">
-                  <span class="text-emerald-700 font-medium">In:</span>
-                  <span id="inv-stat-in" class="font-bold text-emerald-800">0</span>
-                </div>
-                <div class="px-3 py-2 rounded-lg bg-rose-50 border border-rose-100">
-                  <span class="text-rose-700 font-medium">Out:</span>
-                  <span id="inv-stat-out" class="font-bold text-rose-800">0</span>
-                </div>
-                <div class="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
-                  <span class="text-slate-600 font-medium">SKUs tracked:</span>
-                  <span id="inv-stat-skus" class="font-bold text-slate-800">0</span>
-                </div>
-                <div class="px-3 py-2 rounded-lg bg-amber-50 border border-amber-100">
-                  <span class="text-amber-700 font-medium">Low stock:</span>
-                  <span id="inv-stat-low" class="font-bold text-amber-800">0</span>
-                </div>
+              <div class="inv-metric-card inv-metric-in">
+                <p class="inv-metric-label">In</p>
+                <p class="inv-metric-value" id="inv-stat-in">0</p>
+              </div>
+              <div class="inv-metric-card inv-metric-out">
+                <p class="inv-metric-label">Out</p>
+                <p class="inv-metric-value" id="inv-stat-out">0</p>
+              </div>
+              <div class="inv-metric-card inv-metric-sku">
+                <p class="inv-metric-label">SKUs tracked</p>
+                <p class="inv-metric-value" id="inv-stat-skus">0</p>
+              </div>
+              <div class="inv-metric-card inv-metric-low">
+                <p class="inv-metric-label">Low stock</p>
+                <p class="inv-metric-value" id="inv-stat-low">0</p>
               </div>
             </div>
 

@@ -2876,8 +2876,8 @@ function selectAllPres(checked) {
 }
 
 function formatNairaPlain(n) {
-  const v = Math.round(Number(n) || 0);
-  return 'N' + v.toLocaleString('en-US');
+  const v = Number(n) || 0;
+  return 'N' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function loadJsPdf() {
@@ -3194,35 +3194,28 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
 
   // Ultra-simple table summary (image-style: navy header, zebra rows)
   function drawUltraSummaryPages(list, startPageNo, totalPagesGuess) {
-    const rowH = 22;
-    const headerH = 28;
-    const topY = 58;
-    const bottomSafe = 52;
+    // Item | Qty | Original Unit Price | Line Total — navy header, zebra rows, multi-page
+    const rowH = 24;
+    const headerH = 32;
+    const topY = 48;
+    const bottomSafe = 48;
     const tableLeft = M;
     const tableW = W - 2 * M;
-    // Columns: Item | Qty | Unit Price | Line Total
-    const colQtyW = 42;
-    const colUnitW = 110;
-    const colLineW = 110;
+    const colQtyW = 48;
+    const colUnitW = 112;
+    const colLineW = 112;
     const colItemW = tableW - colQtyW - colUnitW - colLineW;
     const xItem = tableLeft;
     const xQty = tableLeft + colItemW;
     const xUnit = xQty + colQtyW;
     const xLine = xUnit + colUnitW;
 
-    const availFirst = H - topY - bottomSafe - 36 - headerH - 40; // title space
-    const availCont = H - topY - bottomSafe - 20 - headerH - 24;
-    const maxFirst = Math.max(8, Math.floor(availFirst / rowH));
-    const maxCont = Math.max(10, Math.floor(availCont / rowH));
+    const avail = H - topY - bottomSafe - headerH - 40;
+    const maxRows = Math.max(12, Math.floor(avail / rowH));
 
     const chunks = [];
-    let i = 0;
-    let first = true;
-    while (i < list.length) {
-      const n = first ? maxFirst : maxCont;
-      chunks.push(list.slice(i, i + n));
-      i += n;
-      first = false;
+    for (let i = 0; i < list.length; i += maxRows) {
+      chunks.push(list.slice(i, i + maxRows));
     }
     if (!chunks.length) chunks.push([]);
 
@@ -3231,50 +3224,50 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
 
     chunks.forEach((chunk, ci) => {
       if (ci > 0) doc.addPage();
-      setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+      setFill(WHITE); doc.rect(0, 0, W, H, 'F');
 
-      setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
-      doc.text(ci === 0 ? 'Price Summary' : 'Price Summary (continued)', M, topY);
-
-      let ty = topY + 18;
+      let ty = topY;
 
       // Header bar
       setFill(NAVY);
       doc.rect(tableLeft, ty, tableW, headerH, 'F');
       setCol(WHITE); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-      const hy = ty + 18;
-      doc.text('Item', xItem + 8, hy);
-      doc.text('Qty', xQty + colQtyW / 2, hy, { align: 'center' });
-      doc.text('Unit Price', xUnit + colUnitW - 8, hy, { align: 'right' });
-      doc.text('Line Total', xLine + colLineW - 8, hy, { align: 'right' });
+      const hy = ty + 14;
+      doc.text('Item', xItem + 10, hy + 6);
+      doc.text('Qty', xQty + colQtyW / 2, hy + 6, { align: 'center' });
+      doc.text('Original Unit', xUnit + colUnitW - 8, hy, { align: 'right' });
+      doc.text('Price', xUnit + colUnitW - 8, hy + 11, { align: 'right' });
+      doc.text('Line Total', xLine + colLineW - 8, hy + 6, { align: 'right' });
       ty += headerH;
 
       chunk.forEach((p, ri) => {
-        if (ri % 2 === 0) {
-          setFill([241, 245, 249]); // slate-100 zebra
+        if (ri % 2 === 1) {
+          setFill([242, 244, 247]);
           doc.rect(tableLeft, ty, tableW, rowH, 'F');
         } else {
           setFill(WHITE);
           doc.rect(tableLeft, ty, tableW, rowH, 'F');
         }
-        // light bottom line
-        setDraw([226, 232, 240]);
-        doc.setLineWidth(0.4);
+        setDraw([210, 215, 222]);
+        doc.setLineWidth(0.5);
         doc.line(tableLeft, ty + rowH, tableLeft + tableW, ty + rowH);
+        doc.line(xQty, ty, xQty, ty + rowH);
+        doc.line(xUnit, ty, xUnit, ty + rowH);
+        doc.line(xLine, ty, xLine, ty + rowH);
 
         const qty = lineQty(p);
         const unit = lineUnit(p);
         const total = unit * qty;
         const name = String(p.name || 'Item');
-        setCol(INK); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-        const maxNameW = colItemW - 16;
+        setCol([30, 35, 42]); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+        const maxNameW = colItemW - 18;
         let displayName = name;
-        while (doc.getTextWidth(displayName) > maxNameW && displayName.length > 4) {
+        while (doc.getTextWidth(displayName) > maxNameW && displayName.length > 5) {
           displayName = displayName.slice(0, -2);
         }
-        if (displayName !== name) displayName = displayName.slice(0, -1) + '…';
-        const textY = ty + 15;
-        doc.text(displayName, xItem + 8, textY);
+        if (displayName !== name) displayName = displayName.replace(/\s+\S*$/, '') + '…';
+        const textY = ty + 16;
+        doc.text(displayName, xItem + 10, textY);
         doc.text(String(qty), xQty + colQtyW / 2, textY, { align: 'center' });
         doc.text(formatNairaPlain(unit), xUnit + colUnitW - 8, textY, { align: 'right' });
         doc.setFont('helvetica', 'bold');
@@ -3282,16 +3275,22 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
         ty += rowH;
       });
 
+      setDraw([180, 186, 196]);
+      doc.setLineWidth(0.8);
+      const tableH = headerH + chunk.length * rowH;
+      doc.rect(tableLeft, topY, tableW, tableH);
+
       const isLast = ci === chunks.length - 1;
       if (isLast) {
+        ty += 10;
         setFill(NAVY);
-        doc.rect(tableLeft, ty, tableW, 30, 'F');
-        setCol(WHITE); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-        doc.text('TOTAL', xItem + 8, ty + 19);
-        doc.text(formatNairaPlain(grandTotal), xLine + colLineW - 8, ty + 19, { align: 'right' });
+        doc.rect(tableLeft, ty, tableW, 28, 'F');
+        setCol(WHITE); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+        doc.text('TOTAL', xItem + 10, ty + 18);
+        doc.text(formatNairaPlain(grandTotal), xLine + colLineW - 8, ty + 18, { align: 'right' });
       } else {
-        setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-        doc.text('Continued on next page…', M, ty + 16);
+        setCol([100, 110, 120]); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+        doc.text('Continued on next page…', M, ty + 18);
       }
 
       footer(pageNo, totalPagesGuess);
