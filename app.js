@@ -327,14 +327,25 @@ function navigate(page) {
   const el = document.getElementById('page-' + page);
   if (el) el.classList.remove('hidden');
 
+  const sidebarPage = (page === 'quote-editor') ? 'quotes'
+    : (page === 'invoice-editor') ? 'invoices'
+    : page;
   document.querySelectorAll('.sidebar-link').forEach(a => {
-    a.classList.toggle('active', a.dataset.page === page);
+    a.classList.toggle('active', a.dataset.page === sidebarPage);
   });
+  // Retrigger page enter animation
+  const pageEl = document.getElementById('page-' + page);
+  if (pageEl) {
+    pageEl.style.animation = 'none';
+    // force reflow
+    void pageEl.offsetWidth;
+    pageEl.style.animation = '';
+  }
 
   const titles = {
     dashboard: 'Dashboard',
-    calendar: 'Calendar',
-    products: 'Equipment Catalog',
+    calendar: 'Events',
+    products: 'Inventory',
     clients: 'Clients',
     quotes: 'Quotes',
     'quote-editor': 'Quote Editor',
@@ -396,7 +407,116 @@ function renderDashboard() {
     }).join('');
   }
 
+  renderDashCalendar();
+  renderDashUpcomingEvents();
   updateRatesDisplay();
+}
+
+let dashCalView = new Date();
+let dashCalSelected = new Date();
+
+function dashCalPrev() {
+  dashCalView = new Date(dashCalView.getFullYear(), dashCalView.getMonth() - 1, 1);
+  renderDashCalendar();
+}
+function dashCalNext() {
+  dashCalView = new Date(dashCalView.getFullYear(), dashCalView.getMonth() + 1, 1);
+  renderDashCalendar();
+}
+function selectDashDay(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  dashCalSelected = new Date(y, m - 1, d);
+  renderDashCalendar();
+  renderDashUpcomingEvents();
+}
+
+function renderDashCalendar() {
+  const grid = document.getElementById('dash-mini-cal');
+  const label = document.getElementById('dash-cal-month');
+  const dayLabel = document.getElementById('dash-day-label');
+  const fullDateEl = document.getElementById('dash-full-date');
+  if (!grid) return;
+  const year = dashCalView.getFullYear();
+  const month = dashCalView.getMonth();
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  if (label) label.textContent = monthNames[month] + ' ' + year;
+  if (dayLabel) {
+    dayLabel.textContent = monthNames[dashCalSelected.getMonth()] + ' ' + dashCalSelected.getDate();
+  }
+  if (fullDateEl) {
+    const d = dashCalSelected;
+    fullDateEl.textContent = dayNames[d.getDay()] + ' ' + d.getDate() + ' ' + monthNames[d.getMonth()] + ', ' + d.getFullYear();
+  }
+
+  const first = new Date(year, month, 1);
+  let startDow = first.getDay();
+  startDow = startDow === 0 ? 6 : startDow - 1;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayKey = toDateKey(new Date());
+  const selectedKey = toDateKey(dashCalSelected);
+  const eventDays = new Set((data.calendarEvents || []).map(e => (e.date || '').slice(0, 10)));
+
+  const labels = ['MO','TU','WE','TH','FR','SA','SU'];
+  let html = labels.map(l => `<div class="dow">${l}</div>`).join('');
+  for (let i = 0; i < startDow; i++) html += `<div class="d muted"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const cls = ['d'];
+    if (key === todayKey) cls.push('today');
+    if (key === selectedKey) cls.push('selected');
+    if (eventDays.has(key)) cls.push('has');
+    html += `<button type="button" class="${cls.join(' ')}" onclick="selectDashDay('${key}')">${d}</button>`;
+  }
+  grid.innerHTML = html;
+}
+
+function renderDashUpcomingEvents() {
+  const el = document.getElementById('dash-upcoming-events');
+  if (!el) return;
+  const key = toDateKey(dashCalSelected);
+  const dayEvents = (data.calendarEvents || [])
+    .filter(e => (e.date || '').slice(0, 10) === key)
+    .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+  // Also show next upcoming if selected day empty
+  let list = dayEvents;
+  let mode = 'day';
+  if (!list.length) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    list = (data.calendarEvents || [])
+      .filter(e => {
+        const d = new Date((e.date || '') + 'T00:00:00');
+        return !isNaN(d) && d >= today;
+      })
+      .sort((a, b) => ((a.date || '') + (a.time || '')).localeCompare((b.date || '') + (b.time || '')))
+      .slice(0, 5);
+    mode = 'upcoming';
+  }
+
+  if (!list.length) {
+    el.innerHTML = '<div class="dash-timeline-empty">No events. Click <strong>Add event</strong> to schedule.</div>';
+    return;
+  }
+
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  el.innerHTML = (mode === 'upcoming' ? '<p class="dash-timeline-hint">Upcoming</p>' : '') + list.map(e => {
+    const client = e.clientId ? getClient(e.clientId) : null;
+    const color = e.color || 'pink';
+    const [yy, mm, dd] = (e.date || '').split('-');
+    const dateLabel = dd && mm ? `${parseInt(dd, 10)} ${monthNames[parseInt(mm, 10) - 1]}` : '';
+    return `<div class="dash-tl-item">
+      <span class="dash-tl-dot ${color}"></span>
+      <div class="dash-tl-body ${color}">
+        <div class="dash-tl-top">
+          <span class="dash-tl-title">${escHtml(e.title || 'Event')}</span>
+          <span class="dash-tl-time">${escHtml(e.time || dateLabel || '—')}</span>
+        </div>
+        <div class="dash-tl-meta">${escHtml(e.type || 'Event')}${client ? ' · ' + escHtml(client.name) : ''}${mode === 'upcoming' && dateLabel ? ' · ' + dateLabel : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function statusClass(s) {
@@ -1114,6 +1234,12 @@ function openQuote(id) {
   navigate('quote-editor');
 }
 
+function quoteFinalUnit(baseNgn, markupPct) {
+  const base = parseFloat(baseNgn) || 0;
+  const m = parseFloat(markupPct) || 0;
+  return base * (1 + m / 100);
+}
+
 function addQuoteItemRow(existing = null) {
   quoteItemCounter++;
   const rowId = 'qi_' + quoteItemCounter;
@@ -1122,33 +1248,57 @@ function addQuoteItemRow(existing = null) {
   tr.id = rowId;
   tr.className = 'border-t border-slate-100';
 
-  const productId = existing ? existing.productId : '';
+  const productId = existing ? (existing.productId || '') : '';
   const p = productId ? getProduct(productId) : null;
   const options = data.products.filter(pr => pr.active).map(pr =>
-    `<option value="${pr.id}" ${productId === pr.id ? 'selected' : ''}>${pr.sku} — ${pr.name}</option>`
+    `<option value="${pr.id}" ${productId === pr.id ? 'selected' : ''}>${escHtml(pr.sku)} — ${escHtml(pr.name)}</option>`
   ).join('');
 
+  let baseNgn = 0;
+  let markup = existing && existing.markupPct != null ? existing.markupPct : 0;
+  if (existing) {
+    if (existing.baseNGN != null) baseNgn = existing.baseNGN;
+    else if (existing.unitNGN != null && markup) baseNgn = existing.unitNGN / (1 + markup / 100);
+    else if (existing.unitNGN != null) baseNgn = existing.unitNGN;
+    else if (p) baseNgn = toNGN(p.price, p.currency);
+  }
+  const nameVal = existing ? (existing.name || (p ? p.name : '') || '') : '';
+  const qtyVal = existing ? (existing.qty || 1) : 1;
+
   tr.innerHTML = `
-    <td class="py-2 pr-2">
-      <select class="qi-product w-full px-2 py-1.5 border rounded text-sm" onchange="onItemProductChange('${rowId}')">
-        <option value="">Select equipment...</option>
+    <td class="py-2 pr-2 min-w-[180px]">
+      <select class="qi-product w-full px-2 py-1.5 border rounded text-sm mb-1" onchange="onItemProductChange('${rowId}')">
+        <option value="">Custom / from sheet...</option>
         ${options}
       </select>
+      <input type="text" class="qi-name w-full px-2 py-1.5 border rounded text-sm" placeholder="Item name" value="${escHtml(nameVal)}" oninput="recalcQuote()" />
     </td>
     <td class="py-2 pr-2">
-      <input type="number" min="1" value="${existing ? (existing.qty || 1) : 1}" class="qi-qty w-full px-2 py-1.5 border rounded text-sm text-center" oninput="recalcQuote()" />
+      <input type="number" min="0" step="1" value="${qtyVal}" class="qi-qty w-full px-2 py-1.5 border rounded text-sm text-center" oninput="recalcQuote()" />
     </td>
-    <td class="py-2 pr-2 text-xs text-slate-500 qi-orig">—</td>
-    <td class="py-2 pr-2 qi-unit-ngn text-sm">—</td>
+    <td class="py-2 pr-2">
+      <input type="number" min="0" step="1" value="${Math.round(baseNgn)}" class="qi-base w-full px-2 py-1.5 border rounded text-sm text-right" oninput="recalcQuote()" title="Base cost in NGN (before markup)" />
+    </td>
+    <td class="py-2 pr-2">
+      <input type="number" min="0" step="0.1" value="${markup}" class="qi-markup w-full px-2 py-1.5 border rounded text-sm text-center" oninput="recalcQuote()" title="Optional markup % — not shown on PDF" />
+    </td>
+    <td class="py-2 pr-2 qi-unit-ngn text-sm font-medium">—</td>
     <td class="py-2 pr-2 qi-line font-medium text-sm">—</td>
     <td class="py-2">
-      <button onclick="document.getElementById('${rowId}').remove(); recalcQuote()" class="text-red-400 hover:text-red-600 text-lg">×</button>
+      <button type="button" onclick="document.getElementById('${rowId}').remove(); recalcQuote()" class="text-red-400 hover:text-red-600 text-lg">×</button>
     </td>
   `;
   tbody.appendChild(tr);
   if (productId) {
-    onItemProductChange(rowId);
+    // keep existing base/markup if provided; only fill from product if empty base
+    const p2 = getProduct(productId);
+    if (p2 && !(existing && existing.baseNGN != null)) {
+      const unit = toNGN(p2.price, p2.currency);
+      tr.querySelector('.qi-base').value = Math.round(unit);
+      if (!tr.querySelector('.qi-name').value) tr.querySelector('.qi-name').value = p2.name || '';
+    }
   }
+  recalcQuote();
 }
 
 function onItemProductChange(rowId) {
@@ -1156,16 +1306,13 @@ function onItemProductChange(rowId) {
   const prodId = row.querySelector('.qi-product').value;
   const p = getProduct(prodId);
   if (p) {
-    row.querySelector('.qi-orig').textContent = formatMoney(p.price, p.currency);
     const unitNgn = toNGN(p.price, p.currency);
-    row.querySelector('.qi-unit-ngn').textContent = formatNGN(unitNgn);
-    row.dataset.unitNgn = unitNgn;
+    row.querySelector('.qi-base').value = Math.round(unitNgn);
+    const nameEl = row.querySelector('.qi-name');
+    if (nameEl && (!nameEl.value || nameEl.value === '—')) nameEl.value = p.name || '';
+    else if (nameEl && !nameEl.value) nameEl.value = p.name || '';
     row.dataset.currency = p.currency;
     row.dataset.price = p.price;
-  } else {
-    row.querySelector('.qi-orig').textContent = '—';
-    row.querySelector('.qi-unit-ngn').textContent = '—';
-    row.dataset.unitNgn = 0;
   }
   recalcQuote();
 }
@@ -1174,10 +1321,18 @@ function recalcQuote() {
   let subtotal = 0;
   let count = 0;
   document.querySelectorAll('#quote-items-tbody tr').forEach(row => {
-    const prod = row.querySelector('.qi-product');
-    if (prod && prod.value) count++;
-    const qty = parseFloat(row.querySelector('.qi-qty').value) || 0;
-    const unit = parseFloat(row.dataset.unitNgn) || 0;
+    const name = (row.querySelector('.qi-name')?.value || '').trim();
+    const prod = row.querySelector('.qi-product')?.value;
+    if (name || prod) count++;
+    const qty = parseFloat(row.querySelector('.qi-qty')?.value) || 0;
+    const base = parseFloat(row.querySelector('.qi-base')?.value) || 0;
+    const markup = parseFloat(row.querySelector('.qi-markup')?.value) || 0;
+    const unit = quoteFinalUnit(base, markup);
+    row.dataset.unitNgn = unit;
+    row.dataset.baseNgn = base;
+    row.dataset.markupPct = markup;
+    const unitEl = row.querySelector('.qi-unit-ngn');
+    if (unitEl) unitEl.textContent = formatNGN(unit);
     const line = qty * unit;
     const lineEl = row.querySelector('.qi-line');
     if (lineEl) lineEl.textContent = formatNGN(line);
@@ -1203,24 +1358,31 @@ function saveQuote() {
 
   const items = [];
   document.querySelectorAll('#quote-items-tbody tr').forEach(row => {
-    const productId = row.querySelector('.qi-product').value;
-    if (!productId) return;
-    const qty = parseFloat(row.querySelector('.qi-qty').value) || 1;
-    const p = getProduct(productId);
+    const productId = row.querySelector('.qi-product')?.value || '';
+    const name = (row.querySelector('.qi-name')?.value || '').trim();
+    const p = productId ? getProduct(productId) : null;
+    const displayName = name || (p ? p.name : '');
+    if (!displayName && !productId) return;
+    const qty = parseFloat(row.querySelector('.qi-qty')?.value) || 1;
+    const baseNGN = parseFloat(row.querySelector('.qi-base')?.value) || 0;
+    const markupPct = parseFloat(row.querySelector('.qi-markup')?.value) || 0;
+    const unitNGN = quoteFinalUnit(baseNGN, markupPct);
     items.push({
-      productId,
-      sku: p.sku,
-      name: p.name,
+      productId: productId || '',
+      sku: p ? p.sku : (row.dataset.sku || ''),
+      name: displayName,
       qty,
-      unitPrice: parseFloat(row.dataset.price) || p.price,
-      currency: row.dataset.currency || p.currency,
-      unitNGN: parseFloat(row.dataset.unitNgn) || 0,
-      lineNGN: qty * (parseFloat(row.dataset.unitNgn) || 0)
+      unitPrice: p ? p.price : baseNGN,
+      currency: (row.dataset.currency || (p && p.currency) || 'NGN'),
+      baseNGN,
+      markupPct,
+      unitNGN,
+      lineNGN: qty * unitNGN
     });
   });
 
   if (items.length === 0) {
-    alert('Add at least one equipment item.');
+    alert('Add at least one line item.');
     return;
   }
 
@@ -1262,6 +1424,94 @@ function saveQuote() {
   renderDashboard();
 }
 
+function downloadQuoteItemsTemplate() {
+  const headers = ['SKU', 'Name', 'Qty', 'Unit_Price', 'Currency', 'Markup_Pct'];
+  const sample = ['MRI-3T-001', '3.0T MRI Scanner System', '1', '850000', 'USD', '10'];
+  const csv = headers.join(',') + '\\n' + sample.join(',') + '\\n';
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Medicano_Quote_Items_Template.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function onImportQuoteItemsFile(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function() {
+    try {
+      const text = String(reader.result || '');
+      const rows = parseCsv(text);
+      if (!rows.length) { alert('No rows found in file.'); return; }
+      // header map
+      const header = rows[0].map(h => String(h || '').trim().toLowerCase().replace(/\\s+/g, '_'));
+      const idx = (names) => {
+        for (const n of names) {
+          const i = header.indexOf(n);
+          if (i >= 0) return i;
+        }
+        return -1;
+      };
+      const iSku = idx(['sku', 'code', 'item_code']);
+      const iName = idx(['name', 'item', 'description', 'equipment', 'product']);
+      const iQty = idx(['qty', 'quantity', 'qty.']);
+      const iPrice = idx(['unit_price', 'price', 'unit', 'unit_ngn', 'amount']);
+      const iCur = idx(['currency', 'curr', 'ccy']);
+      const iMarkup = idx(['markup_pct', 'markup', 'markup%', 'margin']);
+      if (iName < 0 && iSku < 0) {
+        alert('Spreadsheet needs a Name or SKU column.');
+        return;
+      }
+      let added = 0;
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row || !row.length) continue;
+        const sku = iSku >= 0 ? String(row[iSku] || '').trim() : '';
+        let name = iName >= 0 ? String(row[iName] || '').trim() : '';
+        const qty = iQty >= 0 ? parseFloat(row[iQty]) || 1 : 1;
+        const rawPrice = iPrice >= 0 ? parseFloat(String(row[iPrice]).replace(/,/g, '')) : 0;
+        const currency = (iCur >= 0 ? String(row[iCur] || 'NGN').trim().toUpperCase() : 'NGN') || 'NGN';
+        const markupPct = iMarkup >= 0 ? parseFloat(row[iMarkup]) || 0 : 0;
+        // match catalog by SKU
+        let productId = '';
+        let p = null;
+        if (sku) {
+          p = (data.products || []).find(x => String(x.sku).toLowerCase() === sku.toLowerCase());
+          if (p) productId = p.id;
+        }
+        if (!name && p) name = p.name;
+        if (!name && !sku) continue;
+        let baseNGN = 0;
+        if (rawPrice > 0) {
+          baseNGN = currency === 'NGN' ? rawPrice : toNGN(rawPrice, currency);
+        } else if (p) {
+          baseNGN = toNGN(p.price, p.currency);
+        }
+        addQuoteItemRow({
+          productId,
+          sku,
+          name: name || sku,
+          qty,
+          baseNGN,
+          markupPct,
+          unitNGN: quoteFinalUnit(baseNGN, markupPct)
+        });
+        added++;
+      }
+      recalcQuote();
+      alert(added ? ('Added ' + added + ' line(s) from spreadsheet.') : 'No valid lines found.');
+    } catch (err) {
+      console.error(err);
+      alert('Could not read spreadsheet. Use CSV with columns: SKU, Name, Qty, Unit_Price, Currency, Markup_Pct');
+    }
+  };
+  reader.readAsText(file);
+}
+
+
 function deleteCurrentQuote() {
   if (!currentQuoteId) return;
   data.quotes = data.quotes.filter(q => q.id !== currentQuoteId);
@@ -1291,6 +1541,7 @@ function renderInvoices() {
       draft: 'bg-slate-100 text-slate-700',
       sent: 'bg-blue-50 text-blue-700',
       paid: 'bg-emerald-50 text-emerald-700',
+      unpaid: 'bg-orange-50 text-orange-700',
       partial: 'bg-amber-50 text-amber-800',
       overdue: 'bg-rose-50 text-rose-700',
       cancelled: 'bg-slate-100 text-slate-500'
@@ -1872,17 +2123,19 @@ function printQuote() {
   let itemsHtml = '';
   let subtotal = 0;
   document.querySelectorAll('#quote-items-tbody tr').forEach(row => {
-    const productId = row.querySelector('.qi-product').value;
-    if (!productId) return;
-    const p = getProduct(productId);
-    const qty = parseFloat(row.querySelector('.qi-qty').value) || 1;
+    const productId = row.querySelector('.qi-product')?.value || '';
+    const p = productId ? getProduct(productId) : null;
+    const name = (row.querySelector('.qi-name')?.value || '').trim() || (p ? p.name : '');
+    if (!name && !productId) return;
+    const sku = p ? p.sku : (row.dataset.sku || '');
+    const qty = parseFloat(row.querySelector('.qi-qty')?.value) || 1;
     const unit = parseFloat(row.dataset.unitNgn) || 0;
     const line = qty * unit;
     subtotal += line;
+    // Final unit only — no base/markup shown on quotation
     itemsHtml += `<tr>
-      <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${p.sku}<br><small>${p.name}</small></td>
+      <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${sku ? escHtml(sku) + '<br>' : ''}<small>${escHtml(name)}</small></td>
       <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;">${qty}</td>
-      <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatMoney(p.price, p.currency)}</td>
       <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatNGN(unit)}</td>
       <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatNGN(line)}</td>
     </tr>`;
@@ -2526,7 +2779,67 @@ function resetData() {
 }
 
 // -------------------- Client Presentation --------------------
+function populatePresQuoteSelect() {
+  const sel = document.getElementById('pres-from-quote');
+  if (!sel) return;
+  const cur = sel.value;
+  const quotes = (data.quotes || []).slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  sel.innerHTML = '<option value="">— Select a saved quote —</option>' +
+    quotes.map(q => {
+      const c = getClient(q.clientId);
+      const label = (q.quoteNumber || 'Quote') + ' — ' + (c ? c.name : 'Client') + ' — ' + (q.title || '');
+      return '<option value="' + q.id + '">' + escHtml(label) + '</option>';
+    }).join('');
+  if (cur) sel.value = cur;
+}
+
+function applyQuoteToPresentation() {
+  const id = document.getElementById('pres-from-quote')?.value;
+  if (!id) { alert('Select a quotation first.'); return; }
+  const q = (data.quotes || []).find(x => x.id === id);
+  if (!q) { alert('Quote not found.'); return; }
+  const client = getClient(q.clientId);
+  if (client && document.getElementById('pres-client')) {
+    document.getElementById('pres-client').value = client.name || '';
+  }
+  if (q.title && document.getElementById('pres-title')) {
+    document.getElementById('pres-title').value = q.title;
+  }
+  // Store quote items for generatePresentation
+  window._presQuoteItems = (q.items || []).map(it => {
+    const p = it.productId ? getProduct(it.productId) : null;
+    const unit = it.unitNGN != null ? it.unitNGN : (it.unitNgn != null ? it.unitNgn : (p ? toNGN(p.price, p.currency) : 0));
+    const qty = it.qty || 1;
+    return {
+      id: it.productId || ('custom-' + (it.name || 'item') + '-' + Math.random().toString(36).slice(2, 6)),
+      productId: it.productId || '',
+      name: it.name || (p ? p.name : 'Item'),
+      sku: it.sku || (p ? p.sku : ''),
+      category: (p && p.category) || 'Equipment',
+      description: (p && p.description) || '',
+      features: (p && p.features) || '',
+      image: (p && p.image) || '',
+      price: unit,
+      currency: 'NGN',
+      qty: qty,
+      fromQuote: true
+    };
+  });
+  // Also check catalog products that match
+  const picker = document.getElementById('pres-picker');
+  if (picker) {
+    picker.querySelectorAll('.pres-check').forEach(cb => { cb.checked = false; });
+    (q.items || []).forEach(it => {
+      if (!it.productId) return;
+      const cb = picker.querySelector('.pres-check[value="' + it.productId + '"]');
+      if (cb) cb.checked = true;
+    });
+  }
+  alert('Loaded ' + (window._presQuoteItems || []).length + ' item(s) from ' + (q.quoteNumber || 'quote') + '. Generate PDF when ready.');
+}
+
 function renderPresPicker() {
+  populatePresQuoteSelect();
   const search = (document.getElementById('pres-search')?.value || '').toLowerCase();
   const container = document.getElementById('pres-picker');
   if (!container) return;
@@ -2581,21 +2894,41 @@ function loadJsPdf() {
 
 function generatePresentation() {
   const checked = [...document.querySelectorAll('#pres-picker .pres-check:checked')];
-  if (checked.length === 0) {
-    alert('Please select at least one machine to include in the presentation.');
+  const quoteItems = window._presQuoteItems || [];
+  let products = [];
+  if (quoteItems.length) {
+    // Prefer quote-loaded items (includes qty + unit price); merge any extra checked products not already included
+    const ids = new Set(quoteItems.map(x => x.productId).filter(Boolean));
+    products = quoteItems.slice();
+    checked.forEach(cb => {
+      if (ids.has(cb.value)) return;
+      const p = getProduct(cb.value);
+      if (p) products.push({ ...p, qty: 1, price: toNGN(p.price, p.currency), currency: 'NGN' });
+    });
+  } else {
+    products = checked.map(cb => {
+      const p = getProduct(cb.value);
+      if (!p) return null;
+      return { ...p, qty: 1, price: toNGN(p.price, p.currency), currency: 'NGN' };
+    }).filter(Boolean);
+  }
+  if (products.length === 0) {
+    alert('Select equipment or load a quotation first.');
     return;
   }
-  const products = checked.map(cb => getProduct(cb.value)).filter(Boolean);
   const forClient = document.getElementById('pres-client')?.value.trim() || 'Our Valued Hospital Partner';
   const co = data.company;
   const dateStr = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
   const title = document.getElementById('pres-title')?.value.trim() || 'Medical Equipment Proposal';
+  const layout = (document.querySelector('input[name="pres-layout"]:checked')?.value) || 'picture';
+  const summaryMode = (document.querySelector('input[name="pres-summary"]:checked')?.value) || 'complex';
+  const globalMarkup = parseFloat(document.getElementById('pres-global-markup')?.value) || 0;
 
   const btn = document.querySelector('#page-presentation button[onclick="generatePresentation()"]');
   if (btn) { btn.disabled = true; btn.textContent = 'Generating PDF…'; }
 
   loadJsPdf().then(JsPDF => {
-    buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title);
+    buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, layout, summaryMode, globalMarkup);
   }).catch(err => {
     alert(err.message || 'PDF generation failed.');
   }).finally(() => {
@@ -2603,7 +2936,7 @@ function generatePresentation() {
   });
 }
 
-function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
+function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, layout, summaryMode, globalMarkup) {
   const doc = new JsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
   const W = doc.internal.pageSize.getWidth();  // 595.28
   const H = doc.internal.pageSize.getHeight(); // 841.89
@@ -2626,6 +2959,10 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   // Standard body size matches T&C body (12.5pt)
   const BODY = 12.5;
   const BODY_LEAD = 16;
+  const isList = (layout === 'list' || layout === 'brochure');
+  const isSimpleSummary = (summaryMode === 'simple');
+  const isUltraSummary = (summaryMode === 'ultra');
+  const globalMk = parseFloat(globalMarkup) || 0;
 
   function wrap(text, fontSize, maxW, font='normal') {
     doc.setFont('helvetica', font);
@@ -2633,28 +2970,49 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
     return doc.splitTextToSize(String(text || ''), maxW);
   }
 
-  // Consistent large page-number design on every page
+  // Top running header — keep clear of page titles below
   function footer(pageNo, total) {
     setCol(GRAY);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text((co.name || 'MEDICANO RESOURCES LIMITED').toUpperCase(), M, 28);
+    doc.setFontSize(8);
+    doc.text((co.name || 'MEDICANO RESOURCES LIMITED').toUpperCase(), M, 22);
     setCol([115, 128, 140]);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(18);
-    doc.text(String(pageNo).padStart(2, '0') + ' / ' + String(total).padStart(2, '0'), W - M, 32, { align: 'right' });
+    doc.setFontSize(14);
+    doc.text(String(pageNo).padStart(2, '0') + ' / ' + String(total).padStart(2, '0'), W - M, 24, { align: 'right' });
+  }
+
+  function lineUnitBase(p) {
+    return (p.currency === 'NGN' || p.fromQuote) ? (parseFloat(p.price) || 0) : toNGN(p.price, p.currency);
+  }
+  function lineUnit(p) {
+    return lineUnitBase(p) * (1 + globalMk / 100);
+  }
+  function lineQty(p) {
+    return Math.max(1, parseFloat(p.qty) || 1);
+  }
+  function lineTotal(p) {
+    return lineUnit(p) * lineQty(p);
   }
 
   function estimateCardH(p) {
+    if (isList) {
+      const nameLines = Math.min(2, Math.max(1, wrap(p.name || '', 10.5, W - 2 * M - 160, 'bold').length));
+      const desc = String(p.description || '').trim();
+      const descLines = desc ? Math.min(2, wrap(desc, 9, W - 2 * M - 160).length) : 0;
+      return Math.max(52, 28 + nameLines * 12 + descLines * 11 + 18);
+    }
     const feats = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).length;
     const descLines = Math.max(1, wrap(p.description || '', BODY, W - 2 * M - 140).length);
     let h = 100 + descLines * BODY_LEAD + Math.max(feats, 0) * (BODY_LEAD - 1) + 28;
-    return Math.max(140, Math.min(h, 260));
+    return Math.max(150, Math.min(h + 12, 280));
   }
 
   function packMachines(list) {
-    const usable = 560;
-    const gap = 12;
+    // More cards when content is short; list mode packs denser
+    const usable = isList ? 620 : 560;
+    const gap = isList ? 6 : 12;
+    const maxPerPage = isList ? 14 : 4;
     const heights = list.map(estimateCardH);
     const packs = [];
     let i = 0;
@@ -2668,23 +3026,21 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
         items.push({ p: list[i], h, idx: i });
         used += need;
         i++;
-        if (items.length >= 3) break;
+        if (items.length >= maxPerPage) break;
       }
-      packs.push({ items, usedH: used });
+      packs.push({ items, usedH: used, gap });
     }
     return packs;
   }
 
-  function drawCard(p, x, y, w, h) {
+  function drawPictureCard(p, x, y, w, h) {
     setFill(WHITE); setDraw(LINE); doc.setLineWidth(0.75);
     doc.roundedRect(x, y, w, h, 8, 8, 'FD');
     const pad = 14;
-    // Square image frame (same width and height)
     const imgSize = Math.min(118, h - 2 * pad);
     const imgY = y + pad + Math.max(0, (h - 2 * pad - imgSize) / 2);
     setFill(NAVY2); setDraw(GOLD); doc.setLineWidth(1);
     doc.roundedRect(x + pad, imgY, imgSize, imgSize, 4, 4, 'FD');
-    // image or placeholder
     if (p.image) {
       try {
         doc.addImage(p.image, 'JPEG', x + pad + 1, imgY + 1, imgSize - 2, imgSize - 2);
@@ -2703,82 +3059,253 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
     doc.text(String(p.category || 'EQUIPMENT').toUpperCase(), tx, ty);
     ty += 16;
     setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-    const nameLines = wrap(p.name, 13, tw, 'bold');
-    nameLines.slice(0, 2).forEach(ln => { doc.text(ln, tx, ty); ty += 14; });
+    wrap(p.name, 13, tw, 'bold').slice(0, 2).forEach(ln => { doc.text(ln, tx, ty); ty += 14; });
     setDraw(LINE); doc.setLineWidth(1); doc.line(tx, ty, tx + 28, ty);
     ty += 14;
     setCol([87, 88, 92]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
     wrap(p.description || '', BODY, tw).slice(0, 4).forEach(ln => { doc.text(ln, tx, ty); ty += BODY_LEAD - 2; });
     ty += 6;
-    const feats = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).slice(0, 5);
-    feats.forEach(f => {
+    (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).slice(0, 5).forEach(f => {
       setFill(GOLD); doc.circle(tx + 3, ty - 2, 1.6, 'F');
       setCol([56, 57, 61]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
       doc.text(f.substring(0, 72), tx + 10, ty);
       ty += BODY_LEAD - 1;
     });
-    const priceNgn = toNGN(p.price, p.currency);
+    const unitNgn = lineUnit(p);
+    const qty = lineQty(p);
+    const lineNgn = unitNgn * qty;
     setCol(GRAY); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-    doc.text('PRICE', x + w - pad, y + h - pad - 18, { align: 'right' });
-    setCol(NAVY); doc.setFontSize(BODY);
-    doc.setFont('helvetica', 'bold');
-    doc.text(formatNairaPlain(priceNgn), x + w - pad, y + h - pad - 2, { align: 'right' });
+    doc.text('PRICE', x + w - pad, y + h - pad - 28, { align: 'right' });
+    setCol([115, 118, 124]); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    doc.text(formatNairaPlain(unitNgn) + ' × (' + qty + (qty === 1 ? ' unit' : ' units') + ')', x + w - pad, y + h - pad - 16, { align: 'right' });
+    setCol(NAVY); doc.setFontSize(BODY); doc.setFont('helvetica', 'bold');
+    doc.text(formatNairaPlain(lineNgn), x + w - pad, y + h - pad - 2, { align: 'right' });
   }
 
-  function drawSummaryPage(list, pageNo, total) {
-    // Always its own page — 16pt type, professional spacing, vertically centered
-    setFill(CREAM); doc.rect(0, 0, W, H, 'F');
-    setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-    doc.text('INVESTMENT', M, 48);
-    setCol(NAVY); doc.setFontSize(22);
-    doc.text('Pricing Summary', M, 76);
-    setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 92, M + 54, 92);
+  function drawListCard(p, x, y, w, h) {
+    setFill(WHITE); setDraw(LINE); doc.setLineWidth(0.55);
+    doc.roundedRect(x, y, w, h, 5, 5, 'FD');
+    const padX = 12;
+    const padY = 10;
+    let ty = y + padY + 8;
+    setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
+    doc.text(String(p.category || 'EQUIPMENT').toUpperCase(), x + padX, ty);
+    // price block right
+    const unitNgn = lineUnit(p);
+    const qty = lineQty(p);
+    const lineNgn = unitNgn * qty;
+    setCol([115, 118, 124]); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+    doc.text(formatNairaPlain(unitNgn) + ' × (' + qty + (qty === 1 ? ' unit' : ' units') + ')', x + w - padX, ty, { align: 'right' });
+    ty += 12;
+    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
+    const nameMax = w - padX * 2 - 120;
+    wrap(p.name || '', 10.5, nameMax, 'bold').slice(0, 2).forEach(ln => { doc.text(ln, x + padX, ty); ty += 12; });
+    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+    doc.text(formatNairaPlain(lineNgn), x + w - padX, y + padY + 22, { align: 'right' });
+    const desc = String(p.description || '').trim();
+    if (desc) {
+      setCol([90, 92, 98]); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+      wrap(desc, 9, w - padX * 2 - 100).slice(0, 2).forEach(ln => { doc.text(ln, x + padX, ty); ty += 11; });
+    }
+  }
 
-    const rowH = 36;
-    const padY = 28;
-    const headerBand = 36;
-    const totalBand = 48;
-    const noteH = 24;
-    const panelH = padY + headerBand + list.length * rowH + 16 + totalBand + noteH + padY;
-    const cardW = W - 2 * M;
-    const panelY = Math.max(120, (H - panelH) / 2);
+  function drawCard(p, x, y, w, h) {
+    if (isList) drawListCard(p, x, y, w, h);
+    else drawPictureCard(p, x, y, w, h);
+  }
 
-    setFill(NAVY);
-    doc.roundedRect(M, panelY, cardW, panelH, 10, 10, 'F');
+  // Multi-page pricing summary — continues before footer when long
+  function drawSummaryPages(list, startPageNo, totalPagesGuess) {
+    const rowH = 28;
+    const topY = 122;
+    const bottomSafe = 58;
+    const maxRowsFirst = Math.floor((H - topY - bottomSafe - 90) / rowH);
+    const maxRowsCont = Math.floor((H - topY - bottomSafe - 40) / rowH);
+    const chunks = [];
+    let i = 0;
+    let first = true;
+    while (i < list.length) {
+      const n = first ? Math.max(1, maxRowsFirst) : Math.max(1, maxRowsCont);
+      chunks.push(list.slice(i, i + n));
+      i += n;
+      first = false;
+    }
+    if (!chunks.length) chunks.push([]);
 
-    setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-    doc.text('PRICING SUMMARY', M + 28, panelY + padY + 12);
+    let pageNo = startPageNo;
+    const grandTotal = list.reduce((s, p) => s + lineTotal(p), 0);
 
-    let ry = panelY + padY + headerBand + 8;
-    list.forEach(p => {
-      setCol(CREAM2); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
-      const name = String(p.name || '').substring(0, 42);
-      doc.text(name, M + 28, ry);
-      doc.setFont('helvetica', 'bold');
-      doc.text(formatNairaPlain(toNGN(p.price, p.currency)), W - M - 28, ry, { align: 'right' });
-      ry += rowH;
+    chunks.forEach((chunk, ci) => {
+      if (ci > 0) doc.addPage();
+      setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+      setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+      doc.text('INVESTMENT', M, 58);
+      setCol(NAVY); doc.setFontSize(22);
+      doc.text(ci === 0 ? 'Pricing Summary' : 'Pricing Summary (continued)', M, 86);
+      setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 102, M + 54, 102);
+
+      const isLast = ci === chunks.length - 1;
+      const panelTop = topY;
+      const rowsH = chunk.length * rowH;
+      const totalBand = isLast ? 52 : 0;
+      const noteH = isLast ? 22 : 0;
+      const panelH = 36 + rowsH + 16 + totalBand + noteH + 24;
+      const cardW = W - 2 * M;
+
+      setFill(NAVY);
+      doc.roundedRect(M, panelTop, cardW, Math.min(panelH, H - panelTop - bottomSafe + 8), 10, 10, 'F');
+
+      setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+      doc.text(ci === 0 ? 'PRICING SUMMARY' : 'CONTINUED', M + 28, panelTop + 28);
+
+      let ry = panelTop + 48;
+      chunk.forEach(p => {
+        if (ry > H - bottomSafe - (isLast ? 70 : 20)) return;
+        setCol(CREAM2); doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+        const qty = lineQty(p);
+        const name = String(p.name || '').substring(0, 40) + (qty > 1 ? ' ×' + qty : '');
+        doc.text(name, M + 28, ry);
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatNairaPlain(lineTotal(p)), W - M - 28, ry, { align: 'right' });
+        ry += rowH;
+      });
+
+      if (isLast) {
+        setDraw([80, 100, 120]); doc.setLineWidth(0.9);
+        doc.line(M + 28, ry - 6, W - M - 28, ry - 6);
+        ry += 18;
+        setCol(CREAM); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+        doc.text('TOTAL PROPOSAL VALUE', M + 28, ry);
+        setCol(GOLD); doc.setFontSize(16);
+        doc.text(formatNairaPlain(grandTotal), W - M - 28, ry, { align: 'right' });
+        ry += 22;
+        setCol([160, 170, 185]); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+        doc.text('Prices are indicative and exclude installation, freight, and applicable duties.', M + 28, ry);
+      } else {
+        setCol([160, 170, 185]); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+        doc.text('Continued on next page…', M + 28, ry + 4);
+      }
+
+      footer(pageNo, totalPagesGuess);
+      pageNo++;
     });
+    return pageNo;
+  }
 
-    setDraw([80, 100, 120]); doc.setLineWidth(0.9);
-    doc.line(M + 28, ry - rowH / 2 + 4, W - M - 28, ry - rowH / 2 + 4);
-    ry += 12;
+  // Ultra-simple table summary (image-style: navy header, zebra rows)
+  function drawUltraSummaryPages(list, startPageNo, totalPagesGuess) {
+    const rowH = 22;
+    const headerH = 28;
+    const topY = 58;
+    const bottomSafe = 52;
+    const tableLeft = M;
+    const tableW = W - 2 * M;
+    // Columns: Item | Qty | Unit Price | Line Total
+    const colQtyW = 42;
+    const colUnitW = 110;
+    const colLineW = 110;
+    const colItemW = tableW - colQtyW - colUnitW - colLineW;
+    const xItem = tableLeft;
+    const xQty = tableLeft + colItemW;
+    const xUnit = xQty + colQtyW;
+    const xLine = xUnit + colUnitW;
 
-    const totalNgn = list.reduce((s, p) => s + toNGN(p.price, p.currency), 0);
-    setCol(CREAM); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
-    doc.text('TOTAL PROPOSAL VALUE', M + 28, ry + 8);
-    setCol(GOLD); doc.setFontSize(18);
-    doc.text(formatNairaPlain(totalNgn), W - M - 28, ry + 8, { align: 'right' });
+    const availFirst = H - topY - bottomSafe - 36 - headerH - 40; // title space
+    const availCont = H - topY - bottomSafe - 20 - headerH - 24;
+    const maxFirst = Math.max(8, Math.floor(availFirst / rowH));
+    const maxCont = Math.max(10, Math.floor(availCont / rowH));
 
-    setCol([160, 170, 185]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
-    doc.text('Prices are indicative and exclude installation, freight, and applicable duties.',
-      M + 28, panelY + panelH - 18);
+    const chunks = [];
+    let i = 0;
+    let first = true;
+    while (i < list.length) {
+      const n = first ? maxFirst : maxCont;
+      chunks.push(list.slice(i, i + n));
+      i += n;
+      first = false;
+    }
+    if (!chunks.length) chunks.push([]);
 
-    footer(pageNo, total);
+    const grandTotal = list.reduce((s, p) => s + lineTotal(p), 0);
+    let pageNo = startPageNo;
+
+    chunks.forEach((chunk, ci) => {
+      if (ci > 0) doc.addPage();
+      setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+
+      setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+      doc.text(ci === 0 ? 'Price Summary' : 'Price Summary (continued)', M, topY);
+
+      let ty = topY + 18;
+
+      // Header bar
+      setFill(NAVY);
+      doc.rect(tableLeft, ty, tableW, headerH, 'F');
+      setCol(WHITE); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      const hy = ty + 18;
+      doc.text('Item', xItem + 8, hy);
+      doc.text('Qty', xQty + colQtyW / 2, hy, { align: 'center' });
+      doc.text('Unit Price', xUnit + colUnitW - 8, hy, { align: 'right' });
+      doc.text('Line Total', xLine + colLineW - 8, hy, { align: 'right' });
+      ty += headerH;
+
+      chunk.forEach((p, ri) => {
+        if (ri % 2 === 0) {
+          setFill([241, 245, 249]); // slate-100 zebra
+          doc.rect(tableLeft, ty, tableW, rowH, 'F');
+        } else {
+          setFill(WHITE);
+          doc.rect(tableLeft, ty, tableW, rowH, 'F');
+        }
+        // light bottom line
+        setDraw([226, 232, 240]);
+        doc.setLineWidth(0.4);
+        doc.line(tableLeft, ty + rowH, tableLeft + tableW, ty + rowH);
+
+        const qty = lineQty(p);
+        const unit = lineUnit(p);
+        const total = unit * qty;
+        const name = String(p.name || 'Item');
+        setCol(INK); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+        const maxNameW = colItemW - 16;
+        let displayName = name;
+        while (doc.getTextWidth(displayName) > maxNameW && displayName.length > 4) {
+          displayName = displayName.slice(0, -2);
+        }
+        if (displayName !== name) displayName = displayName.slice(0, -1) + '…';
+        const textY = ty + 15;
+        doc.text(displayName, xItem + 8, textY);
+        doc.text(String(qty), xQty + colQtyW / 2, textY, { align: 'center' });
+        doc.text(formatNairaPlain(unit), xUnit + colUnitW - 8, textY, { align: 'right' });
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatNairaPlain(total), xLine + colLineW - 8, textY, { align: 'right' });
+        ty += rowH;
+      });
+
+      const isLast = ci === chunks.length - 1;
+      if (isLast) {
+        setFill(NAVY);
+        doc.rect(tableLeft, ty, tableW, 30, 'F');
+        setCol(WHITE); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+        doc.text('TOTAL', xItem + 8, ty + 19);
+        doc.text(formatNairaPlain(grandTotal), xLine + colLineW - 8, ty + 19, { align: 'right' });
+      } else {
+        setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+        doc.text('Continued on next page…', M, ty + 16);
+      }
+
+      footer(pageNo, totalPagesGuess);
+      pageNo++;
+    });
+    return pageNo;
   }
 
   const packs = packMachines(products);
-  // Pricing summary is always its own page
-  const catPages = packs.length + 1;
+  // Estimate summary pages for footer totals
+  const estSummaryPages = isSimpleSummary
+    ? 0
+    : Math.max(1, Math.ceil(products.length / (isUltraSummary ? 28 : (isList ? 18 : 14))));
+  const catPages = packs.length + estSummaryPages;
   const totalPages = 2 + catPages + 2;
 
   // ---- COVER ----
@@ -2842,25 +3369,21 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
 
   setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
   doc.text('COMPANY PROFILE', M, 58);
-  setCol(NAVY); doc.setFontSize(24);
-  doc.text('About ' + (nameParts[0] || 'Medicano'), M, 92);
-  doc.text('Resources Limited', M, 120);
-  setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 138, M + 54, 138);
-  const about = (co.name || 'Medicano Resources Limited') + ' supplies and supports advanced medical equipment for hospitals, diagnostic centres, and specialist clinics across Nigeria. We partner with leading manufacturers to bring reliable systems backed by local installation, training, and after-sales support.';
+  setCol(NAVY); doc.setFontSize(20);
+  doc.text('WELCOME TO MEDICANO', M, 88);
+  doc.text('RESOURCES', M, 112);
+  setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 128, M + 54, 128);
+  const welcome = "Incorporated in 2010, we are a multispecialty leading player in the marketing and distribution of Turnkey Medical Equipment and Technology in the Nigerian market with core expertise in Endoscopic equipment, Ear, Nose and Throat Equipment, Cranio and Oral Maxillofacial, Imaging Equipment (MRI, CT, X-Ray, Ultrasound etc), Hospital Furnishing, Intensive Care Unit Solutions, Neonatal & Pediatrics' solutions as well as a wide Theatre instruments portfolio and equipment amongst other things.\n\nWe offer complete integrated medical solutions to our clients which has endeared us to their hearts. We say integrated because we proffer advisory services, through our seasoned and well trained technical personnel, from our first contact with the client all the way to our after sales service long after the sales have been made. Also, our tradition of excellent service delivery by our experienced and enthusiastic employees, has continued to differentiate us from others in the health care industry.";
   setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
-  // Clear space between gold rule and company description
-  let ay = 168;
-  wrap(about, BODY, W - panelW - M - 28).forEach(ln => { doc.text(ln, M, ay); ay += BODY_LEAD; });
-  ay += 22;
-  setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-  doc.text('What We Offer', M, ay); ay += 22;
-  ['Certified new and pre-owned clinical systems', 'Site planning, installation, and commissioning', 'Preventive maintenance and engineer support', 'Staff training and clinical workflow onboarding', 'Flexible procurement and supply options'].forEach(item => {
-    setFill(GOLD); doc.circle(M + 4, ay - 3, 2, 'F');
-    setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
-    doc.text(item, M + 14, ay); ay += BODY_LEAD + 2;
+  let ay = 152;
+  const maxAboutW = W - panelW - M - 28;
+  welcome.split('\n').forEach(para => {
+    if (!para.trim()) { ay += 10; return; }
+    wrap(para.trim(), BODY, maxAboutW).forEach(ln => { doc.text(ln, M, ay); ay += BODY_LEAD; });
+    ay += 8;
   });
-  // Detail cards: address / phone / email — taller so full address fits
-  ay += 28;
+  // Detail cards: address / phone / email
+  ay += 16;
   const cardGap = 12;
   const leftW = W - panelW - M - 28;
   const cardW3 = (leftW - cardGap * 2) / 3;
@@ -2912,44 +3435,88 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
       });
     }
   });
+  // Tagline after contact cards, before page footer
+  const tagY = Math.min(ay + cardH + 28, H - 56);
+  setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+  doc.text('...Making a Habit of Excellence', M, tagY);
   footer(2, totalPages);
 
   // ---- CATALOGUE ----
   let pageNo = 3;
+  function drawSimpleTotal(x, y, w) {
+    const grand = products.reduce((s, p) => s + lineTotal(p), 0);
+    const boxH = 72;
+    setFill(NAVY);
+    doc.roundedRect(x, y, w, boxH, 10, 10, 'F');
+    setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.text('TOTAL PROPOSAL VALUE', x + 20, y + 26);
+    setCol(CREAM); doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+    doc.text(formatNairaPlain(grand), x + w - 20, y + 30, { align: 'right' });
+    setCol([160, 170, 185]); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+    doc.text(products.length + (products.length === 1 ? ' item' : ' items') + ' · indicative pricing in Naira', x + 20, y + 52);
+    return boxH;
+  }
+
   packs.forEach((pack, pi) => {
     doc.addPage();
     setFill(CREAM); doc.rect(0, 0, W, H, 'F');
     setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
-    doc.text('Equipment Catalogue', M, 48);
+    doc.text('Equipment Catalogue', M, 58);
+    let topLimit = 100;
     if (pi > 0) {
       setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
-      doc.text('continued', W - M, 48, { align: 'right' });
+      doc.text('continued', W - M, 58, { align: 'right' });
+      setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 74, M + 54, 74);
+      topLimit = 92;
     } else {
-      setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
-      doc.text('Selected for your facility, with indicative pricing in Naira.', M, 66);
+      // Gold rule under title, breathing room, then offer
+      setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 74, M + 54, 74);
+      const offer = 'Please find below herewith our OFFER for equipping your hospital with our PREMIUM MEDICAL EQUIPMENT that assures of quality and long-lasting use. We look forward to your final review to enable us proceed on the arrangement.';
+      setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
+      let oy = 74 + 20;
+      wrap(offer, BODY, W - 2 * M).forEach(ln => { doc.text(ln, M, oy); oy += BODY_LEAD; });
+      topLimit = oy + 18;
     }
-    setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 78, M + 54, 78);
 
-    const gap = 12;
-    const totalH = pack.items.reduce((s, it) => s + it.h, 0) + gap * (pack.items.length - 1);
-    const topLimit = 95;
-    const bottomLimit = 50;
+    const gap = pack.gap != null ? pack.gap : (isList ? 6 : 12);
+    const isLastPack = pi === packs.length - 1;
+    const simpleBoxH = 72;
+    const simpleGap = 16;
+    const reserveSimple = (isSimpleSummary && isLastPack) ? (simpleBoxH + simpleGap) : 0;
+    const totalH = pack.items.reduce((s, it) => s + it.h, 0) + gap * Math.max(0, pack.items.length - 1);
+    const bottomLimit = 50 + reserveSimple;
     const area = H - topLimit - bottomLimit;
-    // vertical center the card group
     let yTop = topLimit + Math.max(0, (area - totalH) / 2);
+    if (isList && pack.items.length >= 8) yTop = topLimit;
+    // If simple total needs room and vertical centering would push it off, start higher
+    if (reserveSimple && yTop + totalH + simpleGap + simpleBoxH > H - 50) {
+      yTop = topLimit;
+    }
     const cardW = W - 2 * M;
     pack.items.forEach(it => {
       drawCard(it.p, M, yTop, cardW, it.h);
       yTop += it.h + gap;
     });
+    if (isSimpleSummary && isLastPack) {
+      let sy = yTop + simpleGap;
+      if (sy + simpleBoxH > H - 48) {
+        // Not enough room under last card — still place as high as possible above footer
+        sy = Math.max(topLimit, H - 48 - simpleBoxH);
+      }
+      drawSimpleTotal(M, sy, cardW);
+    }
     footer(pageNo, totalPages);
     pageNo++;
   });
 
-  // Pricing summary — always its own page
-  doc.addPage();
-  drawSummaryPage(products, pageNo, totalPages);
-  pageNo++;
+  // Pricing summary modes
+  if (isUltraSummary) {
+    doc.addPage();
+    pageNo = drawUltraSummaryPages(products, pageNo, totalPages);
+  } else if (!isSimpleSummary) {
+    doc.addPage();
+    pageNo = drawSummaryPages(products, pageNo, totalPages);
+  }
 
   // ---- TERMS (always ONE page — auto-fit spacing so nothing spills) ----
   let termHeadSize = 14;
@@ -2973,12 +3540,12 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   doc.addPage();
   setFill(CREAM); doc.rect(0, 0, W, H, 'F');
   setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-  doc.text('COMMERCIAL TERMS', M, 46);
+  doc.text('COMMERCIAL TERMS', M, 58);
   setCol(NAVY); doc.setFontSize(22);
-  doc.text('Terms and Conditions', M, 74);
-  setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 90, M + 54, 90);
+  doc.text('Terms and Conditions', M, 86);
+  setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 102, M + 54, 102);
 
-  const usableTop = 110;
+  const usableTop = 122;
   const usableBottom = H - 48;
   const usableH = usableBottom - usableTop;
 
@@ -3016,14 +3583,14 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title) {
   doc.addPage();
   setFill(CREAM); doc.rect(0, 0, W, H, 'F');
   setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-  doc.text('NEXT STEPS', M, 48);
-  setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 64, M + 54, 64);
+  doc.text('NEXT STEPS', M, 58);
+  setDraw(GOLD); doc.setLineWidth(1.5); doc.line(M, 74, M + 54, 74);
 
   // Measure closing block then center vertically
   const closeLines1 = wrap('Thank you for doing business with us while we look forward to receiving the confirmation of your order.', termBodySize, W - 2 * M - 40);
   const closeLines2 = wrap('For further information or any clarification, please contact us the undersigned on Tel. 09099995426 or call Francis on 08023203522. E-mail: enquiries@medicanoresources.com', termBodySize, W - 2 * M - 40);
   const closeBlockH = closeLines1.length * termBodyLead + 14 + closeLines2.length * termBodyLead + 28 + termBodyLead + 36 + termHeadLead + 40 + termBodyLead;
-  let cy = 80 + Math.max(0, (H - 80 - 50 - closeBlockH) / 2);
+  let cy = 96 + Math.max(0, (H - 96 - 50 - closeBlockH) / 2);
 
   setCol(INK); doc.setFont('helvetica', 'normal'); doc.setFontSize(termBodySize);
   closeLines1.forEach(ln => { doc.text(ln, M, cy); cy += termBodyLead; });
@@ -3078,6 +3645,12 @@ function initDarkMode() {
 }
 
 // -------------------- Quote Product Picker --------------------
+function toggleQuoteEquipPanel() {
+  const panel = document.getElementById('quote-equip-panel');
+  if (!panel) return;
+  panel.classList.toggle('collapsed');
+}
+
 function renderQuoteProductPicker() {
   const search = (document.getElementById('quote-product-search')?.value || '').toLowerCase();
   const container = document.getElementById('quote-product-picker');
@@ -3099,13 +3672,17 @@ function renderQuoteProductPicker() {
 
   container.innerHTML = list.map(p => {
     const ngn = toNGN(p.price, p.currency);
-    return `<label class="flex items-start gap-3 p-3 hover:bg-slate-50 cursor-pointer">
-      <input type="checkbox" class="qp-check mt-1 rounded" value="${p.id}" data-sku="${p.sku}" />
-      <div class="flex-1 min-w-0">
-        <p class="font-medium truncate">${p.name}</p>
-        <p class="text-xs text-slate-500">${p.sku} • ${p.category} • ${formatMoney(p.price, p.currency)} ≈ ${formatNGN(ngn)}</p>
+    return `<div class="qp-row">
+      <input type="checkbox" class="qp-check rounded" value="${p.id}" data-sku="${escHtml(p.sku)}" />
+      <div class="qp-meta">
+        <p class="font-medium">${escHtml(p.name)}</p>
+        <p class="text-xs text-slate-500">${escHtml(p.sku)} • ${escHtml(p.category || '')} • ${formatMoney(p.price, p.currency)}</p>
       </div>
-    </label>`;
+      <div class="qp-units">
+        <span class="text-xs text-slate-400">Units</span>
+        <input type="number" min="1" step="1" value="1" class="qp-qty" data-for="${p.id}" onclick="event.stopPropagation()" />
+      </div>
+    </div>`;
   }).join('');
 }
 
@@ -3122,33 +3699,47 @@ function addSelectedProductsToQuote() {
     return;
   }
 
-  // Avoid duplicates already in quote
-  const existingIds = new Set();
+  // Map existing product rows to update qty instead of skipping
+  const existingRows = {};
   document.querySelectorAll('#quote-items-tbody tr').forEach(row => {
     const sel = row.querySelector('.qi-product');
-    if (sel && sel.value) existingIds.add(sel.value);
+    if (sel && sel.value) existingRows[sel.value] = row;
   });
 
   let added = 0;
+  let updated = 0;
   checked.forEach(cb => {
     const id = cb.value;
-    if (existingIds.has(id)) return;
-    addQuoteItemRow({ productId: id, qty: 1 });
-    existingIds.add(id);
-    added++;
+    const qtyInput = document.querySelector('#quote-product-picker .qp-qty[data-for="' + id + '"]');
+    const qty = Math.max(1, parseFloat(qtyInput && qtyInput.value) || 1);
+    if (existingRows[id]) {
+      const qEl = existingRows[id].querySelector('.qi-qty');
+      if (qEl) qEl.value = qty;
+      updated++;
+    } else {
+      addQuoteItemRow({ productId: id, qty: qty });
+      added++;
+    }
   });
 
-  // Clear selections
   selectAllQuoteProducts(false);
   if (document.getElementById('quote-product-search')) {
     document.getElementById('quote-product-search').value = '';
     renderQuoteProductPicker();
   }
 
-  if (added === 0) {
-    alert('Selected items are already in the quote.');
+  recalcQuote();
+  // Collapse picker after adding so user focuses on units in line items
+  const panel = document.getElementById('quote-equip-panel');
+  if (panel && (added || updated)) panel.classList.add('collapsed');
+
+  if (!added && !updated) {
+    alert('Nothing was added.');
   } else {
-    recalcQuote();
+    const msg = [];
+    if (added) msg.push(added + ' added');
+    if (updated) msg.push(updated + ' qty updated');
+    // soft feedback via item count is enough
   }
 }
 

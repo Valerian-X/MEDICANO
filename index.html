@@ -403,9 +403,14 @@ html.dark .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
     min-height: 44px;
     font-size: 16px; /* prevents iOS zoom */
   }
-  #page-quote-editor button,
-  #page-quote-editor .px-3 {
+  #page-quote-editor .quote-equip-body > .flex button,
+  #page-quote-editor .mt-5 button,
+  #page-quote-editor .space-y-2 > button {
     min-height: 44px;
+  }
+  #quote-product-picker .qp-qty {
+    min-height: 2.25rem !important;
+    font-size: 16px;
   }
   #quote-client,
   #quote-title,
@@ -533,11 +538,12 @@ html, body {
 }
 
 header.sticky {
-  background: transparent !important;
-  border-bottom: none !important;
+  background: var(--cream, #f6f1ea) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.04) !important;
   backdrop-filter: none;
-  padding-top: 1.15rem !important;
-  padding-bottom: 0.5rem !important;
+  padding-top: 1rem !important;
+  padding-bottom: 0.75rem !important;
+  z-index: 30;
 }
 header.sticky h2 {
   font-size: 1.45rem !important;
@@ -894,6 +900,313 @@ html.dark textarea {
   color: #f3f0ea !important;
 }
 </style>
+<style id="dash-intel">
+
+/* Intelly-style dashboard layout */
+.dash-intel-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (min-width: 1100px) {
+  .dash-intel-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+.dash-intel-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.dash-stats-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+@media (min-width: 800px) {
+  .dash-stats-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.dash-two-panels {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  min-width: 0;
+}
+@media (min-width: 800px) {
+  .dash-two-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.dash-panel {
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+.dash-panel-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 1rem;
+}
+
+/* Right calendar column */
+.dash-intel-side {
+  min-width: 0;
+  padding: 1.15rem !important;
+  position: relative;
+  z-index: 1;
+}
+.dash-side-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.dash-side-month {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+}
+.dash-side-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+  margin-bottom: 0.85rem;
+}
+.dash-side-grid .dow {
+  text-align: center;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #9ca3af;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0;
+}
+.dash-side-grid .d {
+  aspect-ratio: 1;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink, #1a1a1a);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dash-side-grid .d.muted { opacity: 0.25; pointer-events: none; }
+.dash-side-grid .d:hover { background: var(--cream-2, #efe8de); }
+.dash-side-grid .d.today { box-shadow: inset 0 0 0 1.5px #d4c8ba; }
+.dash-side-grid .d.selected { background: var(--pink, #f5cfe0) !important; }
+.dash-side-grid .d.has { font-weight: 800; }
+
+.dash-add-event-btn {
+  width: 100%;
+  border: none;
+  background: var(--ink, #1a1a1a);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  margin-bottom: 1.15rem;
+}
+.dash-add-event-btn:hover { opacity: 0.92; }
+
+.dash-timeline-block { border-top: 1px solid rgba(0,0,0,0.05); padding-top: 1rem; }
+.dash-timeline-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+.dash-timeline-kicker {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  margin: 0 0 0.2rem;
+}
+.dash-timeline-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+.dash-timeline-list { display: flex; flex-direction: column; gap: 0.55rem; }
+.dash-timeline-empty {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #9ca3af;
+  background: var(--cream, #f6f1ea);
+  border-radius: 1rem;
+}
+.dash-timeline-hint {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9ca3af;
+  margin: 0 0 0.35rem;
+}
+.dash-tl-item {
+  display: flex;
+  gap: 0.55rem;
+  align-items: stretch;
+}
+.dash-tl-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 0.85rem;
+  flex-shrink: 0;
+  background: #e891b8;
+}
+.dash-tl-dot.yellow { background: #d4b84a; }
+.dash-tl-dot.green { background: #6aaa5f; }
+.dash-tl-dot.blue { background: #6b8fd4; }
+.dash-tl-dot.lavender { background: #9b7fd4; }
+.dash-tl-dot.peach { background: #e8a078; }
+.dash-tl-dot.pink { background: #e891b8; }
+.dash-tl-body {
+  flex: 1;
+  border-radius: 0.85rem;
+  padding: 0.65rem 0.8rem;
+  background: #f3f0ea;
+}
+.dash-tl-body.pink { background: var(--pink, #f5cfe0); }
+.dash-tl-body.yellow { background: var(--yellow, #f5e6a8); }
+.dash-tl-body.green { background: var(--green, #c8e8c0); }
+.dash-tl-body.blue { background: var(--blue, #c9daf8); }
+.dash-tl-body.lavender { background: var(--lavender, #e0d4f7); }
+.dash-tl-body.peach { background: var(--peach, #f8d5c2); }
+.dash-tl-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+.dash-tl-title { font-weight: 700; font-size: 0.85rem; }
+.dash-tl-time { font-size: 0.72rem; font-weight: 700; opacity: 0.7; white-space: nowrap; }
+.dash-tl-meta { font-size: 0.72rem; opacity: 0.7; margin-top: 0.2rem; }
+</style>
+<style id="quote-equip-css">
+.quote-equip-panel {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  margin-bottom: 0.25rem;
+}
+.quote-equip-panel.collapsed .quote-equip-body { display: none; }
+.quote-equip-panel.collapsed .quote-equip-chevron { transform: rotate(-90deg); }
+.quote-equip-chevron { display: inline-block; transition: transform .15s ease; flex-shrink: 0; }
+.quote-equip-toggle {
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer;
+  min-height: auto !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+.quote-equip-toggle:hover { background: rgba(0,0,0,0.02) !important; }
+.quote-equip-body {
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+}
+#quote-product-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.qp-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 0.75rem;
+  row-gap: 0.35rem;
+  padding: 0.75rem 0.85rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.qp-row:last-child { border-bottom: none; }
+.qp-row:hover { background: rgba(0,0,0,0.02); }
+.qp-check {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  margin: 0;
+}
+.qp-meta {
+  min-width: 0;
+  overflow: hidden;
+}
+.qp-meta p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qp-meta .text-xs {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qp-units {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+.qp-qty {
+  width: 3.75rem !important;
+  min-width: 3.75rem;
+  max-width: 4.5rem;
+  min-height: 2.25rem !important;
+  height: 2.25rem;
+  text-align: center;
+  padding: 0.25rem 0.35rem !important;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.85rem !important;
+  box-sizing: border-box;
+  margin: 0;
+}
+#page-quote-editor .quote-equip-body .flex.flex-col.sm\:flex-row,
+#page-quote-editor .quote-equip-body .flex.gap-2 {
+  min-width: 0;
+  max-width: 100%;
+}
+#page-quote-editor .quote-equip-body button {
+  min-height: 2.5rem;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .qp-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+  .qp-units {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 0.15rem;
+  }
+  .qp-check {
+    grid-row: 1 / span 2;
+    align-self: start;
+    margin-top: 0.2rem;
+  }
+}
+</style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
   <!-- Mobile sidebar overlay -->
@@ -911,15 +1224,14 @@ html.dark textarea {
         </div>
       </div>
       <nav class="flex-1 px-3 pb-3 overflow-y-auto">
-        <span class="sidebar-section-label">General</span>
         <a href="#dashboard" data-page="dashboard" class="sidebar-link flex items-center gap-3">
           <span>📊</span> Dashboard
         </a>
         <a href="#calendar" data-page="calendar" class="sidebar-link flex items-center gap-3">
-          <span>📅</span> Calendar
+          <span>📅</span> Events
         </a>
         <a href="#products" data-page="products" class="sidebar-link flex items-center gap-3">
-          <span>🛠️</span> Equipment Catalog
+          <span>🛠️</span> Inventory
         </a>
         <a href="#clients" data-page="clients" class="sidebar-link flex items-center gap-3">
           <span>🏥</span> Clients
@@ -930,7 +1242,6 @@ html.dark textarea {
         <a href="#invoices" data-page="invoices" class="sidebar-link flex items-center gap-3">
           <span>🧾</span> Invoices
         </a>
-        <span class="sidebar-section-label">Tools</span>
         <a href="#inventory" data-page="inventory" class="sidebar-link flex items-center gap-3">
           <span>📦</span> In Stock
         </a>
@@ -953,7 +1264,7 @@ html.dark textarea {
     <!-- Main content -->
     <div class="flex-1 md:ml-64 min-h-screen flex flex-col">
       <!-- Top bar -->
-      <header class="no-print bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-20">
+      <header class="no-print px-4 py-3 flex items-center justify-between sticky top-0 z-30">
         <div class="flex items-center gap-3">
           <button id="menu-btn" class="md:hidden p-2 rounded-lg hover:bg-slate-100">☰</button>
           <h2 id="page-title" class="text-lg font-semibold text-slate-800">Dashboard</h2>
@@ -1059,48 +1370,96 @@ html.dark textarea {
         <!-- DASHBOARD -->
         <section id="page-dashboard" class="page">
           <div class="dash-greeting">
-            <h2>Good day, Medicano team</h2>
-            <p>Here is a quick overview of your catalog, quotes, clients, and stock.</p>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div class="stat-card stat-yellow">
-              <p class="stat-label">Total Equipment</p>
-              <p class="stat-value" id="stat-products">0</p>
-            </div>
-            <div class="stat-card stat-pink">
-              <p class="stat-label">Active Quotes</p>
-              <p class="stat-value" id="stat-quotes">0</p>
-            </div>
-            <div class="stat-card stat-blue">
-              <p class="stat-label">Clients</p>
-              <p class="stat-value" id="stat-clients">0</p>
-            </div>
-            <div class="stat-card stat-green">
-              <p class="stat-label">Low Stock Items</p>
-              <p class="stat-value" id="stat-lowstock">0</p>
+            <div class="dash-greeting-row">
+              <div>
+                <p class="dash-greeting-eyebrow">Medicano workspace</p>
+                <h2>Good day, Medicano team</h2>
+                <p>Here is a quick overview of your catalog, quotes, clients, and stock.</p>
+              </div>
+              <div class="dash-greeting-badge">Offline ready</div>
             </div>
           </div>
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div class="panel-soft">
-              <h3 class="font-semibold mb-4" style="font-size:1.05rem">Recent Quotes</h3>
-              <div id="recent-quotes" class="space-y-3 text-sm"></div>
-            </div>
-            <div class="panel-soft">
-              <h3 class="font-semibold mb-4" style="font-size:1.05rem">Quick Actions</h3>
-              <div class="flex flex-wrap gap-2">
-                <button onclick="navigate('quotes'); showNewQuote()" class="action-chip dark">+ New Quote</button>
-                <button onclick="navigate('products'); showProductForm()" class="action-chip soft">+ Add Equipment</button>
-                <button onclick="navigate('clients'); showClientForm()" class="action-chip pink">+ Add Client</button>
-                <button onclick="navigate('invoices'); showNewInvoice()" class="action-chip blue">+ New Invoice</button>
+
+          <div class="dash-intel-layout">
+            <!-- LEFT COLUMN -->
+            <div class="dash-intel-main">
+              <div class="dash-stats-row">
+                <div class="stat-card stat-yellow">
+                  <p class="stat-label">Total Equipment</p>
+                  <p class="stat-value" id="stat-products">0</p>
+                </div>
+                <div class="stat-card stat-pink">
+                  <p class="stat-label">Active Quotes</p>
+                  <p class="stat-value" id="stat-quotes">0</p>
+                </div>
+                <div class="stat-card stat-blue">
+                  <p class="stat-label">Clients</p>
+                  <p class="stat-value" id="stat-clients">0</p>
+                </div>
+                <div class="stat-card stat-green">
+                  <p class="stat-label">Low Stock Items</p>
+                  <p class="stat-value" id="stat-lowstock">0</p>
+                </div>
               </div>
-              <div class="mt-6 p-4 rounded-2xl text-sm" style="background:var(--mint,#c5ebe3)">
-                <p class="font-semibold">Company</p>
-                <p class="mt-1 font-medium">Medicano Resources Limited</p>
-                <p class="text-xs mt-2 opacity-70">6, Ojulari Street, Off Kunsela Road, Chisco Bus Stop, Ikate Elegushi, Lekki Expressway</p>
-                <p class="text-xs opacity-70">Tel: 08023203522 | 07045763887</p>
-                <p class="text-xs opacity-70">enquiries@medicanoresources.com</p>
+
+              <div class="dash-two-panels">
+                <div class="panel-soft dash-panel">
+                  <h3 class="dash-panel-title">Recent Quotes</h3>
+                  <div id="recent-quotes" class="space-y-3 text-sm"></div>
+                </div>
+                <div class="panel-soft dash-panel dash-actions-panel">
+                  <h3 class="dash-panel-title">Quick Actions</h3>
+                  <div class="qa-grid">
+                    <button type="button" class="qa-btn qa-dark" onclick="navigate('quotes'); showNewQuote()">
+                      <span class="qa-icon">📋</span>
+                      <span class="qa-label">New Quote</span>
+                    </button>
+                    <button type="button" class="qa-btn qa-soft" onclick="navigate('products'); showProductForm()">
+                      <span class="qa-icon">🛠️</span>
+                      <span class="qa-label">Add Equipment</span>
+                    </button>
+                    <button type="button" class="qa-btn qa-pink" onclick="navigate('clients'); showClientForm()">
+                      <span class="qa-icon">🏥</span>
+                      <span class="qa-label">Add Client</span>
+                    </button>
+                    <button type="button" class="qa-btn qa-blue" onclick="navigate('invoices'); showNewInvoice()">
+                      <span class="qa-icon">🧾</span>
+                      <span class="qa-label">New Invoice</span>
+                    </button>
+                  </div>
+                  <div class="dash-company-card">
+                    <p class="dash-company-kicker">Company</p>
+                    <p class="dash-company-name">Medicano Resources Limited</p>
+                    <p class="dash-company-line">6, Ojulari Street, Off Kunsela Road, Chisco Bus Stop, Ikate Elegushi, Lekki Expressway</p>
+                    <p class="dash-company-line">Tel: 08023203522 | 07045763887</p>
+                    <p class="dash-company-line">enquiries@medicanoresources.com</p>
+                  </div>
+                </div>
               </div>
             </div>
+
+            <!-- RIGHT COLUMN: calendar + timeline -->
+            <aside class="dash-intel-side panel-soft">
+              <p id="dash-full-date" class="dash-full-date">Tue 11 August, 2026</p>
+              <div class="dash-side-cal-header">
+                <button type="button" class="cal-nav-btn" onclick="dashCalPrev()" aria-label="Previous">‹</button>
+                <h3 id="dash-cal-month" class="dash-side-month">Month</h3>
+                <button type="button" class="cal-nav-btn" onclick="dashCalNext()" aria-label="Next">›</button>
+              </div>
+              <div id="dash-mini-cal" class="dash-side-grid"></div>
+              <button type="button" class="dash-add-event-btn" onclick="navigate('calendar'); openCalEventForm()">Add event</button>
+
+              <div class="dash-timeline-block">
+                <div class="dash-timeline-head">
+                  <div>
+                    <p class="dash-timeline-kicker">Day timeline</p>
+                    <h4 id="dash-day-label" class="dash-timeline-title">Day</h4>
+                  </div>
+                  <button type="button" class="action-chip soft" style="padding:0.35rem 0.75rem;font-size:0.72rem" onclick="navigate('calendar')">View all</button>
+                </div>
+                <div id="dash-upcoming-events" class="dash-timeline-list"></div>
+              </div>
+            </aside>
           </div>
         </section>
 
@@ -1239,37 +1598,55 @@ html.dark textarea {
                 </div>
               </div>
 
-              <!-- Product Picker with Search + Checkboxes -->
-              <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
-                <h4 class="font-medium mb-3">Select Equipment to Add</h4>
-                <div class="flex flex-col sm:flex-row gap-2 mb-3">
-                  <input id="quote-product-search" type="search" placeholder="Search tools / equipment..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" oninput="renderQuoteProductPicker()" />
-                  <div class="flex gap-2">
-                    <button type="button" onclick="selectAllQuoteProducts(true)" class="px-3 py-2 text-sm bg-brand-100 text-brand-800 rounded-lg hover:bg-brand-200">Select All</button>
-                    <button type="button" onclick="selectAllQuoteProducts(false)" class="px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">Clear</button>
-                    <button type="button" onclick="addSelectedProductsToQuote()" class="px-3 py-2 text-sm bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium">Add Selected</button>
+              <!-- Product Picker — collapsible -->
+              <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden quote-equip-panel" id="quote-equip-panel">
+                <button type="button" class="quote-equip-toggle w-full flex items-center justify-between px-5 py-4 text-left" onclick="toggleQuoteEquipPanel()">
+                  <span class="font-medium">Select Equipment to Add</span>
+                  <span class="quote-equip-chevron text-slate-400 text-sm">▼</span>
+                </button>
+                <div class="quote-equip-body px-5 pb-5 border-t border-slate-100">
+                  <p class="text-xs text-slate-500 pt-3 mb-3">Tick items, set units, then tap <strong>Add Selected</strong>. Adjust quantities again in Line Items if needed.</p>
+                  <div class="flex flex-col sm:flex-row gap-2 mb-3">
+                    <input id="quote-product-search" type="search" placeholder="Search tools / equipment..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" oninput="renderQuoteProductPicker()" />
+                    <div class="flex gap-2 flex-wrap">
+                      <button type="button" onclick="selectAllQuoteProducts(true)" class="px-3 py-2 text-sm bg-brand-100 text-brand-800 rounded-lg hover:bg-brand-200">Select All</button>
+                      <button type="button" onclick="selectAllQuoteProducts(false)" class="px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">Clear</button>
+                      <button type="button" onclick="addSelectedProductsToQuote()" class="px-3 py-2 text-sm bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium">Add Selected</button>
+                    </div>
                   </div>
-                </div>
-                <div id="quote-product-picker" class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 text-sm">
-                  <!-- filled by JS -->
+                  <div id="quote-product-picker" class="max-h-56 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 text-sm">
+                    <!-- filled by JS -->
+                  </div>
                 </div>
               </div>
 
               <!-- Line Items -->
               <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
-                <div class="flex justify-between items-center mb-3">
-                  <h4 class="font-medium">Line Items</h4>
-                  <span id="quote-item-count" class="text-xs text-slate-500">0 items</span>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                  <div class="flex items-center gap-2">
+                    <h4 class="font-medium">Line Items</h4>
+                    <span id="quote-item-count" class="text-xs text-slate-500">0 items</span>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="addQuoteItemRow()" class="px-3 py-1.5 text-xs bg-slate-100 text-slate-700 rounded-lg font-medium">+ Custom line</button>
+                    <label class="px-3 py-1.5 text-xs bg-brand-600 text-white rounded-lg font-medium cursor-pointer" style="background:#1a1a1a">
+                      Import spreadsheet
+                      <input type="file" accept=".csv,text/csv,.xlsx" class="hidden" onchange="onImportQuoteItemsFile(event)" />
+                    </label>
+                    <button type="button" onclick="downloadQuoteItemsTemplate()" class="px-3 py-1.5 text-xs bg-slate-100 text-slate-700 rounded-lg font-medium">Template</button>
+                  </div>
                 </div>
+                <p class="text-xs text-slate-500 mb-3">Optional markup % is internal only — the quotation PDF shows final unit price only (no markup label).</p>
                 <div class="overflow-x-auto">
                   <table class="w-full text-sm pastel-cols">
                     <thead class="text-slate-500 text-left">
                       <tr>
                         <th class="pb-2 font-medium">Equipment</th>
-                        <th class="pb-2 font-medium w-20">Qty</th>
-                        <th class="pb-2 font-medium">Unit Price (Orig)</th>
+                        <th class="pb-2 font-medium w-16">Qty</th>
+                        <th class="pb-2 font-medium w-28">Base (NGN)</th>
+                        <th class="pb-2 font-medium w-20">Markup %</th>
                         <th class="pb-2 font-medium">Unit (NGN)</th>
-                        <th class="pb-2 font-medium">Line Total (NGN)</th>
+                        <th class="pb-2 font-medium">Line Total</th>
                         <th class="pb-2 w-10"></th>
                       </tr>
                     </thead>
@@ -1316,6 +1693,7 @@ html.dark textarea {
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
               <option value="paid">Paid</option>
+              <option value="unpaid">Unpaid</option>
               <option value="partial">Partial</option>
               <option value="overdue">Overdue</option>
               <option value="cancelled">Cancelled</option>
@@ -1363,6 +1741,7 @@ html.dark textarea {
                       <option value="sent">Sent</option>
                       <option value="partial">Partial</option>
                       <option value="paid">Paid</option>
+                      <option value="unpaid">Unpaid</option>
                       <option value="overdue">Overdue</option>
                       <option value="cancelled">Cancelled</option>
                     </select>
@@ -1596,25 +1975,69 @@ html.dark textarea {
                   <label class="block text-sm font-medium text-slate-700 mb-1">Prepared For (optional)</label>
                   <input id="pres-client" type="text" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Hospital or client name" />
                 </div>
+                <div class="sm:col-span-2">
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Import from existing quotation (optional)</label>
+                  <div class="flex flex-col sm:flex-row gap-2">
+                    <select id="pres-from-quote" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                      <option value="">— Select a saved quote —</option>
+                    </select>
+                    <button type="button" onclick="applyQuoteToPresentation()" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium whitespace-nowrap">Load quote items</button>
+                  </div>
+                  <p class="text-xs text-slate-500 mt-1">Loads client name and line items (qty × unit price). You can still add more equipment below.</p>
+                </div>
               </div>
 
               <div class="mb-4">
                 <label class="block text-sm font-medium text-slate-700 mb-2">Layout Style</label>
                 <div class="flex flex-wrap gap-3">
                   <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
-                    <input type="radio" name="pres-layout" value="detailed" checked class="text-brand-600" />
+                    <input type="radio" name="pres-layout" value="picture" checked class="text-brand-600" />
                     <div>
-                      <p class="text-sm font-medium">Detailed</p>
-                      <p class="text-xs text-slate-500">1 machine per page — premium look</p>
+                      <p class="text-sm font-medium">Picture</p>
+                      <p class="text-xs text-slate-500">Image + details — premium cards</p>
                     </div>
                   </label>
                   <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
-                    <input type="radio" name="pres-layout" value="brochure" class="text-brand-600" />
+                    <input type="radio" name="pres-layout" value="list" class="text-brand-600" />
                     <div>
-                      <p class="text-sm font-medium">Brochure</p>
-                      <p class="text-xs text-slate-500">2 machines per page — compact</p>
+                      <p class="text-sm font-medium">List</p>
+                      <p class="text-xs text-slate-500">No images — compact rows, more per page</p>
                     </div>
                   </label>
+                </div>
+              </div>
+
+              <div class="mb-2">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Price Summary</label>
+                <div class="flex flex-wrap gap-3">
+                  <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                    <input type="radio" name="pres-summary" value="complex" checked class="text-brand-600" />
+                    <div>
+                      <p class="text-sm font-medium">Complex</p>
+                      <p class="text-xs text-slate-500">Navy card, itemised on own page(s)</p>
+                    </div>
+                  </label>
+                  <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                    <input type="radio" name="pres-summary" value="simple" class="text-brand-600" />
+                    <div>
+                      <p class="text-sm font-medium">Simple</p>
+                      <p class="text-xs text-slate-500">Total only after last card</p>
+                    </div>
+                  </label>
+                  <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                    <input type="radio" name="pres-summary" value="ultra" class="text-brand-600" />
+                    <div>
+                      <p class="text-sm font-medium">Ultra simple</p>
+                      <p class="text-xs text-slate-500">Clean table: Item · Qty · Price · Total</p>
+                    </div>
+                  </label>
+                </div>
+                <div class="mt-4 flex flex-wrap items-end gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">General markup % (all items)</label>
+                    <input id="pres-global-markup" type="number" min="0" step="0.1" value="0" class="w-28 px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="0" />
+                  </div>
+                  <p class="text-xs text-slate-500 pb-2">Optional. Applies to every line in this presentation (not shown as markup on the PDF).</p>
                 </div>
               </div>
             </div>
@@ -1678,118 +2101,135 @@ html.dark textarea {
 
         <!-- SETTINGS -->
         <section id="page-settings" class="page hidden">
-          <div class="max-w-2xl space-y-3">
+          <div class="settings-page">
             <!-- Company -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden settings-panel" data-panel="company">
-              <button type="button" class="settings-panel-toggle w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50" onclick="toggleSettingsPanel('company')">
-                <span class="font-semibold text-lg">Company Information</span>
-                <span class="settings-chevron text-slate-400 text-sm transition-transform">▼</span>
+            <div class="settings-card settings-panel" data-panel="company">
+              <button type="button" class="settings-panel-toggle" onclick="toggleSettingsPanel('company')">
+                <span class="settings-card-title">Company Information</span>
+                <span class="settings-chevron">▼</span>
               </button>
-              <div class="settings-panel-body px-5 pb-5 border-t border-slate-100">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm pt-4">
+              <div class="settings-panel-body">
+                <div class="settings-form-grid">
                   <div>
-                    <label class="block text-slate-500 mb-1">Company Name</label>
-                    <input id="set-company" type="text" class="w-full px-3 py-2 border rounded-lg" value="Medicano Resources Limited" />
-                  </div>
-                  <div>
-                    <label class="block text-slate-500 mb-1">Email</label>
-                    <input id="set-email" type="email" class="w-full px-3 py-2 border rounded-lg" value="enquiries@medicanoresources.com" />
-                  </div>
-                  <div class="sm:col-span-2">
-                    <label class="block text-slate-500 mb-1">Address</label>
-                    <input id="set-address" type="text" class="w-full px-3 py-2 border rounded-lg" value="6, Ojulari Street, Off Kunsela Road, Chisco Bus Stop, Ikate Elegushi, Lekki Expressway" />
+                    <label class="settings-label">Company Name</label>
+                    <input id="set-company" type="text" class="settings-input" value="Medicano Resources Limited" />
                   </div>
                   <div>
-                    <label class="block text-slate-500 mb-1">Phone 1</label>
-                    <input id="set-phone1" type="text" class="w-full px-3 py-2 border rounded-lg" value="08023203522" />
+                    <label class="settings-label">Email</label>
+                    <input id="set-email" type="email" class="settings-input" value="enquiries@medicanoresources.com" />
+                  </div>
+                  <div class="settings-span-2">
+                    <label class="settings-label">Address</label>
+                    <input id="set-address" type="text" class="settings-input" value="6, Ojulari Street, Off Kunsela Road, Chisco Bus Stop, Ikate Elegushi, Lekki Expressway" />
                   </div>
                   <div>
-                    <label class="block text-slate-500 mb-1">Phone 2</label>
-                    <input id="set-phone2" type="text" class="w-full px-3 py-2 border rounded-lg" value="07045763887" />
-                  </div>
-                  <div class="sm:col-span-2 pt-2">
-                    <p class="font-medium text-slate-700 mb-2">Bank / payment details (shown on invoices)</p>
+                    <label class="settings-label">Phone 1</label>
+                    <input id="set-phone1" type="text" class="settings-input" value="08023203522" />
                   </div>
                   <div>
-                    <label class="block text-slate-500 mb-1">Bank name</label>
-                    <input id="set-bank-name" type="text" class="w-full px-3 py-2 border rounded-lg" placeholder="e.g. Zenith Bank" />
+                    <label class="settings-label">Phone 2</label>
+                    <input id="set-phone2" type="text" class="settings-input" value="07045763887" />
+                  </div>
+                  <div class="settings-span-2">
+                    <p class="settings-section-label">Bank / payment details (shown on invoices)</p>
                   </div>
                   <div>
-                    <label class="block text-slate-500 mb-1">Account name</label>
-                    <input id="set-account-name" type="text" class="w-full px-3 py-2 border rounded-lg" placeholder="Medicano Resources Limited" />
+                    <label class="settings-label">Bank name</label>
+                    <input id="set-bank-name" type="text" class="settings-input" placeholder="e.g. Zenith Bank" />
                   </div>
                   <div>
-                    <label class="block text-slate-500 mb-1">Account number</label>
-                    <input id="set-account-number" type="text" class="w-full px-3 py-2 border rounded-lg" placeholder="0123456789" />
+                    <label class="settings-label">Account name</label>
+                    <input id="set-account-name" type="text" class="settings-input" placeholder="Medicano Resources Limited" />
                   </div>
                   <div>
-                    <label class="block text-slate-500 mb-1">Sort / Bank code</label>
-                    <input id="set-bank-code" type="text" class="w-full px-3 py-2 border rounded-lg" placeholder="Optional" />
+                    <label class="settings-label">Account number</label>
+                    <input id="set-account-number" type="text" class="settings-input" placeholder="0123456789" />
+                  </div>
+                  <div>
+                    <label class="settings-label">Sort / Bank code</label>
+                    <input id="set-bank-code" type="text" class="settings-input" placeholder="Optional" />
                   </div>
                 </div>
-                <button onclick="saveSettings()" class="mt-4 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm">Save Settings</button>
+                <button onclick="saveSettings()" class="settings-primary-btn">Save Settings</button>
               </div>
             </div>
 
             <!-- Categories -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden settings-panel collapsed" data-panel="categories">
-              <button type="button" class="settings-panel-toggle w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50" onclick="toggleSettingsPanel('categories')">
-                <span class="font-semibold text-lg">Equipment Categories</span>
-                <span class="settings-chevron text-slate-400 text-sm transition-transform">▼</span>
+            <div class="settings-card settings-panel collapsed" data-panel="categories">
+              <button type="button" class="settings-panel-toggle" onclick="toggleSettingsPanel('categories')">
+                <span class="settings-card-title">Equipment Categories</span>
+                <span class="settings-chevron">▼</span>
               </button>
-              <div class="settings-panel-body px-5 pb-5 border-t border-slate-100">
-                <p class="text-sm text-slate-500 mb-4 pt-3">Manage categories used in the equipment dropdown when adding machines.</p>
-                <div class="flex gap-2 mb-3">
-                  <input id="new-category" type="text" placeholder="New category name..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-                  <button onclick="addCategory()" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium whitespace-nowrap">Add</button>
+              <div class="settings-panel-body">
+                <p class="settings-help">Manage categories used in the equipment dropdown when adding machines.</p>
+                <div class="settings-inline-row">
+                  <input id="new-category" type="text" placeholder="New category name..." class="settings-input" />
+                  <button onclick="addCategory()" class="settings-primary-btn settings-btn-compact">Add</button>
                 </div>
-                <ul id="categories-list" class="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden text-sm">
+                <ul id="categories-list" class="settings-list">
                   <!-- filled by JS -->
                 </ul>
               </div>
             </div>
 
             <!-- Terms -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden settings-panel collapsed" data-panel="terms">
-              <button type="button" class="settings-panel-toggle w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50" onclick="toggleSettingsPanel('terms')">
-                <span class="font-semibold text-lg">Terms &amp; Conditions</span>
-                <span class="settings-chevron text-slate-400 text-sm transition-transform">▼</span>
+            <div class="settings-card settings-panel collapsed" data-panel="terms">
+              <button type="button" class="settings-panel-toggle" onclick="toggleSettingsPanel('terms')">
+                <span class="settings-card-title">Terms &amp; Conditions</span>
+                <span class="settings-chevron">▼</span>
               </button>
-              <div class="settings-panel-body px-5 pb-5 border-t border-slate-100">
-                <p class="text-sm text-slate-500 mb-4 pt-3">Edit the clauses used on Client Presentation PDFs. Changes are saved on this device.</p>
-                <div id="terms-editor" class="space-y-4">
+              <div class="settings-panel-body">
+                <p class="settings-help">Edit the clauses used on Client Presentation PDFs. Changes are saved on this device.</p>
+                <div id="terms-editor" class="settings-terms-editor">
                   <!-- filled by JS -->
                 </div>
-                <div class="flex flex-wrap gap-2 mt-4">
-                  <button type="button" onclick="addTermRow()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium">+ Add clause</button>
-                  <button type="button" onclick="saveTerms()" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium">Save Terms</button>
-                  <button type="button" onclick="if(confirm('Reset terms to default text?')) resetTerms()" class="px-4 py-2 text-slate-600 border border-slate-200 rounded-lg text-sm">Reset defaults</button>
+                <div class="settings-inline-row settings-inline-wrap">
+                  <button type="button" onclick="addTermRow()" class="settings-secondary-btn">+ Add clause</button>
+                  <button type="button" onclick="saveTerms()" class="settings-primary-btn settings-btn-compact">Save Terms</button>
+                  <button type="button" onclick="if(confirm('Reset terms to default text?')) resetTerms()" class="settings-secondary-btn">Reset defaults</button>
                 </div>
               </div>
             </div>
 
             <!-- Data -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden settings-panel collapsed" data-panel="data">
-              <button type="button" class="settings-panel-toggle w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50" onclick="toggleSettingsPanel('data')">
-                <span class="font-semibold text-lg">Data Management</span>
-                <span class="settings-chevron text-slate-400 text-sm transition-transform">▼</span>
+            <div class="settings-card settings-panel collapsed" data-panel="data">
+              <button type="button" class="settings-panel-toggle" onclick="toggleSettingsPanel('data')">
+                <span class="settings-card-title">Data Management</span>
+                <span class="settings-chevron">▼</span>
               </button>
-              <div class="settings-panel-body px-5 pb-5 border-t border-slate-100">
-                <p class="text-sm text-slate-500 mb-4 pt-3">All data is stored locally in this browser (offline-first). Export/import to backup or move between devices.</p>
-                <div class="flex flex-wrap gap-3">
-                  <button onclick="exportData()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export All Data (JSON)</button>
-                  <button onclick="exportProductsExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export Equipment (Excel)</button>
-                  <button onclick="exportQuotesExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Export Quotes (Excel)</button>
-                  <button onclick="downloadEquipmentTemplate()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm">Equipment Template</button>
-                  <label class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm cursor-pointer" style="background:#0d9488">
-                    Import Equipment Spreadsheet
+              <div class="settings-panel-body">
+                <p class="settings-help">All data is stored locally in this browser (offline-first). Export or import to backup or move between devices.</p>
+                <div class="qa-grid settings-data-grid">
+                  <button type="button" class="qa-btn qa-dark" onclick="exportData()">
+                    <span class="qa-icon">💾</span>
+                    <span class="qa-label">Export All Data</span>
+                  </button>
+                  <button type="button" class="qa-btn qa-soft" onclick="exportProductsExcel()">
+                    <span class="qa-icon">🛠️</span>
+                    <span class="qa-label">Export Equipment</span>
+                  </button>
+                  <button type="button" class="qa-btn qa-blue" onclick="exportQuotesExcel()">
+                    <span class="qa-icon">📋</span>
+                    <span class="qa-label">Export Quotes</span>
+                  </button>
+                  <button type="button" class="qa-btn qa-soft" onclick="downloadEquipmentTemplate()">
+                    <span class="qa-icon">📄</span>
+                    <span class="qa-label">Equipment Template</span>
+                  </button>
+                  <label class="qa-btn qa-pink" style="cursor:pointer">
+                    <span class="qa-icon">📥</span>
+                    <span class="qa-label">Import Equipment</span>
                     <input type="file" accept=".csv,text/csv" class="hidden" onchange="onImportProductsFile(event)" />
                   </label>
-                  <label class="px-4 py-2 bg-brand-100 text-brand-800 rounded-lg text-sm cursor-pointer hover:bg-brand-200">
-                    Import Data (JSON backup)
+                  <label class="qa-btn qa-blue" style="cursor:pointer">
+                    <span class="qa-icon">📂</span>
+                    <span class="qa-label">Import JSON Backup</span>
                     <input type="file" accept=".json" class="hidden" onchange="importData(event)" />
                   </label>
-                  <button onclick="if(confirm('This will erase ALL local data. Continue?')) resetData()" class="px-4 py-2 text-red-600 border border-red-200 rounded-lg text-sm hover:bg-red-50">Reset All Data</button>
+                  <button type="button" class="qa-btn qa-danger settings-span-2-btn" onclick="if(confirm('This will erase ALL local data. Continue?')) resetData()">
+                    <span class="qa-icon">⚠️</span>
+                    <span class="qa-label">Reset All Data</span>
+                  </button>
                 </div>
               </div>
             </div>
