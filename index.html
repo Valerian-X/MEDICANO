@@ -1885,12 +1885,25 @@ html.dark textarea {
                   </div>
                   <div class="flex flex-wrap gap-2">
                     <button type="button" onclick="addQuoteItemRow()" class="px-3 py-1.5 text-xs bg-slate-100 text-slate-700 rounded-lg font-medium">+ Custom line</button>
-                    <label class="px-3 py-1.5 text-xs bg-brand-600 text-white rounded-lg font-medium cursor-pointer" style="background:#1a1a1a">
-                      Import spreadsheet
-                      <input type="file" accept=".csv,text/csv,.xlsx" class="hidden" onchange="onImportQuoteItemsFile(event)" />
-                    </label>
-                    <button type="button" onclick="downloadQuoteItemsTemplate()" class="px-3 py-1.5 text-xs bg-slate-100 text-slate-700 rounded-lg font-medium">Template</button>
                   </div>
+                </div>
+                <div class="select-stack mb-3" style="max-width:100%">
+                  <label class="select-row" style="border-radius:1.1rem;cursor:pointer">
+                    <span class="select-row-icon">📥</span>
+                    <span class="select-row-text">
+                      <span class="select-row-title">Import spreadsheet</span>
+                      <span class="select-row-sub">Populate Item, Qty &amp; Unit Price from CSV (Excel → Save as CSV)</span>
+                    </span>
+                    <span class="text-xs font-semibold text-slate-500">Upload</span>
+                    <input type="file" accept=".csv,text/csv" class="hidden" onchange="onImportQuoteItemsFile(event)" />
+                  </label>
+                  <button type="button" onclick="downloadQuoteItemsTemplate()" class="select-row" style="border-radius:1.1rem;border:none;width:100%;text-align:left">
+                    <span class="select-row-icon">📄</span>
+                    <span class="select-row-text">
+                      <span class="select-row-title">Download CSV template</span>
+                      <span class="select-row-sub">Columns: Item / Name, Qty, Unit_Price (optional SKU, Currency, Markup_Pct)</span>
+                    </span>
+                  </button>
                 </div>
                 <p class="text-xs text-slate-500 mb-3">Optional markup % is internal only — the quotation PDF shows final unit price only (no markup label).</p>
                 <div class="overflow-x-auto">
@@ -2306,6 +2319,29 @@ html.dark textarea {
                   <p class="text-xs text-slate-500">Optional. Applies to every line (not shown as markup on the PDF).</p>
                 </div>
               </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 mb-4">
+              <p class="text-sm font-semibold text-slate-800 mb-2">Import items from spreadsheet</p>
+              <div class="select-stack mb-2" style="max-width:100%">
+                <label class="select-row" style="border-radius:1.1rem;cursor:pointer">
+                  <span class="select-row-icon">📥</span>
+                  <span class="select-row-text">
+                    <span class="select-row-title">Upload CSV spreadsheet</span>
+                    <span class="select-row-sub">Fills Item, Qty &amp; Unit Price for this presentation</span>
+                  </span>
+                  <span class="text-xs font-semibold text-slate-500">Upload</span>
+                  <input type="file" accept=".csv,text/csv" class="hidden" onchange="onImportPresItemsFile(event)" />
+                </label>
+                <button type="button" onclick="downloadPresItemsTemplate()" class="select-row" style="border-radius:1.1rem;border:none;width:100%;text-align:left">
+                  <span class="select-row-icon">📄</span>
+                  <span class="select-row-text">
+                    <span class="select-row-title">Download CSV template</span>
+                    <span class="select-row-sub">Columns: Item, Qty, Unit_Price (optional SKU)</span>
+                  </span>
+                </button>
+              </div>
+              <p id="pres-import-status" class="text-xs text-slate-500">No spreadsheet loaded yet. You can also pick catalog items below or load a quote above.</p>
             </div>
 
             <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
