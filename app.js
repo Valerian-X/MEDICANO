@@ -1097,19 +1097,36 @@ function renderClients() {
   const list = data.clients.filter(c =>
     !search || c.name.toLowerCase().includes(search) || (c.contact || '').toLowerCase().includes(search)
   );
-
-  document.getElementById('clients-tbody').innerHTML = list.map(c => `
-    <tr class="border-t border-slate-100 hover:bg-slate-50">
-      <td class="px-4 py-3 font-medium" data-label="Client">${escHtml(c.name)}</td>
-      <td class="px-4 py-3" data-label="Contact">${escHtml(c.contact || '—')}</td>
-      <td class="px-4 py-3" data-label="Phone">${escHtml(c.phone || '—')}</td>
-      <td class="px-4 py-3" data-label="Email">${escHtml(c.email || '—')}</td>
-      <td class="px-4 py-3" data-label="Actions">
-        <button onclick="editClient('${c.id}')" class="text-brand-600 hover:underline text-xs mr-2">Edit</button>
-        <button onclick="if(confirm('Delete client?')) deleteClient('${c.id}')" class="text-red-500 hover:underline text-xs">Del</button>
-      </td>
-    </tr>
-  `).join('') || '<tr class="list-empty"><td colspan="5" class="px-4 py-8 text-center text-slate-400">No clients yet</td></tr>';
+  const el = document.getElementById('clients-list');
+  if (!el) return;
+  if (!list.length) {
+    el.innerHTML = '<div class="entity-empty">No clients yet</div>';
+    return;
+  }
+  el.innerHTML = list.map(c => {
+    const sub = [c.contact, c.phone].filter(Boolean).join(' · ') || 'No contact details';
+    return `<div class="entity-card" id="client-card-${c.id}">
+      <button type="button" class="entity-card-header"
+        onclick="onEntityCardClick(event, 'client-card-${c.id}')"
+        ondblclick="editClient('${c.id}')">
+        <span class="entity-card-chevron">▾</span>
+        <span class="entity-card-main">
+          <span class="entity-card-title">${escHtml(c.name)}</span>
+          <span class="entity-card-sub">${escHtml(sub)}</span>
+        </span>
+      </button>
+      <div class="entity-card-body">
+        <div class="entity-detail"><span class="entity-detail-label">Contact</span><span class="entity-detail-value">${escHtml(c.contact || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Phone</span><span class="entity-detail-value">${escHtml(c.phone || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Email</span><span class="entity-detail-value">${escHtml(c.email || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Address</span><span class="entity-detail-value">${escHtml(c.address || '—')}</span></div>
+        <div class="entity-card-actions">
+          <button type="button" onclick="editClient('${c.id}')">Edit</button>
+          <button type="button" class="danger" onclick="if(confirm('Delete client?')) deleteClient('${c.id}')">Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function showClientForm(id = null) {
@@ -1167,23 +1184,41 @@ function renderQuotes() {
   const status = document.getElementById('quote-status-filter')?.value || '';
   let list = [...data.quotes].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   if (status) list = list.filter(q => q.status === status);
-
-  document.getElementById('quotes-tbody').innerHTML = list.map(q => {
+  const el = document.getElementById('quotes-list');
+  if (!el) return;
+  if (!list.length) {
+    el.innerHTML = '<div class="entity-empty">No quotes yet</div>';
+    return;
+  }
+  el.innerHTML = list.map(q => {
     const client = getClient(q.clientId);
-    return `<tr class="border-t border-slate-100 hover:bg-slate-50">
-      <td class="px-4 py-3 font-mono text-xs font-medium" data-label="Quote #">${escHtml(q.quoteNumber || '')}</td>
-      <td class="px-4 py-3" data-label="Client">${escHtml(client ? client.name : '—')}</td>
-      <td class="px-4 py-3" data-label="Title">${escHtml(q.title || '')}</td>
-      <td class="px-4 py-3 font-medium" data-label="Total">${formatNGN(q.totalNGN)}</td>
-      <td class="px-4 py-3" data-label="Status"><span class="text-xs px-2 py-0.5 rounded-full ${statusClass(q.status)}">${escHtml(q.status || '')}</span></td>
-      <td class="px-4 py-3 text-xs text-slate-500" data-label="Date">${new Date(q.createdAt).toLocaleDateString()}</td>
-      <td class="px-4 py-3" data-label="Actions">
-        <button onclick="openQuote('${q.id}')" class="text-brand-600 hover:underline text-xs mr-2">Open</button>
-        <button onclick="createInvoiceFromQuote('${q.id}')" class="text-slate-700 hover:underline text-xs mr-2">Invoice</button>
-        <button onclick="if(confirm('Delete quote?')) { data.quotes = data.quotes.filter(x => x.id !== '${q.id}'); saveData(); renderQuotes(); renderDashboard(); }" class="text-red-500 hover:underline text-xs">Del</button>
-      </td>
-    </tr>`;
-  }).join('') || '<tr class="list-empty"><td colspan="7" class="px-4 py-8 text-center text-slate-400">No quotes yet</td></tr>';
+    const clientName = client ? client.name : '—';
+    const dateStr = q.createdAt ? new Date(q.createdAt).toLocaleDateString() : '—';
+    return `<div class="entity-card" id="quote-card-${q.id}">
+      <button type="button" class="entity-card-header"
+        onclick="onEntityCardClick(event, 'quote-card-${q.id}')"
+        ondblclick="openQuote('${q.id}')">
+        <span class="entity-card-chevron">▾</span>
+        <span class="entity-card-main">
+          <span class="entity-card-title">${escHtml(clientName)}</span>
+          <span class="entity-card-sub">${escHtml(q.quoteNumber || '')} · ${escHtml(q.title || '')} · ${escHtml(q.status || '')}</span>
+        </span>
+        <span class="entity-card-price">${formatNGN(q.totalNGN)}</span>
+      </button>
+      <div class="entity-card-body">
+        <div class="entity-detail"><span class="entity-detail-label">Quote #</span><span class="entity-detail-value">${escHtml(q.quoteNumber || '')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Title</span><span class="entity-detail-value">${escHtml(q.title || '')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Status</span><span class="entity-detail-value"><span class="text-xs px-2 py-0.5 rounded-full ${statusClass(q.status)}">${escHtml(q.status || '')}</span></span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Date</span><span class="entity-detail-value">${escHtml(dateStr)}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Total</span><span class="entity-detail-value">${formatNGN(q.totalNGN)}</span></div>
+        <div class="entity-card-actions">
+          <button type="button" onclick="openQuote('${q.id}')">Open</button>
+          <button type="button" onclick="createInvoiceFromQuote('${q.id}')">Invoice</button>
+          <button type="button" class="danger" onclick="if(confirm('Delete quote?')) { data.quotes = data.quotes.filter(x => x.id !== '${q.id}'); saveData(); renderQuotes(); renderDashboard(); }">Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function showNewQuote() {
@@ -1250,9 +1285,14 @@ function addQuoteItemRow(existing = null) {
 
   const productId = existing ? (existing.productId || '') : '';
   const p = productId ? getProduct(productId) : null;
-  const options = data.products.filter(pr => pr.active).map(pr =>
-    `<option value="${pr.id}" ${productId === pr.id ? 'selected' : ''}>${escHtml(pr.sku)} — ${escHtml(pr.name)}</option>`
-  ).join('');
+  const options = data.products.filter(pr => pr.active).map(pr => {
+    const desc = (pr.description || '').trim().replace(/\s+/g, ' ');
+    const shortDesc = desc ? (desc.length > 60 ? desc.slice(0, 57) + '…' : desc) : '';
+    const label = shortDesc
+      ? `${escHtml(pr.sku)} — ${escHtml(pr.name)} · ${escHtml(shortDesc)}`
+      : `${escHtml(pr.sku)} — ${escHtml(pr.name)}`;
+    return `<option value="${pr.id}" ${productId === pr.id ? 'selected' : ''} title="${escHtml(pr.description || pr.name || '')}">${label}</option>`;
+  }).join('');
 
   let baseNgn = 0;
   let markup = existing && existing.markupPct != null ? existing.markupPct : 0;
@@ -1318,6 +1358,19 @@ function addQuoteItemRow(existing = null) {
     }
   }
   recalcQuote();
+}
+
+
+function onEntityCardClick(ev, cardId) {
+  if (ev.target.closest && ev.target.closest('.entity-card-actions')) return;
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  card._clickCount = (card._clickCount || 0) + 1;
+  clearTimeout(card._clickTimer);
+  card._clickTimer = setTimeout(() => {
+    if (card._clickCount === 1) card.classList.toggle('is-open');
+    card._clickCount = 0;
+  }, 280);
 }
 
 function toggleLineCard(id) {
@@ -1685,39 +1738,51 @@ let currentInvoiceId = null;
 let invoiceItemCounter = 0;
 
 function renderInvoices() {
-  const tbody = document.getElementById('invoices-tbody');
-  if (!tbody) return;
+  const el = document.getElementById('invoices-list');
+  if (!el) return;
   const filter = document.getElementById('invoice-status-filter')?.value || '';
   let list = (data.invoices || []).slice().sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
   if (filter) list = list.filter(inv => inv.status === filter);
   if (!list.length) {
-    tbody.innerHTML = '<tr class="list-empty"><td colspan="7" class="px-4 py-8 text-center text-slate-400">No invoices yet. Create one or convert a quote.</td></tr>';
+    el.innerHTML = '<div class="entity-empty">No invoices yet. Create one or convert a quote.</div>';
     return;
   }
-  tbody.innerHTML = list.map(inv => {
+  const statusColors = {
+    draft: 'bg-slate-100 text-slate-700',
+    sent: 'bg-blue-50 text-blue-700',
+    paid: 'bg-emerald-50 text-emerald-700',
+    unpaid: 'bg-orange-50 text-orange-700',
+    partial: 'bg-amber-50 text-amber-800',
+    overdue: 'bg-rose-50 text-rose-700',
+    cancelled: 'bg-slate-100 text-slate-500'
+  };
+  el.innerHTML = list.map(inv => {
     const client = getClient(inv.clientId);
-    const statusColors = {
-      draft: 'bg-slate-100 text-slate-700',
-      sent: 'bg-blue-50 text-blue-700',
-      paid: 'bg-emerald-50 text-emerald-700',
-      unpaid: 'bg-orange-50 text-orange-700',
-      partial: 'bg-amber-50 text-amber-800',
-      overdue: 'bg-rose-50 text-rose-700',
-      cancelled: 'bg-slate-100 text-slate-500'
-    };
+    const clientName = client ? client.name : '—';
     const sc = statusColors[inv.status] || statusColors.draft;
-    return `<tr class="hover:bg-slate-50">
-      <td class="px-4 py-3 font-medium" data-label="Invoice #">${escHtml(inv.invoiceNumber || '')}</td>
-      <td class="px-4 py-3" data-label="Client">${escHtml(client ? client.name : '—')}</td>
-      <td class="px-4 py-3" data-label="Title">${escHtml(inv.title || '')}</td>
-      <td class="px-4 py-3 font-medium" data-label="Total">${formatNGN(inv.totalNgn || 0)}</td>
-      <td class="px-4 py-3" data-label="Status"><span class="px-2 py-0.5 rounded text-xs font-medium ${sc}">${(inv.status || 'draft').toUpperCase()}</span></td>
-      <td class="px-4 py-3 text-slate-500" data-label="Date">${(inv.date || '').slice(0, 10)}</td>
-      <td class="px-4 py-3 whitespace-nowrap" data-label="Actions">
-        <button onclick="editInvoice('${inv.id}')" class="text-brand-600 hover:underline text-xs mr-2">Edit</button>
-        <button onclick="editInvoice('${inv.id}'); setTimeout(printInvoice, 200)" class="text-slate-600 hover:underline text-xs">PDF</button>
-      </td>
-    </tr>`;
+    return `<div class="entity-card" id="invoice-card-${inv.id}">
+      <button type="button" class="entity-card-header"
+        onclick="onEntityCardClick(event, 'invoice-card-${inv.id}')"
+        ondblclick="editInvoice('${inv.id}')">
+        <span class="entity-card-chevron">▾</span>
+        <span class="entity-card-main">
+          <span class="entity-card-title">${escHtml(clientName)}</span>
+          <span class="entity-card-sub">${escHtml(inv.invoiceNumber || '')} · ${escHtml(inv.title || '')} · ${(inv.status || 'draft').toUpperCase()}</span>
+        </span>
+        <span class="entity-card-price">${formatNGN(inv.totalNgn || 0)}</span>
+      </button>
+      <div class="entity-card-body">
+        <div class="entity-detail"><span class="entity-detail-label">Invoice #</span><span class="entity-detail-value">${escHtml(inv.invoiceNumber || '')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Title</span><span class="entity-detail-value">${escHtml(inv.title || '')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Status</span><span class="entity-detail-value"><span class="px-2 py-0.5 rounded text-xs font-medium ${sc}">${(inv.status || 'draft').toUpperCase()}</span></span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Date</span><span class="entity-detail-value">${escHtml((inv.date || '').slice(0, 10))}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Total</span><span class="entity-detail-value">${formatNGN(inv.totalNgn || 0)}</span></div>
+        <div class="entity-card-actions">
+          <button type="button" onclick="editInvoice('${inv.id}')">Edit</button>
+          <button type="button" onclick="editInvoice('${inv.id}'); setTimeout(printInvoice, 200)">PDF</button>
+        </div>
+      </div>
+    </div>`;
   }).join('');
 }
 
@@ -1780,9 +1845,12 @@ function addInvoiceItemRow(item) {
   const list = document.getElementById('invoice-items-list');
   if (!list) return;
   const id = 'invrow' + (++invoiceItemCounter);
-  const productOpts = (data.products || []).map(p =>
-    `<option value="${p.id}" ${item && item.productId === p.id ? 'selected' : ''}>${escHtml(p.name)}</option>`
-  ).join('');
+  const productOpts = (data.products || []).map(p => {
+    const desc = (p.description || '').trim().replace(/\s+/g, ' ');
+    const shortDesc = desc ? (desc.length > 60 ? desc.slice(0, 57) + '…' : desc) : '';
+    const label = shortDesc ? `${escHtml(p.name)} · ${escHtml(shortDesc)}` : escHtml(p.name);
+    return `<option value="${p.id}" ${item && item.productId === p.id ? 'selected' : ''} title="${escHtml(p.description || p.name || '')}">${label}</option>`;
+  }).join('');
   const nameVal = item ? (item.name || '') : '';
   const titleText = nameVal || 'New line item';
   const card = document.createElement('div');
@@ -3898,11 +3966,14 @@ function renderQuoteProductPicker() {
 
   container.innerHTML = list.map(p => {
     const ngn = toNGN(p.price, p.currency);
+    const desc = (p.description || '').trim();
+    const shortDesc = desc ? (desc.length > 90 ? desc.slice(0, 87) + '…' : desc) : '';
     return `<div class="qp-row">
       <input type="checkbox" class="qp-check rounded" value="${p.id}" data-sku="${escHtml(p.sku)}" />
       <div class="qp-meta">
         <p class="font-medium">${escHtml(p.name)}</p>
-        <p class="text-xs text-slate-500">${escHtml(p.sku)} • ${escHtml(p.category || '')} • ${formatMoney(p.price, p.currency)}</p>
+        <p class="text-xs text-slate-500">${escHtml(p.sku)} • ${escHtml(p.category || '')} • ${formatNGN(ngn)}</p>
+        ${shortDesc ? `<p class="text-xs text-slate-400 mt-0.5">${escHtml(shortDesc)}</p>` : ''}
       </div>
       <div class="qp-units">
         <span class="text-xs text-slate-400">Units</span>

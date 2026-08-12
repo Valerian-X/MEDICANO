@@ -1602,6 +1602,180 @@ html.dark textarea {
 }
 
 
+
+/* ========== Entity list cards (clients / quotes / invoices) ========== */
+.entity-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: 100%;
+}
+.entity-card {
+  border-radius: 1.25rem;
+  border: 1.5px solid transparent;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(26,26,26,0.05);
+  background: linear-gradient(180deg,
+    rgba(245, 230, 168, 0.55) 0%,
+    rgba(245, 207, 224, 0.42) 35%,
+    rgba(201, 218, 248, 0.38) 70%,
+    rgba(200, 232, 192, 0.35) 100%);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+.entity-card.is-open {
+  border-color: #1a1a1a;
+  box-shadow: 0 6px 20px rgba(26,26,26,0.08);
+}
+.entity-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.95rem 1.1rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  min-height: 3.4rem;
+  box-sizing: border-box;
+}
+.entity-card-chevron {
+  flex-shrink: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: #4b5563;
+  transition: transform 0.2s ease;
+}
+.entity-card:not(.is-open) .entity-card-chevron {
+  transform: rotate(-90deg);
+}
+.entity-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.entity-card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.entity-card-sub {
+  font-size: 0.72rem;
+  color: #4b5563;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.entity-card-price {
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.entity-card-body {
+  display: none;
+  padding: 0 1.1rem 1.05rem;
+  background: rgba(255,255,255,0.55);
+  border-top: 1px solid rgba(26,26,26,0.06);
+}
+.entity-card.is-open .entity-card-body {
+  display: block;
+  padding-top: 0.85rem;
+}
+.entity-detail {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  font-size: 0.875rem;
+  border-bottom: 1px solid rgba(26,26,26,0.05);
+}
+.entity-detail:last-of-type {
+  border-bottom: none;
+}
+.entity-detail-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6b7280;
+  flex: 0 0 36%;
+}
+.entity-detail-value {
+  text-align: right;
+  color: #1a1a1a;
+  font-weight: 500;
+  word-break: break-word;
+}
+.entity-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(26,26,26,0.08);
+}
+.entity-card-actions button {
+  min-height: 36px !important;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.65rem;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(26,26,26,0.08);
+  font-size: 0.8rem !important;
+  font-weight: 600;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+.entity-card-actions button.danger {
+  color: #dc2626;
+}
+.entity-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #9ca3af;
+  font-size: 0.9rem;
+  border: 1.5px dashed #e5e0d6;
+  border-radius: 1.25rem;
+  background: rgba(255,255,255,0.5);
+}
+
+/* Mobile pastel product/inventory cards: full-bleed vertical wash */
+@media (max-width: 767px) {
+  table.pastel-cols tbody tr:not(.list-empty) {
+    background: linear-gradient(180deg,
+      rgba(245, 230, 168, 0.55) 0%,
+      rgba(245, 207, 224, 0.4) 40%,
+      rgba(201, 218, 248, 0.38) 100%) !important;
+    border-radius: 1.15rem !important;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(26,26,26,0.05);
+  }
+  table.pastel-cols tbody tr:not(.list-empty) td {
+    background: transparent !important;
+  }
+  table.pastel-cols tbody tr:not(.list-empty) td:first-child {
+    border-radius: 1.15rem 1.15rem 0 0 !important;
+  }
+  table.pastel-cols tbody tr:not(.list-empty) td:last-child {
+    border-radius: 0 0 1.15rem 1.15rem !important;
+  }
+}
+
 /* ========== Collapsible line-item cards (quote / invoice) ========== */
 .line-cards {
   display: flex;
@@ -2181,22 +2355,7 @@ html.dark textarea {
             <input id="client-search" type="search" placeholder="Search hospitals..." class="max-w-md px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
             <button onclick="showClientForm()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">+ Add Client</button>
           </div>
-          <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm pastel-cols">
-                <thead class="bg-slate-50 text-slate-600 text-left">
-                  <tr>
-                    <th class="px-4 py-3 font-medium">Hospital / Clinic</th>
-                    <th class="px-4 py-3 font-medium">Contact</th>
-                    <th class="px-4 py-3 font-medium">Phone</th>
-                    <th class="px-4 py-3 font-medium">Email</th>
-                    <th class="px-4 py-3 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="clients-tbody"></tbody>
-              </table>
-            </div>
-          </div>
+          <div id="clients-list" class="entity-cards"></div>
         </section>
 
         <!-- QUOTES LIST -->
@@ -2214,24 +2373,7 @@ html.dark textarea {
             <button onclick="exportQuotesExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium">Export Excel</button>
             <button onclick="showNewQuote()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">+ New Quote / Project</button>
           </div>
-          <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm pastel-cols">
-                <thead class="bg-slate-50 text-slate-600 text-left">
-                  <tr>
-                    <th class="px-4 py-3 font-medium">Quote #</th>
-                    <th class="px-4 py-3 font-medium">Client</th>
-                    <th class="px-4 py-3 font-medium">Title</th>
-                    <th class="px-4 py-3 font-medium">Total (NGN)</th>
-                    <th class="px-4 py-3 font-medium">Status</th>
-                    <th class="px-4 py-3 font-medium">Date</th>
-                    <th class="px-4 py-3 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="quotes-tbody"></tbody>
-              </table>
-            </div>
-          </div>
+          <div id="quotes-list" class="entity-cards"></div>
         </section>
 
         <!-- QUOTE BUILDER / VIEW -->
@@ -2372,24 +2514,7 @@ html.dark textarea {
             </select>
             <button onclick="showNewInvoice()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">+ New Invoice</button>
           </div>
-          <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm pastel-cols">
-                <thead class="bg-slate-50 text-slate-600 text-left">
-                  <tr>
-                    <th class="px-4 py-3 font-medium">Invoice #</th>
-                    <th class="px-4 py-3 font-medium">Client</th>
-                    <th class="px-4 py-3 font-medium">Title</th>
-                    <th class="px-4 py-3 font-medium">Total (NGN)</th>
-                    <th class="px-4 py-3 font-medium">Status</th>
-                    <th class="px-4 py-3 font-medium">Date</th>
-                    <th class="px-4 py-3 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="invoices-tbody"></tbody>
-              </table>
-            </div>
-          </div>
+          <div id="invoices-list" class="entity-cards"></div>
         </section>
 
         <!-- INVOICE EDITOR -->
