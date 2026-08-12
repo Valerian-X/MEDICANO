@@ -584,7 +584,7 @@ function renderProducts() {
         <button onclick="if(confirm('Delete this item?')) deleteProduct('${p.id}')" class="text-red-500 hover:underline text-xs">Del</button>
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No equipment found</td></tr>';
+  }).join('') || '<tr class="list-empty"><td colspan="8" class="px-4 py-8 text-center text-slate-400">No equipment found</td></tr>';
 }
 
 function showProductForm(id = null) {
@@ -957,7 +957,7 @@ function renderInventoryStock() {
     );
   }
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">No equipment found.</td></tr>';
+    body.innerHTML = '<tr class="list-empty"><td colspan="6" class="px-4 py-6 text-center text-slate-400">No equipment found.</td></tr>';
     return;
   }
   body.innerHTML = list.map(p => {
@@ -984,7 +984,7 @@ function renderInventoryMovements() {
     .slice()
     .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
   if (!moves.length) {
-    body.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">No movements in this period.</td></tr>';
+    body.innerHTML = '<tr class="list-empty"><td colspan="7" class="px-4 py-6 text-center text-slate-400">No movements in this period.</td></tr>';
     return;
   }
   body.innerHTML = moves.map(m => {
@@ -1109,7 +1109,7 @@ function renderClients() {
         <button onclick="if(confirm('Delete client?')) deleteClient('${c.id}')" class="text-red-500 hover:underline text-xs">Del</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">No clients yet</td></tr>';
+  `).join('') || '<tr class="list-empty"><td colspan="5" class="px-4 py-8 text-center text-slate-400">No clients yet</td></tr>';
 }
 
 function showClientForm(id = null) {
@@ -1183,7 +1183,7 @@ function renderQuotes() {
         <button onclick="if(confirm('Delete quote?')) { data.quotes = data.quotes.filter(x => x.id !== '${q.id}'); saveData(); renderQuotes(); renderDashboard(); }" class="text-red-500 hover:underline text-xs">Del</button>
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">No quotes yet</td></tr>';
+  }).join('') || '<tr class="list-empty"><td colspan="7" class="px-4 py-8 text-center text-slate-400">No quotes yet</td></tr>';
 }
 
 function showNewQuote() {
@@ -1197,7 +1197,7 @@ function showNewQuote() {
   document.getElementById('quote-status').value = 'draft';
   document.getElementById('quote-notes').value = '';
   document.getElementById('quote-discount').value = 0;
-  document.getElementById('quote-items-tbody').innerHTML = '';
+  document.getElementById('quote-items-list').innerHTML = '';
   quoteItemCounter = 0;
   if (document.getElementById('quote-product-search')) {
     document.getElementById('quote-product-search').value = '';
@@ -1222,7 +1222,7 @@ function openQuote(id) {
   document.getElementById('quote-notes').value = q.notes || '';
   document.getElementById('quote-discount').value = q.discount || 0;
 
-  document.getElementById('quote-items-tbody').innerHTML = '';
+  document.getElementById('quote-items-list').innerHTML = '';
   quoteItemCounter = 0;
   (q.items || []).forEach(item => addQuoteItemRow(item));
   if (document.getElementById('quote-product-search')) {
@@ -1242,10 +1242,11 @@ function quoteFinalUnit(baseNgn, markupPct) {
 function addQuoteItemRow(existing = null) {
   quoteItemCounter++;
   const rowId = 'qi_' + quoteItemCounter;
-  const tbody = document.getElementById('quote-items-tbody');
-  const tr = document.createElement('tr');
-  tr.id = rowId;
-  tr.className = 'border-t border-slate-100';
+  const list = document.getElementById('quote-items-list');
+  if (!list) return;
+  const card = document.createElement('div');
+  card.id = rowId;
+  card.className = 'line-card' + (existing ? '' : ' is-open');
 
   const productId = existing ? (existing.productId || '') : '';
   const p = productId ? getProduct(productId) : null;
@@ -1263,63 +1264,103 @@ function addQuoteItemRow(existing = null) {
   }
   const nameVal = existing ? (existing.name || (p ? p.name : '') || '') : '';
   const qtyVal = existing ? (existing.qty || 1) : 1;
+  const titleText = nameVal || 'New line item';
 
-  tr.innerHTML = `
-    <td class="py-2.5 pr-2 min-w-[180px]" data-label="Equipment">
-      <select class="qi-product w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm mb-1.5 bg-white" onchange="onItemProductChange('${rowId}')">
-        <option value="">Custom / from sheet...</option>
-        ${options}
-      </select>
-      <input type="text" class="qi-name w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Item name" value="${escHtml(nameVal)}" oninput="recalcQuote()" />
-    </td>
-    <td class="py-2.5 pr-2" data-label="Qty">
-      <input type="number" min="0" step="1" value="${qtyVal}" class="qi-qty input-compact" oninput="recalcQuote()" inputmode="numeric" />
-    </td>
-    <td class="py-2.5 pr-2" data-label="Base NGN">
-      <input type="number" min="0" step="1" value="${Math.round(baseNgn)}" class="qi-base w-28 px-2.5 py-2 border border-slate-200 rounded-lg text-sm text-right" oninput="recalcQuote()" title="Base cost in NGN (before markup)" />
-    </td>
-    <td class="py-2.5 pr-2" data-label="Markup %">
-      <input type="number" min="0" step="0.1" value="${markup}" class="qi-markup input-compact" oninput="recalcQuote()" title="Optional markup % — not shown on PDF" inputmode="decimal" />
-    </td>
-    <td class="py-2.5 pr-2 qi-unit-ngn text-sm font-semibold" data-label="Unit">—</td>
-    <td class="py-2.5 pr-2 qi-line font-semibold text-sm" data-label="Line total">—</td>
-    <td class="py-2.5" data-label="Actions">
-      <button type="button" onclick="document.getElementById('${rowId}').remove(); recalcQuote()" class="text-red-500 hover:text-red-700 text-sm font-medium px-2">Remove</button>
-    </td>
+  card.innerHTML = `
+    <button type="button" class="line-card-header" onclick="toggleLineCard('${rowId}')">
+      <span class="line-card-chevron" aria-hidden="true">▾</span>
+      <span class="line-card-title">${escHtml(titleText)}</span>
+      <span class="line-card-total qi-line">—</span>
+    </button>
+    <div class="line-card-body">
+      <div class="line-field">
+        <label class="line-label">Inventory</label>
+        <select class="qi-product line-input" onchange="onItemProductChange('${rowId}')">
+          <option value="">Custom / from sheet...</option>
+          ${options}
+        </select>
+      </div>
+      <div class="line-field">
+        <label class="line-label">Item name</label>
+        <input type="text" class="qi-name line-input" placeholder="Item name" value="${escHtml(nameVal)}" oninput="syncLineCardTitle('${rowId}'); recalcQuote()" />
+      </div>
+      <div class="line-field-row">
+        <div class="line-field">
+          <label class="line-label">Qty</label>
+          <input type="number" min="0" step="1" value="${qtyVal}" class="qi-qty input-compact" oninput="recalcQuote()" inputmode="numeric" />
+        </div>
+        <div class="line-field line-field-grow">
+          <label class="line-label">Price (NGN)</label>
+          <input type="number" min="0" step="1" value="${Math.round(baseNgn)}" class="qi-base line-input text-right" oninput="recalcQuote()" title="Unit price in NGN before markup" />
+        </div>
+        <div class="line-field">
+          <label class="line-label">Markup %</label>
+          <input type="number" min="0" step="0.1" value="${markup}" class="qi-markup input-compact" oninput="recalcQuote()" title="Optional markup % — not shown on PDF" inputmode="decimal" />
+        </div>
+      </div>
+      <div class="line-field-row line-field-meta">
+        <div class="line-meta"><span class="line-label">Unit</span> <strong class="qi-unit-ngn">—</strong></div>
+        <div class="line-meta"><span class="line-label">Total</span> <strong class="qi-line-body">—</strong></div>
+      </div>
+      <div class="line-card-actions">
+        <button type="button" onclick="document.getElementById('${rowId}').remove(); recalcQuote()" class="line-remove-btn">Remove</button>
+      </div>
+    </div>
   `;
-  tbody.appendChild(tr);
+  list.appendChild(card);
   if (productId) {
-    // keep existing base/markup if provided; only fill from product if empty base
     const p2 = getProduct(productId);
     if (p2 && !(existing && existing.baseNGN != null)) {
       const unit = toNGN(p2.price, p2.currency);
-      tr.querySelector('.qi-base').value = Math.round(unit);
-      if (!tr.querySelector('.qi-name').value) tr.querySelector('.qi-name').value = p2.name || '';
+      card.querySelector('.qi-base').value = Math.round(unit);
+      if (!card.querySelector('.qi-name').value) card.querySelector('.qi-name').value = p2.name || '';
+      syncLineCardTitle(rowId);
     }
   }
   recalcQuote();
 }
 
+function toggleLineCard(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('is-open');
+}
+
+function syncLineCardTitle(rowId) {
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  const name = (row.querySelector('.qi-name')?.value || '').trim();
+  const sel = row.querySelector('.qi-product, .inv-product');
+  let title = name;
+  if (!title && sel && sel.value) {
+    const opt = sel.options[sel.selectedIndex];
+    title = opt ? opt.text.replace(/^[^\—\-]+[\—\-]\s*/, '') : '';
+  }
+  const titleEl = row.querySelector('.line-card-title');
+  if (titleEl) titleEl.textContent = title || 'New line item';
+}
+
 function onItemProductChange(rowId) {
   const row = document.getElementById(rowId);
-  const prodId = row.querySelector('.qi-product').value;
+  if (!row) return;
+  const prodId = row.querySelector('.qi-product')?.value;
   const p = getProduct(prodId);
   if (p) {
     const unitNgn = toNGN(p.price, p.currency);
-    row.querySelector('.qi-base').value = Math.round(unitNgn);
+    const baseEl = row.querySelector('.qi-base');
+    if (baseEl) baseEl.value = Math.round(unitNgn);
     const nameEl = row.querySelector('.qi-name');
-    if (nameEl && (!nameEl.value || nameEl.value === '—')) nameEl.value = p.name || '';
-    else if (nameEl && !nameEl.value) nameEl.value = p.name || '';
+    if (nameEl) nameEl.value = p.name || '';
     row.dataset.currency = p.currency;
     row.dataset.price = p.price;
   }
+  syncLineCardTitle(rowId);
   recalcQuote();
 }
 
 function recalcQuote() {
   let subtotal = 0;
   let count = 0;
-  document.querySelectorAll('#quote-items-tbody tr').forEach(row => {
+  document.querySelectorAll('#quote-items-list .line-card').forEach(row => {
     const name = (row.querySelector('.qi-name')?.value || '').trim();
     const prod = row.querySelector('.qi-product')?.value;
     if (name || prod) count++;
@@ -1333,8 +1374,8 @@ function recalcQuote() {
     const unitEl = row.querySelector('.qi-unit-ngn');
     if (unitEl) unitEl.textContent = formatNGN(unit);
     const line = qty * unit;
-    const lineEl = row.querySelector('.qi-line');
-    if (lineEl) lineEl.textContent = formatNGN(line);
+    const lineStr = formatNGN(line);
+    row.querySelectorAll('.qi-line, .qi-line-body').forEach(el => { el.textContent = lineStr; });
     subtotal += line;
   });
   const discountPct = parseFloat(document.getElementById('quote-discount')?.value) || 0;
@@ -1356,7 +1397,7 @@ function saveQuote() {
   }
 
   const items = [];
-  document.querySelectorAll('#quote-items-tbody tr').forEach(row => {
+  document.querySelectorAll('#quote-items-list .line-card').forEach(row => {
     const productId = row.querySelector('.qi-product')?.value || '';
     const name = (row.querySelector('.qi-name')?.value || '').trim();
     const p = productId ? getProduct(productId) : null;
@@ -1650,7 +1691,7 @@ function renderInvoices() {
   let list = (data.invoices || []).slice().sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
   if (filter) list = list.filter(inv => inv.status === filter);
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">No invoices yet. Create one or convert a quote.</td></tr>';
+    tbody.innerHTML = '<tr class="list-empty"><td colspan="7" class="px-4 py-8 text-center text-slate-400">No invoices yet. Create one or convert a quote.</td></tr>';
     return;
   }
   tbody.innerHTML = list.map(inv => {
@@ -1704,7 +1745,7 @@ function showNewInvoice() {
   document.getElementById('inv-notes').value = '';
   const sf = document.getElementById('inv-show-footer');
   if (sf) sf.checked = true;
-  document.getElementById('invoice-items-tbody').innerHTML = '';
+  document.getElementById('invoice-items-list').innerHTML = '';
   addInvoiceItemRow();
   recalcInvoiceTotal();
   navigate('invoice-editor');
@@ -1727,7 +1768,7 @@ function editInvoice(id) {
   document.getElementById('inv-notes').value = inv.notes || '';
   const sf = document.getElementById('inv-show-footer');
   if (sf) sf.checked = inv.showFooter !== false;
-  const tbody = document.getElementById('invoice-items-tbody');
+  const tbody = document.getElementById('invoice-items-list');
   tbody.innerHTML = '';
   (inv.items || []).forEach(it => addInvoiceItemRow(it));
   if (!(inv.items || []).length) addInvoiceItemRow();
@@ -1736,30 +1777,56 @@ function editInvoice(id) {
 }
 
 function addInvoiceItemRow(item) {
-  const tbody = document.getElementById('invoice-items-tbody');
-  if (!tbody) return;
+  const list = document.getElementById('invoice-items-list');
+  if (!list) return;
   const id = 'invrow' + (++invoiceItemCounter);
   const productOpts = (data.products || []).map(p =>
     `<option value="${p.id}" ${item && item.productId === p.id ? 'selected' : ''}>${escHtml(p.name)}</option>`
   ).join('');
-  const tr = document.createElement('tr');
-  tr.id = id;
-  tr.innerHTML = `
-    <td class="py-2.5 pr-2" data-label="Item">
-      <select class="inv-product w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm bg-white" onchange="onInvoiceProductChange('${id}')">
-        <option value="">— Custom / select —</option>
-        ${productOpts}
-      </select>
-      <input class="inv-name w-full mt-1.5 px-2.5 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Description" value="${item ? escHtml(item.name || '') : ''}" oninput="recalcInvoiceTotal()" />
-    </td>
-    <td class="py-2.5 pr-2" data-label="Qty"><input type="number" min="0" step="1" class="inv-qty input-compact" value="${item ? (item.qty || 1) : 1}" oninput="recalcInvoiceTotal()" inputmode="numeric" /></td>
-    <td class="py-2.5 pr-2" data-label="Unit NGN"><input type="number" min="0" step="1" class="inv-unit w-28 px-2.5 py-2 border border-slate-200 rounded-lg text-sm text-right" value="${item ? Math.round(item.unitNgn || 0) : 0}" oninput="recalcInvoiceTotal()" /></td>
-    <td class="py-2.5 pr-2 inv-line text-right font-semibold" data-label="Line total">₦0</td>
-    <td class="py-2.5" data-label="Actions"><button type="button" onclick="this.closest('tr').remove(); recalcInvoiceTotal()" class="text-red-500 text-sm font-medium px-2">Remove</button></td>
+  const nameVal = item ? (item.name || '') : '';
+  const titleText = nameVal || 'New line item';
+  const card = document.createElement('div');
+  card.id = id;
+  card.className = 'line-card' + (item ? '' : ' is-open');
+  card.innerHTML = `
+    <button type="button" class="line-card-header" onclick="toggleLineCard('${id}')">
+      <span class="line-card-chevron" aria-hidden="true">▾</span>
+      <span class="line-card-title">${escHtml(titleText)}</span>
+      <span class="line-card-total inv-line">₦0</span>
+    </button>
+    <div class="line-card-body">
+      <div class="line-field">
+        <label class="line-label">Inventory</label>
+        <select class="inv-product line-input" onchange="onInvoiceProductChange('${id}')">
+          <option value="">— Custom / select —</option>
+          ${productOpts}
+        </select>
+      </div>
+      <div class="line-field">
+        <label class="line-label">Description</label>
+        <input class="inv-name line-input" placeholder="Description" value="${escHtml(nameVal)}" oninput="syncLineCardTitle('${id}'); recalcInvoiceTotal()" />
+      </div>
+      <div class="line-field-row">
+        <div class="line-field">
+          <label class="line-label">Qty</label>
+          <input type="number" min="0" step="1" class="inv-qty input-compact" value="${item ? (item.qty || 1) : 1}" oninput="recalcInvoiceTotal()" inputmode="numeric" />
+        </div>
+        <div class="line-field line-field-grow">
+          <label class="line-label">Price (NGN)</label>
+          <input type="number" min="0" step="1" class="inv-unit line-input text-right" value="${item ? Math.round(item.unitNgn || 0) : 0}" oninput="recalcInvoiceTotal()" />
+        </div>
+      </div>
+      <div class="line-field-row line-field-meta">
+        <div class="line-meta"><span class="line-label">Total</span> <strong class="inv-line-body">₦0</strong></div>
+      </div>
+      <div class="line-card-actions">
+        <button type="button" onclick="document.getElementById('${id}').remove(); recalcInvoiceTotal()" class="line-remove-btn">Remove</button>
+      </div>
+    </div>
   `;
-  tbody.appendChild(tr);
+  list.appendChild(card);
   if (item && item.productId) {
-    const sel = tr.querySelector('.inv-product');
+    const sel = card.querySelector('.inv-product');
     if (sel) sel.value = item.productId;
   }
   recalcInvoiceTotal();
@@ -1774,12 +1841,13 @@ function onInvoiceProductChange(rowId) {
   tr.querySelector('.inv-name').value = p.name || '';
   const unit = toNGN(p.price, p.currency);
   tr.querySelector('.inv-unit').value = Math.round(unit);
+  syncLineCardTitle(rowId);
   recalcInvoiceTotal();
 }
 
 function collectInvoiceItems() {
   const items = [];
-  document.querySelectorAll('#invoice-items-tbody tr').forEach(tr => {
+  document.querySelectorAll('#invoice-items-list .line-card').forEach(tr => {
     const productId = tr.querySelector('.inv-product')?.value || '';
     const name = tr.querySelector('.inv-name')?.value.trim() || '';
     const qty = parseFloat(tr.querySelector('.inv-qty')?.value) || 0;
@@ -1792,13 +1860,13 @@ function collectInvoiceItems() {
 
 function recalcInvoiceTotal() {
   let sub = 0;
-  document.querySelectorAll('#invoice-items-tbody tr').forEach(tr => {
+  document.querySelectorAll('#invoice-items-list .line-card').forEach(tr => {
     const qty = parseFloat(tr.querySelector('.inv-qty')?.value) || 0;
     const unit = parseFloat(tr.querySelector('.inv-unit')?.value) || 0;
     const line = qty * unit;
     sub += line;
-    const cell = tr.querySelector('.inv-line');
-    if (cell) cell.textContent = formatNGN(line);
+    const lineStr = formatNGN(line);
+    tr.querySelectorAll('.inv-line, .inv-line-body').forEach(cell => { cell.textContent = lineStr; });
   });
   const discount = parseFloat(document.getElementById('inv-discount')?.value) || 0;
   const total = sub * (1 - discount / 100);
@@ -1871,7 +1939,7 @@ function createInvoiceFromQuote(quoteId) {
   document.getElementById('inv-quote-ref').value = q.quoteNumber || '';
   document.getElementById('inv-discount').value = q.discount || 0;
   document.getElementById('inv-notes').value = q.notes || '';
-  const tbody = document.getElementById('invoice-items-tbody');
+  const tbody = document.getElementById('invoice-items-list');
   tbody.innerHTML = '';
   invoiceItemCounter = 0;
   (q.items || []).forEach(it => {
@@ -2240,7 +2308,7 @@ function printQuote() {
 
   let itemsHtml = '';
   let subtotal = 0;
-  document.querySelectorAll('#quote-items-tbody tr').forEach(row => {
+  document.querySelectorAll('#quote-items-list .line-card').forEach(row => {
     const productId = row.querySelector('.qi-product')?.value || '';
     const p = productId ? getProduct(productId) : null;
     const name = (row.querySelector('.qi-name')?.value || '').trim() || (p ? p.name : '');
@@ -2826,7 +2894,7 @@ function emailQuote() {
   const co = data.company;
 
   let itemsText = '';
-  document.querySelectorAll('#quote-items-tbody tr').forEach(row => {
+  document.querySelectorAll('#quote-items-list .line-card').forEach(row => {
     const productId = row.querySelector('.qi-product')?.value;
     if (!productId) return;
     const p = getProduct(productId);
@@ -3859,7 +3927,7 @@ function addSelectedProductsToQuote() {
 
   // Map existing product rows to update qty instead of skipping
   const existingRows = {};
-  document.querySelectorAll('#quote-items-tbody tr').forEach(row => {
+  document.querySelectorAll('#quote-items-list .line-card').forEach(row => {
     const sel = row.querySelector('.qi-product');
     if (sel && sel.value) existingRows[sel.value] = row;
   });
