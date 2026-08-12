@@ -1466,12 +1466,15 @@ html.dark textarea {
 .pres-picker-stack .select-row {
   max-width: none;
   width: 100%;
-  align-items: flex-start;
+  align-items: stretch;
   border-radius: 1.25rem;
   padding: 0.9rem 1.05rem;
 }
 .pres-picker-stack .select-row-text {
   gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
+  padding-right: 0.5rem;
 }
 .pres-picker-stack .select-row-title {
   font-size: 0.95rem;
@@ -1484,9 +1487,26 @@ html.dark textarea {
   line-height: 1.4;
   white-space: normal;
 }
+.pres-picker-stack .pres-pick-aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 0.5rem;
+  min-width: 5.5rem;
+}
 .pres-picker-stack .select-row-check {
-  margin-top: 0.15rem !important;
+  margin-top: 0.1rem !important;
   border-radius: 50% !important; /* radio-style circle like payment UI */
+}
+.pres-picker-stack .pres-pick-price {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.25;
+  text-align: right;
+  white-space: nowrap;
 }
 @media (max-width: 520px) {
   .select-row {
@@ -1495,6 +1515,9 @@ html.dark textarea {
   }
   .pres-picker-stack .select-row {
     border-radius: 1.1rem;
+  }
+  .pres-picker-stack .pres-pick-aside {
+    min-width: 4.5rem;
   }
 }
 </style>

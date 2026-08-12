@@ -2978,18 +2978,15 @@ function renderPresPicker() {
   }
 
   // Payment-style select rows: all inventory details, no images / no icons
+  // Price: Naira only, bold, same size as name, bottom-right of card
   container.innerHTML = list.map(p => {
-    const priceStr = formatMoney(p.price, p.currency);
-    const ngn = toNGN(p.price, p.currency);
-    const ngnStr = formatNGN(ngn);
+    const ngnStr = formatNGN(toNGN(p.price, p.currency));
     const stock = Number(p.stock) || 0;
     const low = stock <= (Number(p.lowStock) || 1);
     const meta = [
       p.sku ? `SKU ${p.sku}` : null,
       p.category || null,
       p.brand || null,
-      priceStr,
-      p.currency !== 'NGN' ? `≈ ${ngnStr}` : null,
       `Stock ${stock}${low ? ' · low' : ''}`
     ].filter(Boolean).join(' · ');
     const desc = (p.description || '').trim();
@@ -2998,12 +2995,15 @@ function renderPresPicker() {
     if (desc) subParts.push(desc.length > 160 ? desc.slice(0, 157) + '…' : desc);
     if (features) subParts.push(features.length > 120 ? features.slice(0, 117) + '…' : features);
     const sub = subParts.map(s => escHtml(s)).join('<br>');
-    return `<label class="select-row">
+    return `<label class="select-row pres-pick-row">
       <span class="select-row-text">
         <span class="select-row-title">${escHtml(p.name || 'Untitled')}</span>
         <span class="select-row-sub">${sub}</span>
       </span>
-      <input type="checkbox" class="pres-check select-row-check" value="${escHtml(p.id)}" />
+      <span class="pres-pick-aside">
+        <input type="checkbox" class="pres-check select-row-check" value="${escHtml(p.id)}" />
+        <span class="pres-pick-price">${escHtml(ngnStr)}</span>
+      </span>
     </label>`;
   }).join('');
 }
