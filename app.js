@@ -1427,7 +1427,7 @@ function saveQuote() {
 function downloadQuoteItemsTemplate() {
   const headers = ['SKU', 'Name', 'Qty', 'Unit_Price', 'Currency', 'Markup_Pct'];
   const sample = ['MRI-3T-001', '3.0T MRI Scanner System', '1', '850000', 'USD', '10'];
-  const csv = headers.join(',') + '\\n' + sample.join(',') + '\\n';
+  const csv = headers.join(',') + '\n' + sample.join(',') + '\n';
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1447,7 +1447,7 @@ function onImportQuoteItemsFile(ev) {
       const rows = parseCsv(text);
       if (!rows.length) { alert('No rows found in file.'); return; }
       // header map
-      const header = rows[0].map(h => String(h || '').trim().toLowerCase().replace(/\\s+/g, '_'));
+      const header = rows[0].map(h => String(h || '').trim().toLowerCase().replace(/\s+/g, '_'));
       const idx = (names) => {
         for (const n of names) {
           const i = header.indexOf(n);
@@ -1511,6 +1511,125 @@ function onImportQuoteItemsFile(ev) {
   reader.readAsText(file);
 }
 
+
+
+function downloadPresItemsTemplate() {
+  const headers = ['Item', 'Qty', 'Unit_Price', 'SKU'];
+  const sample = ['Hospital bed', '4', '200000', ''];
+  const csv = headers.join(',') + '\n' + sample.join(',') + '\n';
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Medicano_Presentation_Items_Template.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function parseLineItemsFromCsv(text) {
+  const rows = parseCsv(text);
+  if (!rows.length) return [];
+  const header = rows[0].map(h => String(h || '').trim().toLowerCase().replace(/\s+/g, '_'));
+  const idx = (names) => {
+    for (const n of names) {
+      const i = header.indexOf(n);
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+  const iSku = idx(['sku', 'code', 'item_code']);
+  const iName = idx(['name', 'item', 'description', 'equipment', 'product']);
+  const iQty = idx(['qty', 'quantity', 'qty.', 'units', 'unit_qty']);
+  const iPrice = idx(['unit_price', 'price', 'unit', 'unit_ngn', 'amount', 'original_unit_price']);
+  const iCur = idx(['currency', 'curr', 'ccy']);
+  const iMarkup = idx(['markup_pct', 'markup', 'markup%', 'margin']);
+  if (iName < 0 && iSku < 0) return null;
+  const out = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || !row.length) continue;
+    const sku = iSku >= 0 ? String(row[iSku] || '').trim() : '';
+    let name = iName >= 0 ? String(row[iName] || '').trim() : '';
+    const qty = iQty >= 0 ? parseFloat(row[iQty]) || 1 : 1;
+    const rawPrice = iPrice >= 0 ? parseFloat(String(row[iPrice]).replace(/,/g, '')) : 0;
+    const currency = (iCur >= 0 ? String(row[iCur] || 'NGN').trim().toUpperCase() : 'NGN') || 'NGN';
+    const markupPct = iMarkup >= 0 ? parseFloat(row[iMarkup]) || 0 : 0;
+    let p = null;
+    let productId = '';
+    if (sku) {
+      p = (data.products || []).find(x => String(x.sku).toLowerCase() === sku.toLowerCase());
+      if (p) productId = p.id;
+    }
+    if (!name && p) name = p.name;
+    if (!name && !sku) continue;
+    let baseNGN = 0;
+    if (rawPrice > 0) {
+      baseNGN = currency === 'NGN' ? rawPrice : toNGN(rawPrice, currency);
+    } else if (p) {
+      baseNGN = toNGN(p.price, p.currency);
+    }
+    const unitNGN = (typeof quoteFinalUnit === 'function')
+      ? quoteFinalUnit(baseNGN, markupPct)
+      : baseNGN * (1 + (markupPct || 0) / 100);
+    out.push({ productId, sku, name: name || sku, qty, baseNGN, markupPct, unitNGN, product: p });
+  }
+  return out;
+}
+
+function onImportPresItemsFile(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function() {
+    try {
+      const items = parseLineItemsFromCsv(String(reader.result || ''));
+      if (items === null) {
+        alert('Spreadsheet needs an Item/Name or SKU column.');
+        return;
+      }
+      if (!items.length) {
+        alert('No valid rows found. Use columns: Item, Qty, Unit_Price');
+        return;
+      }
+      window._presQuoteItems = items.map(it => {
+        const p = it.product;
+        return {
+          id: it.productId || ('csv-' + (it.name || 'item') + '-' + Math.random().toString(36).slice(2, 6)),
+          productId: it.productId || '',
+          name: it.name,
+          sku: it.sku || (p ? p.sku : ''),
+          category: (p && p.category) || 'Equipment',
+          description: (p && p.description) || '',
+          features: (p && p.features) || '',
+          image: (p && p.image) || '',
+          price: it.unitNGN || it.baseNGN || 0,
+          currency: 'NGN',
+          qty: it.qty || 1,
+          fromQuote: true
+        };
+      });
+      const status = document.getElementById('pres-import-status');
+      if (status) {
+        status.textContent = 'Loaded ' + items.length + ' item(s) from spreadsheet. Ready to generate PDF.';
+        status.className = 'text-xs text-emerald-700 font-medium';
+      }
+      const picker = document.getElementById('pres-picker');
+      if (picker) {
+        picker.querySelectorAll('.pres-check').forEach(cb => { cb.checked = false; });
+        items.forEach(it => {
+          if (!it.productId) return;
+          const cb = picker.querySelector('.pres-check[value="' + it.productId + '"]');
+          if (cb) cb.checked = true;
+        });
+      }
+      alert('Loaded ' + items.length + ' item(s) from spreadsheet.');
+    } catch (err) {
+      console.error(err);
+      alert('Could not read spreadsheet. Save as CSV with columns: Item, Qty, Unit_Price');
+    }
+  };
+  reader.readAsText(file);
+}
 
 function deleteCurrentQuote() {
   if (!currentQuoteId) return;
@@ -2846,9 +2965,11 @@ function renderPresPicker() {
 
   const list = data.products.filter(p => p.active).filter(p =>
     !search ||
-    p.name.toLowerCase().includes(search) ||
-    p.sku.toLowerCase().includes(search) ||
-    (p.category || '').toLowerCase().includes(search)
+    (p.name || '').toLowerCase().includes(search) ||
+    (p.sku || '').toLowerCase().includes(search) ||
+    (p.category || '').toLowerCase().includes(search) ||
+    (p.brand || '').toLowerCase().includes(search) ||
+    (p.description || '').toLowerCase().includes(search)
   );
 
   if (list.length === 0) {
@@ -2856,17 +2977,33 @@ function renderPresPicker() {
     return;
   }
 
+  // Payment-style select rows: all inventory details, no images / no icons
   container.innerHTML = list.map(p => {
-    const thumb = p.image
-      ? `<img src="${p.image}" class="w-12 h-12 rounded object-cover border" alt="" />`
-      : `<div class="w-12 h-12 rounded bg-slate-100 flex items-center justify-center text-slate-400">📷</div>`;
-    return `<label class="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer">
-      <input type="checkbox" class="pres-check rounded" value="${p.id}" />
-      ${thumb}
-      <div class="flex-1 min-w-0">
-        <p class="font-medium truncate">${p.name}</p>
-        <p class="text-xs text-slate-500">${p.sku} • ${p.category} • ${formatMoney(p.price, p.currency)}</p>
-      </div>
+    const priceStr = formatMoney(p.price, p.currency);
+    const ngn = toNGN(p.price, p.currency);
+    const ngnStr = formatNGN(ngn);
+    const stock = Number(p.stock) || 0;
+    const low = stock <= (Number(p.lowStock) || 1);
+    const meta = [
+      p.sku ? `SKU ${p.sku}` : null,
+      p.category || null,
+      p.brand || null,
+      priceStr,
+      p.currency !== 'NGN' ? `≈ ${ngnStr}` : null,
+      `Stock ${stock}${low ? ' · low' : ''}`
+    ].filter(Boolean).join(' · ');
+    const desc = (p.description || '').trim();
+    const features = (p.features || '').trim();
+    const subParts = [meta];
+    if (desc) subParts.push(desc.length > 160 ? desc.slice(0, 157) + '…' : desc);
+    if (features) subParts.push(features.length > 120 ? features.slice(0, 117) + '…' : features);
+    const sub = subParts.map(s => escHtml(s)).join('<br>');
+    return `<label class="select-row">
+      <span class="select-row-text">
+        <span class="select-row-title">${escHtml(p.name || 'Untitled')}</span>
+        <span class="select-row-sub">${sub}</span>
+      </span>
+      <input type="checkbox" class="pres-check select-row-check" value="${escHtml(p.id)}" />
     </label>`;
   }).join('');
 }

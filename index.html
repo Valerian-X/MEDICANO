@@ -1456,10 +1456,45 @@ html.dark textarea {
 .pres-options-block {
   width: 100%;
 }
+/* Presentation catalog picker — payment-style rows, no icons/images */
+.pres-picker-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+}
+.pres-picker-stack .select-row {
+  max-width: none;
+  width: 100%;
+  align-items: flex-start;
+  border-radius: 1.25rem;
+  padding: 0.9rem 1.05rem;
+}
+.pres-picker-stack .select-row-text {
+  gap: 0.2rem;
+}
+.pres-picker-stack .select-row-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+.pres-picker-stack .select-row-sub {
+  font-size: 0.72rem;
+  color: #6b7280;
+  line-height: 1.4;
+  white-space: normal;
+}
+.pres-picker-stack .select-row-check {
+  margin-top: 0.15rem !important;
+  border-radius: 50% !important; /* radio-style circle like payment UI */
+}
 @media (max-width: 520px) {
   .select-row {
     border-radius: 1.15rem;
     padding: 0.8rem 0.9rem;
+  }
+  .pres-picker-stack .select-row {
+    border-radius: 1.1rem;
   }
 }
 </style>
@@ -2352,8 +2387,8 @@ html.dark textarea {
                   <button type="button" onclick="selectAllPres(false)" class="px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg">Clear</button>
                 </div>
               </div>
-              <div id="pres-picker" class="max-h-64 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 text-sm mb-4">
-                <!-- filled by JS -->
+              <div id="pres-picker" class="pres-picker-stack max-h-80 overflow-y-auto mb-4">
+                <!-- filled by JS — payment-style select rows -->
               </div>
               <button onclick="generatePresentation()" class="w-full sm:w-auto px-6 py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium text-sm">
                 Generate High-Quality PDF Presentation
