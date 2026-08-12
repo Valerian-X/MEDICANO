@@ -2110,3 +2110,108 @@ tbody tr {
   background: transparent;
 }
 .qp-row:nth-child(odd) { background: rgba(255,255,255,0.7); }
+
+
+/* Payment-style selection rows */
+.select-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+  max-width: 32rem;
+}
+.select-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  border-radius: 999px;
+  background: #eef1f5;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.select-row:hover {
+  background: #e6ebf2;
+}
+.select-row:has(.select-row-radio:checked),
+.select-row:has(.select-row-check:checked) {
+  background: #e8edf5;
+  border-color: #1a1a1a;
+  box-shadow: 0 4px 14px rgba(26,26,26,0.06);
+}
+.select-row-icon {
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.select-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.select-row-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.25;
+}
+.select-row-sub {
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.3;
+}
+.select-row-radio,
+.select-row-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  min-height: 1.25rem !important;
+  min-width: 1.25rem !important;
+  border-radius: 50%;
+  border: 2px solid #b0b8c4 !important;
+  background: #fff !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: none !important;
+  position: relative;
+}
+.select-row-check {
+  border-radius: 0.35rem !important;
+}
+.select-row-radio:checked,
+.select-row-check:checked {
+  border-color: #1a1a1a !important;
+  background: #1a1a1a !important;
+  box-shadow: inset 0 0 0 3px #fff !important;
+}
+.pres-markup-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  max-width: 32rem;
+}
+.pres-options-block {
+  width: 100%;
+}
+@media (max-width: 520px) {
+  .select-row {
+    border-radius: 1.15rem;
+    padding: 0.8rem 0.9rem;
+  }
+}

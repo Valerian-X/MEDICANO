@@ -3303,7 +3303,7 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
         if (!(ci === 0 && firstTopY != null)) {
           if (ci > 0 || firstTopY == null) doc.addPage();
         }
-        setFill(WHITE); doc.rect(0, 0, W, H, 'F');
+        setFill(CREAM); doc.rect(0, 0, W, H, 'F');
         drawTableChunk(chunk, ci === 0 && firstTopY == null ? topFirst : topCont, ci === chunks.length - 1);
       }
       footer(pageNo, totalPagesGuess);
@@ -3476,7 +3476,7 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
   if (isUltraSummary) {
     // Ultra: offer text, then table only (no catalogue cards, no "Price Summary" heading)
     doc.addPage();
-    setFill(WHITE); doc.rect(0, 0, W, H, 'F');
+    setFill(CREAM); doc.rect(0, 0, W, H, 'F');
     setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
     doc.text('Equipment Catalogue', M, 58);
     setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 74, M + 54, 74);

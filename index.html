@@ -1358,6 +1358,111 @@ html.dark textarea {
   }
 }
 </style>
+<style id="select-row-ui">
+/* Payment-style selection rows */
+.select-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+  max-width: 32rem;
+}
+.select-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  border-radius: 999px;
+  background: #eef1f5;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.select-row:hover {
+  background: #e6ebf2;
+}
+.select-row:has(.select-row-radio:checked),
+.select-row:has(.select-row-check:checked) {
+  background: #e8edf5;
+  border-color: #1a1a1a;
+  box-shadow: 0 4px 14px rgba(26,26,26,0.06);
+}
+.select-row-icon {
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.select-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.select-row-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.25;
+}
+.select-row-sub {
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.3;
+}
+.select-row-radio,
+.select-row-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  min-height: 1.25rem !important;
+  min-width: 1.25rem !important;
+  border-radius: 50%;
+  border: 2px solid #b0b8c4 !important;
+  background: #fff !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: none !important;
+  position: relative;
+}
+.select-row-check {
+  border-radius: 0.35rem !important;
+}
+.select-row-radio:checked,
+.select-row-check:checked {
+  border-color: #1a1a1a !important;
+  background: #1a1a1a !important;
+  box-shadow: inset 0 0 0 3px #fff !important;
+}
+.pres-markup-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  max-width: 32rem;
+}
+.pres-options-block {
+  width: 100%;
+}
+@media (max-width: 520px) {
+  .select-row {
+    border-radius: 1.15rem;
+    padding: 0.8rem 0.9rem;
+  }
+}
+</style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
   <!-- Mobile sidebar overlay -->
@@ -1942,10 +2047,17 @@ html.dark textarea {
                     <textarea id="inv-notes" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="Extra payment notes..."></textarea>
                   </div>
                   <div class="sm:col-span-2">
-                    <label class="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                      <input id="inv-show-footer" type="checkbox" class="rounded border-slate-300" checked />
-                      <span>Show standard footer on PDF <span class="text-slate-400">(payment notice &amp; exchange rates)</span></span>
-                    </label>
+                    <p class="text-sm font-medium text-slate-700 mb-2">PDF footer</p>
+                    <div class="select-stack">
+                      <label class="select-row">
+                        <span class="select-row-icon">📄</span>
+                        <span class="select-row-text">
+                          <span class="select-row-title">Standard footer on PDF</span>
+                          <span class="select-row-sub">Payment notice &amp; exchange rates</span>
+                        </span>
+                        <input id="inv-show-footer" type="checkbox" class="select-row-check" checked />
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2136,57 +2248,62 @@ html.dark textarea {
                 </div>
               </div>
 
-              <div class="mb-4">
-                <label class="block text-sm font-medium text-slate-700 mb-2">Layout Style</label>
-                <div class="flex flex-wrap gap-3">
-                  <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
-                    <input type="radio" name="pres-layout" value="picture" checked class="text-brand-600" />
-                    <div>
-                      <p class="text-sm font-medium">Picture</p>
-                      <p class="text-xs text-slate-500">Image + details — premium cards</p>
-                    </div>
+              <div class="pres-options-block mb-5">
+                <p class="text-sm font-semibold text-slate-800 mb-2">Layout style</p>
+                <div class="select-stack">
+                  <label class="select-row">
+                    <span class="select-row-icon">🖼️</span>
+                    <span class="select-row-text">
+                      <span class="select-row-title">Picture</span>
+                      <span class="select-row-sub">Image + details — premium cards</span>
+                    </span>
+                    <input type="radio" name="pres-layout" value="picture" checked class="select-row-radio" />
                   </label>
-                  <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
-                    <input type="radio" name="pres-layout" value="list" class="text-brand-600" />
-                    <div>
-                      <p class="text-sm font-medium">List</p>
-                      <p class="text-xs text-slate-500">No images — compact rows, more per page</p>
-                    </div>
+                  <label class="select-row">
+                    <span class="select-row-icon">📋</span>
+                    <span class="select-row-text">
+                      <span class="select-row-title">List</span>
+                      <span class="select-row-sub">No images — compact rows, more per page</span>
+                    </span>
+                    <input type="radio" name="pres-layout" value="list" class="select-row-radio" />
                   </label>
                 </div>
               </div>
 
-              <div class="mb-2">
-                <label class="block text-sm font-medium text-slate-700 mb-2">Price Summary</label>
-                <div class="flex flex-wrap gap-3">
-                  <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
-                    <input type="radio" name="pres-summary" value="complex" checked class="text-brand-600" />
-                    <div>
-                      <p class="text-sm font-medium">Complex</p>
-                      <p class="text-xs text-slate-500">Navy card, itemised on own page(s)</p>
-                    </div>
+              <div class="pres-options-block mb-5">
+                <p class="text-sm font-semibold text-slate-800 mb-2">Price summary</p>
+                <div class="select-stack">
+                  <label class="select-row">
+                    <span class="select-row-icon">📑</span>
+                    <span class="select-row-text">
+                      <span class="select-row-title">Complex</span>
+                      <span class="select-row-sub">Navy card, itemised on own page(s)</span>
+                    </span>
+                    <input type="radio" name="pres-summary" value="complex" checked class="select-row-radio" />
                   </label>
-                  <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
-                    <input type="radio" name="pres-summary" value="simple" class="text-brand-600" />
-                    <div>
-                      <p class="text-sm font-medium">Simple</p>
-                      <p class="text-xs text-slate-500">Total only after last card</p>
-                    </div>
+                  <label class="select-row">
+                    <span class="select-row-icon">💵</span>
+                    <span class="select-row-text">
+                      <span class="select-row-title">Simple</span>
+                      <span class="select-row-sub">Total only after the last equipment card</span>
+                    </span>
+                    <input type="radio" name="pres-summary" value="simple" class="select-row-radio" />
                   </label>
-                  <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
-                    <input type="radio" name="pres-summary" value="ultra" class="text-brand-600" />
-                    <div>
-                      <p class="text-sm font-medium">Ultra simple</p>
-                      <p class="text-xs text-slate-500">Clean table: Item · Qty · Price · Total</p>
-                    </div>
+                  <label class="select-row">
+                    <span class="select-row-icon">📊</span>
+                    <span class="select-row-text">
+                      <span class="select-row-title">Ultra simple</span>
+                      <span class="select-row-sub">Clean table: Item · Qty · Price · Line total</span>
+                    </span>
+                    <input type="radio" name="pres-summary" value="ultra" class="select-row-radio" />
                   </label>
                 </div>
-                <div class="mt-4 flex flex-wrap items-end gap-3">
+                <div class="pres-markup-row mt-3">
                   <div>
                     <label class="block text-xs font-medium text-slate-600 mb-1">General markup % (all items)</label>
                     <input id="pres-global-markup" type="number" min="0" step="0.1" value="0" class="w-28 px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="0" />
                   </div>
-                  <p class="text-xs text-slate-500 pb-2">Optional. Applies to every line in this presentation (not shown as markup on the PDF).</p>
+                  <p class="text-xs text-slate-500">Optional. Applies to every line (not shown as markup on the PDF).</p>
                 </div>
               </div>
             </div>
