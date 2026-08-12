@@ -565,22 +565,21 @@ function renderProducts() {
       ? `<img src="${p.image}" class="w-10 h-10 rounded object-cover border border-slate-200" alt="" />`
       : `<div class="w-10 h-10 rounded bg-slate-100 flex items-center justify-center text-slate-400 text-xs">—</div>`;
     return `<tr class="border-t border-slate-100 hover:bg-slate-50">
-      <td class="px-4 py-3">${thumb}</td>
-      <td class="px-4 py-3 font-mono text-xs">${p.sku}</td>
-      <td class="px-4 py-3">
-        <p class="font-medium">${p.name}</p>
-        <p class="text-xs text-slate-500 truncate max-w-xs">${p.brand || ''}</p>
+      <td class="px-4 py-3" data-label="Image">${thumb}</td>
+      <td class="px-4 py-3 font-mono text-xs" data-label="SKU">${escHtml(p.sku || '')}</td>
+      <td class="px-4 py-3" data-label="Name">
+        <p class="font-medium">${escHtml(p.name || '')}</p>
+        <p class="text-xs text-slate-500 truncate max-w-xs">${escHtml(p.brand || '')}</p>
       </td>
-      <td class="px-4 py-3">${p.category}</td>
-      <td class="px-4 py-3">
-        <p>${formatMoney(p.price, p.currency)}</p>
-        <p class="text-xs text-slate-500">${formatNGN(ngn)}</p>
+      <td class="px-4 py-3" data-label="Category">${escHtml(p.category || '')}</td>
+      <td class="px-4 py-3" data-label="Price">
+        <p class="font-medium">${formatNGN(ngn)}</p>
       </td>
-      <td class="px-4 py-3 ${low ? 'text-amber-600 font-medium' : ''}">${p.stock}${low ? ' ⚠' : ''}</td>
-      <td class="px-4 py-3">
+      <td class="px-4 py-3 ${low ? 'text-amber-600 font-medium' : ''}" data-label="Stock">${p.stock}${low ? ' ⚠' : ''}</td>
+      <td class="px-4 py-3" data-label="Status">
         <span class="text-xs px-2 py-0.5 rounded-full ${p.active ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-500'}">${p.active ? 'Active' : 'Inactive'}</span>
       </td>
-      <td class="px-4 py-3">
+      <td class="px-4 py-3" data-label="Actions">
         <button onclick="editProduct('${p.id}')" class="text-brand-600 hover:underline text-xs mr-2">Edit</button>
         <button onclick="if(confirm('Delete this item?')) deleteProduct('${p.id}')" class="text-red-500 hover:underline text-xs">Del</button>
       </td>
@@ -968,12 +967,12 @@ function renderInventoryStock() {
     if (stock <= 0) status = '<span class="text-rose-700 bg-rose-50 px-2 py-0.5 rounded text-xs font-medium">Out of stock</span>';
     else if (stock <= low) status = '<span class="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-xs font-medium">Low</span>';
     return `<tr class="hover:bg-slate-50">
-      <td class="px-4 py-2.5 text-slate-500">${escHtml(p.sku || '—')}</td>
-      <td class="px-4 py-2.5 font-medium">${escHtml(p.name || '')}</td>
-      <td class="px-4 py-2.5 text-slate-500">${escHtml(p.category || '—')}</td>
-      <td class="px-4 py-2.5 text-right font-semibold">${stock}</td>
-      <td class="px-4 py-2.5 text-right text-slate-500">${low}</td>
-      <td class="px-4 py-2.5">${status}</td>
+      <td class="px-4 py-2.5 text-slate-500" data-label="SKU">${escHtml(p.sku || '—')}</td>
+      <td class="px-4 py-2.5 font-medium" data-label="Equipment">${escHtml(p.name || '')}</td>
+      <td class="px-4 py-2.5 text-slate-500" data-label="Category">${escHtml(p.category || '—')}</td>
+      <td class="px-4 py-2.5 text-right font-semibold" data-label="In stock">${stock}</td>
+      <td class="px-4 py-2.5 text-right text-slate-500" data-label="Low at">${low}</td>
+      <td class="px-4 py-2.5" data-label="Status">${status}</td>
     </tr>`;
   }).join('');
 }
@@ -994,13 +993,13 @@ function renderInventoryMovements() {
     const typeClass = m.type === 'in' ? 'text-emerald-700 bg-emerald-50' : m.type === 'out' ? 'text-rose-700 bg-rose-50' : 'text-slate-700 bg-slate-100';
     const d = (m.date || '').slice(0, 10);
     return `<tr class="hover:bg-slate-50">
-      <td class="px-4 py-2.5 whitespace-nowrap">${escHtml(d)}</td>
-      <td class="px-4 py-2.5">${escHtml(p ? p.name : '(deleted item)')}</td>
-      <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-xs font-medium ${typeClass}">${typeLabel}</span></td>
-      <td class="px-4 py-2.5 text-right font-medium">${m.type === 'out' ? '−' : m.type === 'in' ? '+' : ''}${Number(m.qty) || 0}</td>
-      <td class="px-4 py-2.5 text-right text-slate-500">${m.balanceAfter ?? '—'}</td>
-      <td class="px-4 py-2.5 text-slate-500">${escHtml(m.note || '')}</td>
-      <td class="px-4 py-2.5 text-right">
+      <td class="px-4 py-2.5 whitespace-nowrap" data-label="Date">${escHtml(d)}</td>
+      <td class="px-4 py-2.5" data-label="Equipment">${escHtml(p ? p.name : '(deleted item)')}</td>
+      <td class="px-4 py-2.5" data-label="Type"><span class="px-2 py-0.5 rounded text-xs font-medium ${typeClass}">${typeLabel}</span></td>
+      <td class="px-4 py-2.5 text-right font-medium" data-label="Qty">${m.type === 'out' ? '−' : m.type === 'in' ? '+' : ''}${Number(m.qty) || 0}</td>
+      <td class="px-4 py-2.5 text-right text-slate-500" data-label="Balance">${m.balanceAfter ?? '—'}</td>
+      <td class="px-4 py-2.5 text-slate-500" data-label="Note">${escHtml(m.note || '')}</td>
+      <td class="px-4 py-2.5 text-right" data-label="Actions">
         <button type="button" onclick="deleteStockMovement('${m.id}')" class="text-xs text-red-500 hover:underline">Delete</button>
       </td>
     </tr>`;
@@ -1101,11 +1100,11 @@ function renderClients() {
 
   document.getElementById('clients-tbody').innerHTML = list.map(c => `
     <tr class="border-t border-slate-100 hover:bg-slate-50">
-      <td class="px-4 py-3 font-medium">${c.name}</td>
-      <td class="px-4 py-3">${c.contact || '—'}</td>
-      <td class="px-4 py-3">${c.phone || '—'}</td>
-      <td class="px-4 py-3">${c.email || '—'}</td>
-      <td class="px-4 py-3">
+      <td class="px-4 py-3 font-medium" data-label="Client">${escHtml(c.name)}</td>
+      <td class="px-4 py-3" data-label="Contact">${escHtml(c.contact || '—')}</td>
+      <td class="px-4 py-3" data-label="Phone">${escHtml(c.phone || '—')}</td>
+      <td class="px-4 py-3" data-label="Email">${escHtml(c.email || '—')}</td>
+      <td class="px-4 py-3" data-label="Actions">
         <button onclick="editClient('${c.id}')" class="text-brand-600 hover:underline text-xs mr-2">Edit</button>
         <button onclick="if(confirm('Delete client?')) deleteClient('${c.id}')" class="text-red-500 hover:underline text-xs">Del</button>
       </td>
@@ -1172,13 +1171,13 @@ function renderQuotes() {
   document.getElementById('quotes-tbody').innerHTML = list.map(q => {
     const client = getClient(q.clientId);
     return `<tr class="border-t border-slate-100 hover:bg-slate-50">
-      <td class="px-4 py-3 font-mono text-xs font-medium">${q.quoteNumber}</td>
-      <td class="px-4 py-3">${client ? client.name : '—'}</td>
-      <td class="px-4 py-3">${q.title}</td>
-      <td class="px-4 py-3 font-medium">${formatNGN(q.totalNGN)}</td>
-      <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 rounded-full ${statusClass(q.status)}">${q.status}</span></td>
-      <td class="px-4 py-3 text-xs text-slate-500">${new Date(q.createdAt).toLocaleDateString()}</td>
-      <td class="px-4 py-3">
+      <td class="px-4 py-3 font-mono text-xs font-medium" data-label="Quote #">${escHtml(q.quoteNumber || '')}</td>
+      <td class="px-4 py-3" data-label="Client">${escHtml(client ? client.name : '—')}</td>
+      <td class="px-4 py-3" data-label="Title">${escHtml(q.title || '')}</td>
+      <td class="px-4 py-3 font-medium" data-label="Total">${formatNGN(q.totalNGN)}</td>
+      <td class="px-4 py-3" data-label="Status"><span class="text-xs px-2 py-0.5 rounded-full ${statusClass(q.status)}">${escHtml(q.status || '')}</span></td>
+      <td class="px-4 py-3 text-xs text-slate-500" data-label="Date">${new Date(q.createdAt).toLocaleDateString()}</td>
+      <td class="px-4 py-3" data-label="Actions">
         <button onclick="openQuote('${q.id}')" class="text-brand-600 hover:underline text-xs mr-2">Open</button>
         <button onclick="createInvoiceFromQuote('${q.id}')" class="text-slate-700 hover:underline text-xs mr-2">Invoice</button>
         <button onclick="if(confirm('Delete quote?')) { data.quotes = data.quotes.filter(x => x.id !== '${q.id}'); saveData(); renderQuotes(); renderDashboard(); }" class="text-red-500 hover:underline text-xs">Del</button>
@@ -1266,26 +1265,26 @@ function addQuoteItemRow(existing = null) {
   const qtyVal = existing ? (existing.qty || 1) : 1;
 
   tr.innerHTML = `
-    <td class="py-2 pr-2 min-w-[180px]">
-      <select class="qi-product w-full px-2 py-1.5 border rounded text-sm mb-1" onchange="onItemProductChange('${rowId}')">
+    <td class="py-2.5 pr-2 min-w-[180px]" data-label="Equipment">
+      <select class="qi-product w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm mb-1.5 bg-white" onchange="onItemProductChange('${rowId}')">
         <option value="">Custom / from sheet...</option>
         ${options}
       </select>
-      <input type="text" class="qi-name w-full px-2 py-1.5 border rounded text-sm" placeholder="Item name" value="${escHtml(nameVal)}" oninput="recalcQuote()" />
+      <input type="text" class="qi-name w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Item name" value="${escHtml(nameVal)}" oninput="recalcQuote()" />
     </td>
-    <td class="py-2 pr-2">
-      <input type="number" min="0" step="1" value="${qtyVal}" class="qi-qty w-full px-2 py-1.5 border rounded text-sm text-center" oninput="recalcQuote()" />
+    <td class="py-2.5 pr-2" data-label="Qty">
+      <input type="number" min="0" step="1" value="${qtyVal}" class="qi-qty input-compact" oninput="recalcQuote()" inputmode="numeric" />
     </td>
-    <td class="py-2 pr-2">
-      <input type="number" min="0" step="1" value="${Math.round(baseNgn)}" class="qi-base w-full px-2 py-1.5 border rounded text-sm text-right" oninput="recalcQuote()" title="Base cost in NGN (before markup)" />
+    <td class="py-2.5 pr-2" data-label="Base NGN">
+      <input type="number" min="0" step="1" value="${Math.round(baseNgn)}" class="qi-base w-28 px-2.5 py-2 border border-slate-200 rounded-lg text-sm text-right" oninput="recalcQuote()" title="Base cost in NGN (before markup)" />
     </td>
-    <td class="py-2 pr-2">
-      <input type="number" min="0" step="0.1" value="${markup}" class="qi-markup w-full px-2 py-1.5 border rounded text-sm text-center" oninput="recalcQuote()" title="Optional markup % — not shown on PDF" />
+    <td class="py-2.5 pr-2" data-label="Markup %">
+      <input type="number" min="0" step="0.1" value="${markup}" class="qi-markup input-compact" oninput="recalcQuote()" title="Optional markup % — not shown on PDF" inputmode="decimal" />
     </td>
-    <td class="py-2 pr-2 qi-unit-ngn text-sm font-medium">—</td>
-    <td class="py-2 pr-2 qi-line font-medium text-sm">—</td>
-    <td class="py-2">
-      <button type="button" onclick="document.getElementById('${rowId}').remove(); recalcQuote()" class="text-red-400 hover:text-red-600 text-lg">×</button>
+    <td class="py-2.5 pr-2 qi-unit-ngn text-sm font-semibold" data-label="Unit">—</td>
+    <td class="py-2.5 pr-2 qi-line font-semibold text-sm" data-label="Line total">—</td>
+    <td class="py-2.5" data-label="Actions">
+      <button type="button" onclick="document.getElementById('${rowId}').remove(); recalcQuote()" class="text-red-500 hover:text-red-700 text-sm font-medium px-2">Remove</button>
     </td>
   `;
   tbody.appendChild(tr);
@@ -1667,13 +1666,13 @@ function renderInvoices() {
     };
     const sc = statusColors[inv.status] || statusColors.draft;
     return `<tr class="hover:bg-slate-50">
-      <td class="px-4 py-3 font-medium">${escHtml(inv.invoiceNumber || '')}</td>
-      <td class="px-4 py-3">${escHtml(client ? client.name : '—')}</td>
-      <td class="px-4 py-3">${escHtml(inv.title || '')}</td>
-      <td class="px-4 py-3 font-medium">${formatNGN(inv.totalNgn || 0)}</td>
-      <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs font-medium ${sc}">${(inv.status || 'draft').toUpperCase()}</span></td>
-      <td class="px-4 py-3 text-slate-500">${(inv.date || '').slice(0, 10)}</td>
-      <td class="px-4 py-3 whitespace-nowrap">
+      <td class="px-4 py-3 font-medium" data-label="Invoice #">${escHtml(inv.invoiceNumber || '')}</td>
+      <td class="px-4 py-3" data-label="Client">${escHtml(client ? client.name : '—')}</td>
+      <td class="px-4 py-3" data-label="Title">${escHtml(inv.title || '')}</td>
+      <td class="px-4 py-3 font-medium" data-label="Total">${formatNGN(inv.totalNgn || 0)}</td>
+      <td class="px-4 py-3" data-label="Status"><span class="px-2 py-0.5 rounded text-xs font-medium ${sc}">${(inv.status || 'draft').toUpperCase()}</span></td>
+      <td class="px-4 py-3 text-slate-500" data-label="Date">${(inv.date || '').slice(0, 10)}</td>
+      <td class="px-4 py-3 whitespace-nowrap" data-label="Actions">
         <button onclick="editInvoice('${inv.id}')" class="text-brand-600 hover:underline text-xs mr-2">Edit</button>
         <button onclick="editInvoice('${inv.id}'); setTimeout(printInvoice, 200)" class="text-slate-600 hover:underline text-xs">PDF</button>
       </td>
@@ -1746,17 +1745,17 @@ function addInvoiceItemRow(item) {
   const tr = document.createElement('tr');
   tr.id = id;
   tr.innerHTML = `
-    <td class="py-2 pr-2">
-      <select class="inv-product w-full px-2 py-1.5 border border-slate-300 rounded text-sm" onchange="onInvoiceProductChange('${id}')">
+    <td class="py-2.5 pr-2" data-label="Item">
+      <select class="inv-product w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm bg-white" onchange="onInvoiceProductChange('${id}')">
         <option value="">— Custom / select —</option>
         ${productOpts}
       </select>
-      <input class="inv-name w-full mt-1 px-2 py-1.5 border border-slate-200 rounded text-sm" placeholder="Description" value="${item ? escHtml(item.name || '') : ''}" oninput="recalcInvoiceTotal()" />
+      <input class="inv-name w-full mt-1.5 px-2.5 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Description" value="${item ? escHtml(item.name || '') : ''}" oninput="recalcInvoiceTotal()" />
     </td>
-    <td class="py-2 pr-2"><input type="number" min="0" step="1" class="inv-qty w-full px-2 py-1.5 border border-slate-300 rounded text-sm" value="${item ? (item.qty || 1) : 1}" oninput="recalcInvoiceTotal()" /></td>
-    <td class="py-2 pr-2"><input type="number" min="0" step="1" class="inv-unit w-full px-2 py-1.5 border border-slate-300 rounded text-sm" value="${item ? Math.round(item.unitNgn || 0) : 0}" oninput="recalcInvoiceTotal()" /></td>
-    <td class="py-2 pr-2 inv-line text-right font-medium">₦0</td>
-    <td class="py-2"><button type="button" onclick="this.closest('tr').remove(); recalcInvoiceTotal()" class="text-red-500 text-xs">✕</button></td>
+    <td class="py-2.5 pr-2" data-label="Qty"><input type="number" min="0" step="1" class="inv-qty input-compact" value="${item ? (item.qty || 1) : 1}" oninput="recalcInvoiceTotal()" inputmode="numeric" /></td>
+    <td class="py-2.5 pr-2" data-label="Unit NGN"><input type="number" min="0" step="1" class="inv-unit w-28 px-2.5 py-2 border border-slate-200 rounded-lg text-sm text-right" value="${item ? Math.round(item.unitNgn || 0) : 0}" oninput="recalcInvoiceTotal()" /></td>
+    <td class="py-2.5 pr-2 inv-line text-right font-semibold" data-label="Line total">₦0</td>
+    <td class="py-2.5" data-label="Actions"><button type="button" onclick="this.closest('tr').remove(); recalcInvoiceTotal()" class="text-red-500 text-sm font-medium px-2">Remove</button></td>
   `;
   tbody.appendChild(tr);
   if (item && item.productId) {

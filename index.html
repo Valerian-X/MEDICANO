@@ -1287,20 +1287,126 @@ html.dark textarea {
     margin-right: 0 !important;
   }
 
-  /* Tables scroll horizontally instead of crushing */
-  .overflow-x-auto,
-  table {
+  /* List tables → stacked mobile cards */
+  .overflow-x-auto {
+    overflow-x: visible !important;
+  }
+  table.pastel-cols,
+  table.data-list {
+    min-width: 0 !important;
+    width: 100% !important;
+    border-collapse: separate;
+    border-spacing: 0 0.65rem;
+  }
+  table.pastel-cols thead,
+  table.data-list thead {
+    display: none;
+  }
+  table.pastel-cols tbody,
+  table.data-list tbody {
     display: block;
     width: 100%;
-    max-width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
-  thead, tbody, tr {
+  table.pastel-cols tbody tr,
+  table.data-list tbody tr {
+    display: block;
     width: 100%;
+    background: #fff !important;
+    border: 1px solid #e8e4dc !important;
+    border-radius: 1rem;
+    padding: 0.85rem 1rem;
+    margin: 0;
+    box-shadow: 0 4px 14px rgba(26, 26, 26, 0.04);
+    box-sizing: border-box;
   }
-  table {
-    min-width: 520px;
+  table.pastel-cols tbody tr:hover,
+  table.data-list tbody tr:hover {
+    background: #faf9f6 !important;
+  }
+  table.pastel-cols tbody td,
+  table.data-list tbody td {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0.35rem 0 !important;
+    border: none !important;
+    background: transparent !important;
+    text-align: right !important;
+    font-size: 0.875rem !important;
+    line-height: 1.35;
+    box-sizing: border-box;
+  }
+  table.pastel-cols tbody td::before,
+  table.data-list tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6b7280;
+    text-align: left;
+    flex: 0 0 38%;
+    max-width: 42%;
+  }
+  table.pastel-cols tbody td:empty,
+  table.data-list tbody td:empty {
+    display: none !important;
+  }
+  /* Actions row: full-width buttons */
+  table.pastel-cols tbody td[data-label="Actions"],
+  table.data-list tbody td[data-label="Actions"] {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    padding-top: 0.65rem !important;
+    margin-top: 0.35rem;
+    border-top: 1px solid #eee9e0 !important;
+  }
+  table.pastel-cols tbody td[data-label="Actions"]::before,
+  table.data-list tbody td[data-label="Actions"]::before {
+    display: none;
+  }
+  table.pastel-cols tbody td[data-label="Actions"] button,
+  table.data-list tbody td[data-label="Actions"] button {
+    min-height: 36px !important;
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.55rem;
+    background: #f3f0ea;
+    font-size: 0.8rem !important;
+  }
+
+  /* Quote / invoice line-item tables on mobile */
+  #quote-items-tbody tr,
+  #invoice-items-tbody tr {
+    display: block;
+    background: #f7f5f0;
+    border: 1px solid #e8e4dc !important;
+    border-radius: 1rem;
+    padding: 0.85rem;
+    margin-bottom: 0.75rem;
+  }
+  #quote-items-tbody td,
+  #invoice-items-tbody td {
+    display: block;
+    width: 100% !important;
+    padding: 0.35rem 0 !important;
+    border: none !important;
+  }
+  #quote-items-tbody .qi-product,
+  #quote-items-tbody .qi-name,
+  #invoice-items-tbody .inv-product,
+  #invoice-items-tbody .inv-name {
+    width: 100% !important;
+  }
+  #quote-items-tbody .qi-nums,
+  #invoice-items-tbody .inv-nums {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
   }
 
   /* Touch-friendly controls */
@@ -1308,11 +1414,22 @@ html.dark textarea {
     font-size: 16px !important; /* no iOS zoom */
     min-height: 44px !important;
   }
-  input[type="number"].qp-qty,
+  input.input-compact,
   input.qi-qty,
-  input.qi-markup {
+  input.qi-markup,
+  input.inv-qty,
+  input.qp-qty,
+  #pres-global-markup,
+  #inv-qty,
+  #p-stock,
+  #p-low,
+  #quote-discount {
     min-height: 40px !important;
-    min-width: 3.5rem !important;
+    min-width: 3.25rem !important;
+    width: 3.75rem !important;
+    max-width: 3.75rem !important;
+    font-size: 16px !important;
+    padding: 0.4rem 0.35rem !important;
   }
 
   /* Quote / invoice editors stack */
@@ -1456,6 +1573,34 @@ html.dark textarea {
 .pres-options-block {
   width: 100%;
 }
+/* Compact numeric fields (qty, markup %, stock — ~3 digits) */
+.input-compact {
+  width: 3.75rem !important;
+  max-width: 3.75rem !important;
+  min-width: 3.25rem;
+  padding: 0.45rem 0.4rem !important;
+  border: 1.5px solid #d1d5db;
+  border-radius: 0.65rem;
+  font-size: 0.875rem;
+  text-align: center;
+  box-sizing: border-box;
+  background: #fff;
+  line-height: 1.25;
+}
+.input-compact:focus {
+  outline: none;
+  border-color: #1a1a1a;
+  box-shadow: 0 0 0 2px rgba(26, 26, 26, 0.08);
+}
+.rates-mode-stack {
+  max-width: 100%;
+  width: 100%;
+}
+.rates-mode-stack .select-row {
+  max-width: none;
+  width: 100%;
+}
+
 /* Presentation catalog picker — payment-style rows, no icons/images */
 .pres-picker-stack {
   display: flex;
@@ -1993,7 +2138,7 @@ html.dark textarea {
                   </div>
                   <div class="flex justify-between items-center">
                     <span class="text-slate-500">Discount (%)</span>
-                    <input id="quote-discount" type="number" min="0" max="100" value="0" class="w-20 px-2 py-1 border rounded text-right text-sm" oninput="recalcQuote()" />
+                    <input id="quote-discount" type="number" min="0" max="100" value="0" class="input-compact text-right" oninput="recalcQuote()" inputmode="decimal" />
                   </div>
                   <div class="flex justify-between font-semibold text-lg border-t pt-2 mt-2">
                     <span>Total (NGN)</span>
@@ -2224,7 +2369,7 @@ html.dark textarea {
                 </div>
                 <div>
                   <label class="block text-slate-500 mb-1">Quantity</label>
-                  <input id="inv-qty" type="number" min="0" step="1" value="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                  <input id="inv-qty" type="number" min="0" step="1" value="1" class="input-compact" inputmode="numeric" />
                 </div>
                 <div>
                   <label class="block text-slate-500 mb-1">Date</label>
@@ -2371,8 +2516,8 @@ html.dark textarea {
                 </div>
                 <div class="pres-markup-row mt-3">
                   <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">General markup % (all items)</label>
-                    <input id="pres-global-markup" type="number" min="0" step="0.1" value="0" class="w-28 px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="0" />
+                    <label class="block text-xs font-medium text-slate-600 mb-1">General markup %</label>
+                    <input id="pres-global-markup" type="number" min="0" max="999" step="0.1" value="0" class="input-compact" placeholder="0" inputmode="decimal" />
                   </div>
                   <p class="text-xs text-slate-500">Optional. Applies to every line (not shown as markup on the PDF).</p>
                 </div>
@@ -2427,15 +2572,21 @@ html.dark textarea {
             <p class="text-sm text-slate-500 mb-4">Convert USD / EUR equipment prices to Naira. Choose manual entry or auto-fetch from a free FX API.</p>
 
             <div class="mb-5">
-              <label class="block text-sm font-medium text-slate-700 mb-2">Rate mode</label>
-              <div class="flex flex-wrap gap-3">
-                <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer">
-                  <input type="radio" name="rate-mode" value="manual" checked onchange="onRateModeChange()" />
-                  <span class="text-sm font-medium">Manual</span>
+              <p class="text-sm font-semibold text-slate-800 mb-2">Rate mode</p>
+              <div class="select-stack rates-mode-stack">
+                <label class="select-row">
+                  <span class="select-row-text">
+                    <span class="select-row-title">Manual</span>
+                    <span class="select-row-sub">Enter USD &amp; EUR rates yourself</span>
+                  </span>
+                  <input type="radio" name="rate-mode" value="manual" checked class="select-row-radio" onchange="onRateModeChange()" />
                 </label>
-                <label class="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg cursor-pointer">
-                  <input type="radio" name="rate-mode" value="auto" onchange="onRateModeChange()" />
-                  <span class="text-sm font-medium">Auto (free API)</span>
+                <label class="select-row">
+                  <span class="select-row-text">
+                    <span class="select-row-title">Auto</span>
+                    <span class="select-row-sub">Fetch latest rates from free FX API</span>
+                  </span>
+                  <input type="radio" name="rate-mode" value="auto" class="select-row-radio" onchange="onRateModeChange()" />
                 </label>
               </div>
             </div>
@@ -2664,11 +2815,11 @@ html.dark textarea {
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium mb-1">Stock Qty</label>
-            <input id="p-stock" type="number" min="0" value="0" class="w-full px-3 py-2 border rounded-lg text-sm" />
+            <input id="p-stock" type="number" min="0" value="0" class="input-compact" inputmode="numeric" />
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Low Stock Alert</label>
-            <input id="p-low" type="number" min="0" value="2" class="w-full px-3 py-2 border rounded-lg text-sm" />
+            <input id="p-low" type="number" min="0" value="2" class="input-compact" inputmode="numeric" />
           </div>
         </div>
         <div>

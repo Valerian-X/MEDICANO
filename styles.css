@@ -1752,21 +1752,34 @@ input, select, textarea {
   max-width: 100%;
   box-sizing: border-box !important;
 }
-input[type="number"],
 input.qi-base,
-input.qi-qty,
-input.qi-markup,
-input.qp-qty,
-input.inv-unit,
-#quote-discount,
-#pres-global-markup {
-  min-width: 4.5rem !important;
+input.inv-unit {
+  min-width: 6rem !important;
   width: auto !important;
   max-width: 100% !important;
   overflow: visible !important;
   font-variant-numeric: tabular-nums;
   text-align: right;
   padding-right: 0.65rem !important;
+}
+input.input-compact,
+input.qi-qty,
+input.qi-markup,
+input.inv-qty,
+input.qp-qty,
+#quote-discount,
+#pres-global-markup,
+#inv-qty,
+#p-stock,
+#p-low {
+  width: 3.75rem !important;
+  max-width: 3.75rem !important;
+  min-width: 3.25rem !important;
+  padding: 0.45rem 0.35rem !important;
+  text-align: center !important;
+  font-variant-numeric: tabular-nums;
+  overflow: visible !important;
+  border-radius: 0.65rem;
 }
 textarea {
   min-height: 5rem !important;
@@ -1780,11 +1793,19 @@ td, th {
   overflow: visible !important;
   vertical-align: middle;
 }
-#quote-items-tbody input,
-#invoice-items-tbody input {
-  min-width: 4.25rem !important;
+#quote-items-tbody input.qi-base,
+#invoice-items-tbody input.inv-unit {
+  min-width: 6rem !important;
   overflow: visible !important;
   font-size: 0.9rem !important;
+}
+#quote-items-tbody tr,
+#invoice-items-tbody tr {
+  border-color: #eee9e0;
+}
+#quote-items-tbody td,
+#invoice-items-tbody td {
+  vertical-align: top;
 }
 
 /* Buttons & chips motion */
@@ -1911,20 +1932,13 @@ tbody tr {
     margin-right: 0 !important;
   }
 
-  /* Tables scroll horizontally instead of crushing */
-  .overflow-x-auto,
-  table {
-    display: block;
-    width: 100%;
-    max-width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+  /* List tables handled as cards in index.html mobile-fix; avoid forced min-width */
+  .overflow-x-auto {
+    overflow-x: visible !important;
   }
-  thead, tbody, tr {
-    width: 100%;
-  }
-  table {
-    min-width: 520px;
+  table.pastel-cols,
+  table.data-list {
+    min-width: 0 !important;
   }
 
   /* Touch-friendly controls */
@@ -1932,11 +1946,20 @@ tbody tr {
     font-size: 16px !important; /* no iOS zoom */
     min-height: 44px !important;
   }
-  input[type="number"].qp-qty,
+  input.input-compact,
   input.qi-qty,
-  input.qi-markup {
+  input.qi-markup,
+  input.inv-qty,
+  input.qp-qty,
+  #pres-global-markup,
+  #inv-qty,
+  #p-stock,
+  #p-low,
+  #quote-discount {
     min-height: 40px !important;
-    min-width: 3.5rem !important;
+    width: 3.75rem !important;
+    max-width: 3.75rem !important;
+    min-width: 3.25rem !important;
   }
 
   /* Quote / invoice editors stack */
