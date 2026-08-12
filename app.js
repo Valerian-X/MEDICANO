@@ -3193,11 +3193,10 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
   }
 
   // Ultra-simple table summary (image-style: navy header, zebra rows)
-  function drawUltraSummaryPages(list, startPageNo, totalPagesGuess) {
-    // Item | Qty | Original Unit Price | Line Total — navy header, zebra rows, multi-page
+  function drawUltraSummaryPages(list, startPageNo, totalPagesGuess, firstTopY) {
+    // Item | Qty | Original Unit Price | Line Total — no title; multi-page
     const rowH = 24;
     const headerH = 32;
-    const topY = 48;
     const bottomSafe = 48;
     const tableLeft = M;
     const tableW = W - 2 * M;
@@ -3210,25 +3209,29 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
     const xUnit = xQty + colQtyW;
     const xLine = xUnit + colUnitW;
 
-    const avail = H - topY - bottomSafe - headerH - 40;
-    const maxRows = Math.max(12, Math.floor(avail / rowH));
+    const topFirst = (firstTopY != null) ? firstTopY : 48;
+    const topCont = 48;
+    const maxFirst = Math.max(6, Math.floor((H - topFirst - bottomSafe - headerH - 36) / rowH));
+    const maxCont = Math.max(12, Math.floor((H - topCont - bottomSafe - headerH - 36) / rowH));
 
     const chunks = [];
-    for (let i = 0; i < list.length; i += maxRows) {
-      chunks.push(list.slice(i, i + maxRows));
+    let i = 0;
+    let first = true;
+    while (i < list.length) {
+      const n = first ? maxFirst : maxCont;
+      chunks.push(list.slice(i, i + n));
+      i += n;
+      first = false;
     }
     if (!chunks.length) chunks.push([]);
 
     const grandTotal = list.reduce((s, p) => s + lineTotal(p), 0);
     let pageNo = startPageNo;
 
-    chunks.forEach((chunk, ci) => {
-      if (ci > 0) doc.addPage();
-      setFill(WHITE); doc.rect(0, 0, W, H, 'F');
-
+    function drawTableChunk(chunk, topY, isLast) {
       let ty = topY;
+      const tableStartY = ty;
 
-      // Header bar
       setFill(NAVY);
       doc.rect(tableLeft, ty, tableW, headerH, 'F');
       setCol(WHITE); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
@@ -3277,10 +3280,8 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
 
       setDraw([180, 186, 196]);
       doc.setLineWidth(0.8);
-      const tableH = headerH + chunk.length * rowH;
-      doc.rect(tableLeft, topY, tableW, tableH);
+      doc.rect(tableLeft, tableStartY, tableW, headerH + chunk.length * rowH);
 
-      const isLast = ci === chunks.length - 1;
       if (isLast) {
         ty += 10;
         setFill(NAVY);
@@ -3292,18 +3293,32 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
         setCol([100, 110, 120]); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
         doc.text('Continued on next page…', M, ty + 18);
       }
+    }
 
+    chunks.forEach((chunk, ci) => {
+      if (ci === 0 && firstTopY != null) {
+        // First page already started by caller (offer drawn) — only table
+        drawTableChunk(chunk, topFirst, ci === chunks.length - 1);
+      } else {
+        if (!(ci === 0 && firstTopY != null)) {
+          if (ci > 0 || firstTopY == null) doc.addPage();
+        }
+        setFill(WHITE); doc.rect(0, 0, W, H, 'F');
+        drawTableChunk(chunk, ci === 0 && firstTopY == null ? topFirst : topCont, ci === chunks.length - 1);
+      }
       footer(pageNo, totalPagesGuess);
       pageNo++;
     });
     return pageNo;
   }
 
-  const packs = packMachines(products);
-  // Estimate summary pages for footer totals
+  const packs = isUltraSummary ? [] : packMachines(products);
+  const estUltraPages = Math.max(1, Math.ceil(products.length / 24));
   const estSummaryPages = isSimpleSummary
     ? 0
-    : Math.max(1, Math.ceil(products.length / (isUltraSummary ? 28 : (isList ? 18 : 14))));
+    : isUltraSummary
+      ? estUltraPages
+      : Math.max(1, Math.ceil(products.length / (isList ? 18 : 14)));
   const catPages = packs.length + estSummaryPages;
   const totalPages = 2 + catPages + 2;
 
@@ -3440,7 +3455,7 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
   doc.text('...Making a Habit of Excellence', M, tagY);
   footer(2, totalPages);
 
-  // ---- CATALOGUE ----
+  // ---- CATALOGUE / ULTRA TABLE ----
   let pageNo = 3;
   function drawSimpleTotal(x, y, w) {
     const grand = products.reduce((s, p) => s + lineTotal(p), 0);
@@ -3456,65 +3471,73 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
     return boxH;
   }
 
-  packs.forEach((pack, pi) => {
+  const offerText = 'Please find below herewith our OFFER for equipping your hospital with our PREMIUM MEDICAL EQUIPMENT that assures of quality and long-lasting use. We look forward to your final review to enable us proceed on the arrangement.';
+
+  if (isUltraSummary) {
+    // Ultra: offer text, then table only (no catalogue cards, no "Price Summary" heading)
     doc.addPage();
-    setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+    setFill(WHITE); doc.rect(0, 0, W, H, 'F');
     setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
     doc.text('Equipment Catalogue', M, 58);
-    let topLimit = 100;
-    if (pi > 0) {
-      setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
-      doc.text('continued', W - M, 58, { align: 'right' });
-      setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 74, M + 54, 74);
-      topLimit = 92;
-    } else {
-      // Gold rule under title, breathing room, then offer
-      setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 74, M + 54, 74);
-      const offer = 'Please find below herewith our OFFER for equipping your hospital with our PREMIUM MEDICAL EQUIPMENT that assures of quality and long-lasting use. We look forward to your final review to enable us proceed on the arrangement.';
-      setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
-      let oy = 74 + 20;
-      wrap(offer, BODY, W - 2 * M).forEach(ln => { doc.text(ln, M, oy); oy += BODY_LEAD; });
-      topLimit = oy + 18;
-    }
-
-    const gap = pack.gap != null ? pack.gap : (isList ? 6 : 12);
-    const isLastPack = pi === packs.length - 1;
-    const simpleBoxH = 72;
-    const simpleGap = 16;
-    const reserveSimple = (isSimpleSummary && isLastPack) ? (simpleBoxH + simpleGap) : 0;
-    const totalH = pack.items.reduce((s, it) => s + it.h, 0) + gap * Math.max(0, pack.items.length - 1);
-    const bottomLimit = 50 + reserveSimple;
-    const area = H - topLimit - bottomLimit;
-    let yTop = topLimit + Math.max(0, (area - totalH) / 2);
-    if (isList && pack.items.length >= 8) yTop = topLimit;
-    // If simple total needs room and vertical centering would push it off, start higher
-    if (reserveSimple && yTop + totalH + simpleGap + simpleBoxH > H - 50) {
-      yTop = topLimit;
-    }
-    const cardW = W - 2 * M;
-    pack.items.forEach(it => {
-      drawCard(it.p, M, yTop, cardW, it.h);
-      yTop += it.h + gap;
-    });
-    if (isSimpleSummary && isLastPack) {
-      let sy = yTop + simpleGap;
-      if (sy + simpleBoxH > H - 48) {
-        // Not enough room under last card — still place as high as possible above footer
-        sy = Math.max(topLimit, H - 48 - simpleBoxH);
+    setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 74, M + 54, 74);
+    setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
+    let oy = 74 + 20;
+    wrap(offerText, BODY, W - 2 * M).forEach(ln => { doc.text(ln, M, oy); oy += BODY_LEAD; });
+    const tableTop = oy + 18;
+    pageNo = drawUltraSummaryPages(products, pageNo, totalPages, tableTop);
+  } else {
+    packs.forEach((pack, pi) => {
+      doc.addPage();
+      setFill(CREAM); doc.rect(0, 0, W, H, 'F');
+      setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
+      doc.text('Equipment Catalogue', M, 58);
+      let topLimit = 100;
+      if (pi > 0) {
+        setCol(GRAY); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
+        doc.text('continued', W - M, 58, { align: 'right' });
+        setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 74, M + 54, 74);
+        topLimit = 92;
+      } else {
+        setDraw(GOLD); doc.setLineWidth(1.4); doc.line(M, 74, M + 54, 74);
+        setCol([55, 56, 60]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
+        let oy = 74 + 20;
+        wrap(offerText, BODY, W - 2 * M).forEach(ln => { doc.text(ln, M, oy); oy += BODY_LEAD; });
+        topLimit = oy + 18;
       }
-      drawSimpleTotal(M, sy, cardW);
-    }
-    footer(pageNo, totalPages);
-    pageNo++;
-  });
 
-  // Pricing summary modes
-  if (isUltraSummary) {
-    doc.addPage();
-    pageNo = drawUltraSummaryPages(products, pageNo, totalPages);
-  } else if (!isSimpleSummary) {
-    doc.addPage();
-    pageNo = drawSummaryPages(products, pageNo, totalPages);
+      const gap = pack.gap != null ? pack.gap : (isList ? 6 : 12);
+      const isLastPack = pi === packs.length - 1;
+      const simpleBoxH = 72;
+      const simpleGap = 16;
+      const reserveSimple = (isSimpleSummary && isLastPack) ? (simpleBoxH + simpleGap) : 0;
+      const totalH = pack.items.reduce((s, it) => s + it.h, 0) + gap * Math.max(0, pack.items.length - 1);
+      const bottomLimit = 50 + reserveSimple;
+      const area = H - topLimit - bottomLimit;
+      let yTop = topLimit + Math.max(0, (area - totalH) / 2);
+      if (isList && pack.items.length >= 8) yTop = topLimit;
+      if (reserveSimple && yTop + totalH + simpleGap + simpleBoxH > H - 50) {
+        yTop = topLimit;
+      }
+      const cardW = W - 2 * M;
+      pack.items.forEach(it => {
+        drawCard(it.p, M, yTop, cardW, it.h);
+        yTop += it.h + gap;
+      });
+      if (isSimpleSummary && isLastPack) {
+        let sy = yTop + simpleGap;
+        if (sy + simpleBoxH > H - 48) {
+          sy = Math.max(topLimit, H - 48 - simpleBoxH);
+        }
+        drawSimpleTotal(M, sy, cardW);
+      }
+      footer(pageNo, totalPages);
+      pageNo++;
+    });
+
+    if (!isSimpleSummary) {
+      doc.addPage();
+      pageNo = drawSummaryPages(products, pageNo, totalPages);
+    }
   }
 
   // ---- TERMS (always ONE page — auto-fit spacing so nothing spills) ----
