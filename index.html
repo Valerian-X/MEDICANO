@@ -1603,6 +1603,35 @@ html.dark textarea {
 
 
 
+
+/* Global card stack spacing — never overlap */
+.entity-cards,
+.line-cards,
+.pres-picker-stack,
+.select-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem !important;
+}
+.inv-metrics {
+  gap: 0.9rem !important;
+}
+.entity-card,
+.line-card,
+.select-row {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.entity-card + .entity-card,
+.line-card + .line-card {
+  margin-top: 0 !important;
+}
+/* Thumb in product card headers */
+.entity-card-header img,
+.entity-card-header .w-10 {
+  flex-shrink: 0;
+}
+
 /* ========== Entity list cards (clients / quotes / invoices) ========== */
 .entity-cards {
   display: flex;
@@ -2313,40 +2342,41 @@ html.dark textarea {
 
         <!-- PRODUCTS -->
         <section id="page-products" class="page hidden">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-            <div class="flex gap-2 flex-1">
+          <div class="flex flex-col gap-3 mb-5">
+            <div class="flex flex-col sm:flex-row gap-2 flex-1">
               <input id="product-search" type="search" placeholder="Search equipment..." class="flex-1 max-w-md px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
               <select id="product-category-filter" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
                 <option value="">All Categories</option>
               </select>
+              <button onclick="showProductForm()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium whitespace-nowrap">+ Add Equipment</button>
             </div>
-            <button onclick="downloadEquipmentTemplate()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium">Template</button>
-            <label class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium cursor-pointer" style="display:inline-block">
-              Import Spreadsheet
-              <input type="file" accept=".csv,text/csv" class="hidden" onchange="onImportProductsFile(event)" />
-            </label>
-            <button onclick="exportProductsExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium">Export Excel</button>
-            <button onclick="showProductForm()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">+ Add Equipment</button>
-          </div>
-          <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm pastel-cols">
-                <thead class="bg-slate-50 text-slate-600 text-left">
-                  <tr>
-                    <th class="px-4 py-3 font-medium w-14">Image</th>
-                    <th class="px-4 py-3 font-medium">SKU</th>
-                    <th class="px-4 py-3 font-medium">Name</th>
-                    <th class="px-4 py-3 font-medium">Category</th>
-                    <th class="px-4 py-3 font-medium">Price</th>
-                    <th class="px-4 py-3 font-medium">Stock</th>
-                    <th class="px-4 py-3 font-medium">Status</th>
-                    <th class="px-4 py-3 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="products-tbody"></tbody>
-              </table>
+            <div class="select-stack" style="max-width:100%">
+              <label class="select-row" style="border-radius:1.1rem;cursor:pointer">
+                <span class="select-row-icon">📥</span>
+                <span class="select-row-text">
+                  <span class="select-row-title">Import spreadsheet</span>
+                  <span class="select-row-sub">Upload CSV catalog (Excel → Save as CSV)</span>
+                </span>
+                <span class="text-xs font-semibold text-slate-500">Upload</span>
+                <input type="file" accept=".csv,text/csv" class="hidden" onchange="onImportProductsFile(event)" />
+              </label>
+              <button type="button" onclick="downloadEquipmentTemplate()" class="select-row" style="border-radius:1.1rem;border:none;width:100%;text-align:left">
+                <span class="select-row-icon">📄</span>
+                <span class="select-row-text">
+                  <span class="select-row-title">Download CSV template</span>
+                  <span class="select-row-sub">SKU, Name, description, category, price, currency, stock…</span>
+                </span>
+              </button>
+              <button type="button" onclick="exportProductsExcel()" class="select-row" style="border-radius:1.1rem;border:none;width:100%;text-align:left">
+                <span class="select-row-icon">💾</span>
+                <span class="select-row-text">
+                  <span class="select-row-title">Export equipment</span>
+                  <span class="select-row-sub">Download current catalog as CSV</span>
+                </span>
+              </button>
             </div>
           </div>
+          <div id="products-list" class="entity-cards"></div>
         </section>
 
         <!-- CLIENTS -->
@@ -2698,52 +2728,21 @@ html.dark textarea {
             </div>
 
             <!-- Current stock levels -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-              <div class="px-5 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
                 <h3 class="font-semibold">Current stock levels</h3>
                 <input id="inv-search" type="search" placeholder="Search equipment..." oninput="renderInventoryStock()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-full sm:w-56" />
               </div>
-              <div class="overflow-x-auto">
-                <table class="w-full text-sm pastel-cols">
-                  <thead class="bg-slate-50 text-slate-600 text-left">
-                    <tr>
-                      <th class="px-4 py-2.5 font-medium">SKU</th>
-                      <th class="px-4 py-2.5 font-medium">Equipment</th>
-                      <th class="px-4 py-2.5 font-medium">Category</th>
-                      <th class="px-4 py-2.5 font-medium text-right">In stock</th>
-                      <th class="px-4 py-2.5 font-medium text-right">Low at</th>
-                      <th class="px-4 py-2.5 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody id="inv-stock-body" class="divide-y divide-slate-100">
-                  </tbody>
-                </table>
-              </div>
+              <div id="inv-stock-list" class="entity-cards"></div>
             </div>
 
             <!-- Movement history -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-              <div class="px-5 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
                 <h3 class="font-semibold">Stock movements</h3>
                 <button type="button" onclick="exportStockMovementsCsv()" class="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium">Export CSV</button>
               </div>
-              <div class="overflow-x-auto">
-                <table class="w-full text-sm pastel-cols">
-                  <thead class="bg-slate-50 text-slate-600 text-left">
-                    <tr>
-                      <th class="px-4 py-2.5 font-medium">Date</th>
-                      <th class="px-4 py-2.5 font-medium">Equipment</th>
-                      <th class="px-4 py-2.5 font-medium">Type</th>
-                      <th class="px-4 py-2.5 font-medium text-right">Qty</th>
-                      <th class="px-4 py-2.5 font-medium text-right">Balance after</th>
-                      <th class="px-4 py-2.5 font-medium">Note</th>
-                      <th class="px-4 py-2.5 font-medium"></th>
-                    </tr>
-                  </thead>
-                  <tbody id="inv-movements-body" class="divide-y divide-slate-100">
-                  </tbody>
-                </table>
-              </div>
+              <div id="inv-movements-list" class="entity-cards"></div>
             </div>
           </div>
         </section>

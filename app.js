@@ -557,34 +557,51 @@ function renderProducts() {
     return matchSearch && matchCat;
   });
 
-  const tbody = document.getElementById('products-tbody');
-  tbody.innerHTML = list.map(p => {
+  const el = document.getElementById('products-list');
+  if (!el) return;
+  if (!list.length) {
+    el.innerHTML = '<div class="entity-empty">No equipment found</div>';
+    return;
+  }
+  el.innerHTML = list.map(p => {
     const ngn = toNGN(p.price, p.currency);
     const low = p.stock <= p.lowStock;
     const thumb = p.image
-      ? `<img src="${p.image}" class="w-10 h-10 rounded object-cover border border-slate-200" alt="" />`
-      : `<div class="w-10 h-10 rounded bg-slate-100 flex items-center justify-center text-slate-400 text-xs">—</div>`;
-    return `<tr class="border-t border-slate-100 hover:bg-slate-50">
-      <td class="px-4 py-3" data-label="Image">${thumb}</td>
-      <td class="px-4 py-3 font-mono text-xs" data-label="SKU">${escHtml(p.sku || '')}</td>
-      <td class="px-4 py-3" data-label="Name">
-        <p class="font-medium">${escHtml(p.name || '')}</p>
-        <p class="text-xs text-slate-500 truncate max-w-xs">${escHtml(p.brand || '')}</p>
-      </td>
-      <td class="px-4 py-3" data-label="Category">${escHtml(p.category || '')}</td>
-      <td class="px-4 py-3" data-label="Price">
-        <p class="font-medium">${formatNGN(ngn)}</p>
-      </td>
-      <td class="px-4 py-3 ${low ? 'text-amber-600 font-medium' : ''}" data-label="Stock">${p.stock}${low ? ' ⚠' : ''}</td>
-      <td class="px-4 py-3" data-label="Status">
-        <span class="text-xs px-2 py-0.5 rounded-full ${p.active ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-500'}">${p.active ? 'Active' : 'Inactive'}</span>
-      </td>
-      <td class="px-4 py-3" data-label="Actions">
-        <button onclick="editProduct('${p.id}')" class="text-brand-600 hover:underline text-xs mr-2">Edit</button>
-        <button onclick="if(confirm('Delete this item?')) deleteProduct('${p.id}')" class="text-red-500 hover:underline text-xs">Del</button>
-      </td>
-    </tr>`;
-  }).join('') || '<tr class="list-empty"><td colspan="8" class="px-4 py-8 text-center text-slate-400">No equipment found</td></tr>';
+      ? `<img src="${p.image}" class="w-10 h-10 rounded-lg object-cover border border-white/60 shadow-sm" alt="" />`
+      : `<div class="w-10 h-10 rounded-lg bg-white/70 flex items-center justify-center text-slate-400 text-xs">—</div>`;
+    const status = p.active
+      ? '<span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800">Active</span>'
+      : '<span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">Inactive</span>';
+    const sub = [p.sku, p.category, p.brand].filter(Boolean).join(' · ');
+    const desc = (p.description || '').trim();
+    const shortDesc = desc ? (desc.length > 120 ? desc.slice(0, 117) + '…' : desc) : '';
+    return `<div class="entity-card" id="product-card-${p.id}">
+      <button type="button" class="entity-card-header"
+        onclick="onEntityCardClick(event, 'product-card-${p.id}')"
+        ondblclick="editProduct('${p.id}')">
+        <span class="entity-card-chevron">▾</span>
+        ${thumb}
+        <span class="entity-card-main">
+          <span class="entity-card-title">${escHtml(p.name || 'Untitled')}</span>
+          <span class="entity-card-sub">${escHtml(sub)}${low ? ' · low stock' : ''}</span>
+        </span>
+        <span class="entity-card-price">${formatNGN(ngn)}</span>
+      </button>
+      <div class="entity-card-body">
+        <div class="entity-detail"><span class="entity-detail-label">SKU</span><span class="entity-detail-value">${escHtml(p.sku || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Category</span><span class="entity-detail-value">${escHtml(p.category || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Brand</span><span class="entity-detail-value">${escHtml(p.brand || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Price</span><span class="entity-detail-value">${formatNGN(ngn)}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Stock</span><span class="entity-detail-value">${p.stock ?? 0}${low ? ' ⚠' : ''}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Status</span><span class="entity-detail-value">${status}</span></div>
+        ${shortDesc ? `<div class="entity-detail"><span class="entity-detail-label">Description</span><span class="entity-detail-value" style="text-align:left">${escHtml(shortDesc)}</span></div>` : ''}
+        <div class="entity-card-actions">
+          <button type="button" onclick="editProduct('${p.id}')">Edit</button>
+          <button type="button" class="danger" onclick="if(confirm('Delete this item?')) deleteProduct('${p.id}')">Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function showProductForm(id = null) {
@@ -945,8 +962,8 @@ function renderInventory() {
 }
 
 function renderInventoryStock() {
-  const body = document.getElementById('inv-stock-body');
-  if (!body) return;
+  const el = document.getElementById('inv-stock-list');
+  if (!el) return;
   const q = (document.getElementById('inv-search')?.value || '').toLowerCase().trim();
   let list = data.products.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   if (q) {
@@ -957,52 +974,81 @@ function renderInventoryStock() {
     );
   }
   if (!list.length) {
-    body.innerHTML = '<tr class="list-empty"><td colspan="6" class="px-4 py-6 text-center text-slate-400">No equipment found.</td></tr>';
+    el.innerHTML = '<div class="entity-empty">No equipment found.</div>';
     return;
   }
-  body.innerHTML = list.map(p => {
+  el.innerHTML = list.map(p => {
     const stock = Number(p.stock) || 0;
-    const low = Number(p.lowStock) || 1;
-    let status = '<span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-xs font-medium">OK</span>';
-    if (stock <= 0) status = '<span class="text-rose-700 bg-rose-50 px-2 py-0.5 rounded text-xs font-medium">Out of stock</span>';
-    else if (stock <= low) status = '<span class="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-xs font-medium">Low</span>';
-    return `<tr class="hover:bg-slate-50">
-      <td class="px-4 py-2.5 text-slate-500" data-label="SKU">${escHtml(p.sku || '—')}</td>
-      <td class="px-4 py-2.5 font-medium" data-label="Equipment">${escHtml(p.name || '')}</td>
-      <td class="px-4 py-2.5 text-slate-500" data-label="Category">${escHtml(p.category || '—')}</td>
-      <td class="px-4 py-2.5 text-right font-semibold" data-label="In stock">${stock}</td>
-      <td class="px-4 py-2.5 text-right text-slate-500" data-label="Low at">${low}</td>
-      <td class="px-4 py-2.5" data-label="Status">${status}</td>
-    </tr>`;
+    const lowAt = Number(p.lowStock) || 1;
+    let statusLabel = 'OK';
+    let statusHtml = '<span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-xs font-medium">OK</span>';
+    if (stock <= 0) {
+      statusLabel = 'Out of stock';
+      statusHtml = '<span class="text-rose-700 bg-rose-50 px-2 py-0.5 rounded text-xs font-medium">Out of stock</span>';
+    } else if (stock <= lowAt) {
+      statusLabel = 'Low';
+      statusHtml = '<span class="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-xs font-medium">Low</span>';
+    }
+    const sub = [p.sku, p.category, statusLabel].filter(Boolean).join(' · ');
+    return `<div class="entity-card" id="stock-card-${p.id}">
+      <button type="button" class="entity-card-header"
+        onclick="onEntityCardClick(event, 'stock-card-${p.id}')">
+        <span class="entity-card-chevron">▾</span>
+        <span class="entity-card-main">
+          <span class="entity-card-title">${escHtml(p.name || '')}</span>
+          <span class="entity-card-sub">${escHtml(sub)}</span>
+        </span>
+        <span class="entity-card-price">${stock}</span>
+      </button>
+      <div class="entity-card-body">
+        <div class="entity-detail"><span class="entity-detail-label">SKU</span><span class="entity-detail-value">${escHtml(p.sku || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Category</span><span class="entity-detail-value">${escHtml(p.category || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">In stock</span><span class="entity-detail-value">${stock}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Low at</span><span class="entity-detail-value">${lowAt}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Status</span><span class="entity-detail-value">${statusHtml}</span></div>
+      </div>
+    </div>`;
   }).join('');
 }
 
 function renderInventoryMovements() {
-  const body = document.getElementById('inv-movements-body');
-  if (!body) return;
+  const el = document.getElementById('inv-movements-list');
+  if (!el) return;
   const moves = movementsInPeriod()
     .slice()
     .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
   if (!moves.length) {
-    body.innerHTML = '<tr class="list-empty"><td colspan="7" class="px-4 py-6 text-center text-slate-400">No movements in this period.</td></tr>';
+    el.innerHTML = '<div class="entity-empty">No movements in this period.</div>';
     return;
   }
-  body.innerHTML = moves.map(m => {
+  el.innerHTML = moves.map(m => {
     const p = getProduct(m.productId);
     const typeLabel = m.type === 'in' ? 'In' : m.type === 'out' ? 'Out' : 'Adjust';
     const typeClass = m.type === 'in' ? 'text-emerald-700 bg-emerald-50' : m.type === 'out' ? 'text-rose-700 bg-rose-50' : 'text-slate-700 bg-slate-100';
     const d = (m.date || '').slice(0, 10);
-    return `<tr class="hover:bg-slate-50">
-      <td class="px-4 py-2.5 whitespace-nowrap" data-label="Date">${escHtml(d)}</td>
-      <td class="px-4 py-2.5" data-label="Equipment">${escHtml(p ? p.name : '(deleted item)')}</td>
-      <td class="px-4 py-2.5" data-label="Type"><span class="px-2 py-0.5 rounded text-xs font-medium ${typeClass}">${typeLabel}</span></td>
-      <td class="px-4 py-2.5 text-right font-medium" data-label="Qty">${m.type === 'out' ? '−' : m.type === 'in' ? '+' : ''}${Number(m.qty) || 0}</td>
-      <td class="px-4 py-2.5 text-right text-slate-500" data-label="Balance">${m.balanceAfter ?? '—'}</td>
-      <td class="px-4 py-2.5 text-slate-500" data-label="Note">${escHtml(m.note || '')}</td>
-      <td class="px-4 py-2.5 text-right" data-label="Actions">
-        <button type="button" onclick="deleteStockMovement('${m.id}')" class="text-xs text-red-500 hover:underline">Delete</button>
-      </td>
-    </tr>`;
+    const qtyStr = `${m.type === 'out' ? '−' : m.type === 'in' ? '+' : ''}${Number(m.qty) || 0}`;
+    const name = p ? p.name : '(deleted item)';
+    return `<div class="entity-card" id="move-card-${m.id}">
+      <button type="button" class="entity-card-header"
+        onclick="onEntityCardClick(event, 'move-card-${m.id}')">
+        <span class="entity-card-chevron">▾</span>
+        <span class="entity-card-main">
+          <span class="entity-card-title">${escHtml(name)}</span>
+          <span class="entity-card-sub">${escHtml(d)} · ${typeLabel} · Qty ${qtyStr}</span>
+        </span>
+        <span class="entity-card-price">${qtyStr}</span>
+      </button>
+      <div class="entity-card-body">
+        <div class="entity-detail"><span class="entity-detail-label">Date</span><span class="entity-detail-value">${escHtml(d)}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Type</span><span class="entity-detail-value"><span class="px-2 py-0.5 rounded text-xs font-medium ${typeClass}">${typeLabel}</span></span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Qty</span><span class="entity-detail-value">${qtyStr}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Balance</span><span class="entity-detail-value">${m.balanceAfter ?? '—'}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Note</span><span class="entity-detail-value">${escHtml(m.note || '—')}</span></div>
+        <div class="entity-card-actions">
+          <button type="button" class="danger" onclick="deleteStockMovement('${m.id}')">Delete</button>
+        </div>
+      </div>
+    </div>`;
   }).join('');
 }
 
