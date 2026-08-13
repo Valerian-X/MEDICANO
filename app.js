@@ -2268,8 +2268,8 @@ function generateInvoicePdf(inv) {
     doc.setTextColor(...INK);
     doc.text('Item', M + 8, y);
     doc.text('Qty', M + 280, y);
-    doc.text('Unit', M + 340, y);
-    doc.text('Line Total', W - M - 8, y, { align: 'right' });
+    doc.text('Unit (NGN)', M + 340, y);
+    doc.text('Line Total (NGN)', W - M - 8, y, { align: 'right' });
     y += 18;
 
     doc.setFont('helvetica', 'normal');
@@ -2295,8 +2295,8 @@ function generateInvoicePdf(inv) {
         doc.text(String(name).substring(0, 42), M + 8, y + 6);
       }
       doc.text(String(it.qty || 0), M + 280, y + 6);
-      doc.text(formatNGN(it.unitNgn || 0), M + 340, y + 6);
-      doc.text(formatNGN(line), W - M - 8, y + 6, { align: 'right' });
+      doc.text(formatNairaPlain(it.unitNgn || 0), M + 340, y + 6);
+      doc.text(formatNairaPlain(line), W - M - 8, y + 6, { align: 'right' });
       y += 28;
     });
 
@@ -2307,11 +2307,11 @@ function generateInvoicePdf(inv) {
     doc.setFontSize(11);
     doc.setTextColor(...INK);
     doc.text('Subtotal', tx, y);
-    doc.text(formatNGN(subtotal), W - M, y, { align: 'right' });
+    doc.text(formatNairaPlain(subtotal), W - M, y, { align: 'right' });
     if (discount > 0) {
       y += 16;
       doc.text('Discount (' + discount + '%)', tx, y);
-      doc.text('-' + formatNGN(subtotal * discount / 100), W - M, y, { align: 'right' });
+      doc.text('-' + formatNairaPlain(subtotal * discount / 100), W - M, y, { align: 'right' });
     }
     y += 10;
     doc.setDrawColor(...TEAL);
@@ -2321,8 +2321,8 @@ function generateInvoicePdf(inv) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.setTextColor(...TEAL);
-    doc.text('Total', tx, y);
-    doc.text(formatNGN(total), W - M, y, { align: 'right' });
+    doc.text('TOTAL DUE (NGN)', tx, y);
+    doc.text(formatNairaPlain(total), W - M, y, { align: 'right' });
     y += 28;
 
     // Bank details — always reserve space and show clearly
@@ -3197,8 +3197,8 @@ function selectAllPres(checked) {
 }
 
 function formatNairaPlain(n) {
-  // Use Naira symbol consistently in PDFs
-  return formatNGN(n);
+  const v = Number(n) || 0;
+  return 'N' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function loadJsPdf() {
