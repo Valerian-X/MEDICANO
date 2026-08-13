@@ -2381,13 +2381,6 @@ function generateInvoicePdf(inv) {
       let by = y + 28;
       lines.forEach(ln => { doc.text(ln, M + 12, by); by += 14; });
       y += boxH + 16;
-    } else {
-      // Hint if nothing configured
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(...GRAY);
-      doc.text('No bank details set. Add them in Settings → Company, or on this invoice.', M, y);
-      y += 20;
     }
 
     // Notes
