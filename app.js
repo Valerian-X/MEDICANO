@@ -326,6 +326,10 @@ function navigate(page) {
   document.querySelectorAll('.page').forEach(el => el.classList.add('hidden'));
   const el = document.getElementById('page-' + page);
   if (el) el.classList.remove('hidden');
+  try { sessionStorage.setItem('medicano_last_page', page); } catch (e) {}
+  try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch (e) { window.scrollTo(0, 0); }
+  const main = document.getElementById('main-content') || document.querySelector('main');
+  if (main && main.scrollTo) try { main.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch (e) { main.scrollTop = 0; }
 
   const sidebarPage = (page === 'quote-editor') ? 'quotes'
     : (page === 'invoice-editor') ? 'invoices'
@@ -1824,8 +1828,8 @@ function renderInvoices() {
         <div class="entity-detail"><span class="entity-detail-label">Date</span><span class="entity-detail-value">${escHtml((inv.date || '').slice(0, 10))}</span></div>
         <div class="entity-detail"><span class="entity-detail-label">Total</span><span class="entity-detail-value">${formatNGN(inv.totalNgn || 0)}</span></div>
         <div class="entity-card-actions">
-          <button type="button" onclick="editInvoice('${inv.id}')">Edit</button>
-          <button type="button" onclick="editInvoice('${inv.id}'); setTimeout(printInvoice, 200)">PDF</button>
+          <button type="button" onclick="event.stopPropagation(); editInvoice('${inv.id}')">Edit</button>
+          <button type="button" onclick="event.stopPropagation(); printInvoiceById('${inv.id}')">PDF</button>
         </div>
       </div>
     </div>`;
@@ -2109,6 +2113,13 @@ function printInvoice() {
   generateInvoicePdf(inv);
 }
 
+/** Generate PDF for a saved invoice without opening the editor */
+function printInvoiceById(id) {
+  const inv = (data.invoices || []).find(x => x.id === id);
+  if (!inv) { alert('Invoice not found.'); return; }
+  generateInvoicePdf(inv);
+}
+
 /** Invoice PDF — jsPDF file download (same method as Client Presentation) */
 function generateInvoicePdf(inv) {
   const co = data.company || {};
@@ -2358,9 +2369,10 @@ function generateInvoicePdf(inv) {
     doc.text(formatNairaPlain(total), W - M, y, { align: 'right' });
     y += 28;
 
-    // Bank details — always reserve space and show clearly
+    // Bank / payment details — skip when invoice is already paid
+    const isPaid = String(inv.status || '').toLowerCase() === 'paid';
     if (y > H - 140) { doc.addPage(); y = 50; }
-    if (hasBank) {
+    if (hasBank && !isPaid) {
       const lines = [];
       if (bankName) lines.push('Bank: ' + bankName);
       if (accountName) lines.push('Account name: ' + accountName);
@@ -4161,7 +4173,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  navigate('dashboard');
+  let startPage = 'dashboard';
+  try {
+    const saved = sessionStorage.getItem('medicano_last_page');
+    if (saved && document.getElementById('page-' + saved)) startPage = saved;
+  } catch (e) {}
+  navigate(startPage);
+  try { window.scrollTo(0, 0); } catch (e) {}
 });
 
 function closeSidebar() {

@@ -1,5 +1,5 @@
 /* Medicano PWA Service Worker */
-const CACHE = 'medicano-v3';
+const CACHE = 'medicano-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -25,16 +25,14 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
+  // Network-first so app.js / index updates are not stuck on an old cache
   event.respondWith(
-    caches.match(req).then((cached) => {
-      const fetched = fetch(req).then((res) => {
-        if (res && res.status === 200 && req.url.startsWith(self.location.origin)) {
-          const clone = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(req, clone));
-        }
-        return res;
-      }).catch(() => cached);
-      return cached || fetched;
-    })
+    fetch(req).then((res) => {
+      if (res && res.status === 200 && req.url.startsWith(self.location.origin)) {
+        const clone = res.clone();
+        caches.open(CACHE).then((cache) => cache.put(req, clone));
+      }
+      return res;
+    }).catch(() => caches.match(req))
   );
 });
