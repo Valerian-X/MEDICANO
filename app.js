@@ -2199,10 +2199,11 @@ function generateInvoicePdf(inv) {
     estBody += inv.notes ? (28 + noteLines * 13 + 16) : 0;
     estBody += 50; // footer
 
-    const usableTop = headerBottom + 20;
+    const usableTop = headerBottom + 14;
     const usableBottom = H - 40;
     const usableH = usableBottom - usableTop;
-    let y = usableTop + Math.max(12, (usableH - estBody) / 2);
+    // Sit content higher on the page (light offset only if lots of spare space)
+    let y = usableTop + Math.max(0, Math.min(18, (usableH - estBody) * 0.12));
 
     // Company block (part of centered group)
     doc.setFont('helvetica', 'bold');
@@ -2241,13 +2242,13 @@ function generateInvoicePdf(inv) {
     }
     if (client && client.phone) { doc.text(client.phone, M, y); y += 12; }
     if (client && client.email) { doc.text(client.email, M, y); y += 12; }
-    y += 14;
+    y += 10;
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(...INK);
     doc.text('Title: ' + (inv.title || 'Invoice'), M, y);
-    y += 14;
+    y += 12;
     if (inv.quoteRef) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
@@ -2257,47 +2258,79 @@ function generateInvoicePdf(inv) {
     }
     y += 6;
 
-    // Table header
-    doc.setFillColor(...TEAL_BG);
-    doc.rect(M, y - 12, W - 2 * M, 22, 'F');
-    doc.setDrawColor(...TEAL);
-    doc.setLineWidth(1.5);
-    doc.line(M, y - 12, W - M, y - 12);
+    // Table — Description left; Unit Price / Qty / Amount right-aligned (invoice-style)
+    const colDesc = M;
+    const colAmount = W - M;           // right edge
+    const colQty = W - M - 95;         // Qty column right edge
+    const colUnit = W - M - 175;       // Unit Price column right edge
+    const descMaxW = colUnit - colDesc - 24;
+
+    // Header row
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.8);
+    doc.line(M, y, W - M, y);
+    y += 14;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
-    doc.setTextColor(...INK);
-    doc.text('Item', M + 8, y);
-    doc.text('Qty', M + 280, y);
-    doc.text('Unit (NGN)', M + 340, y);
-    doc.text('Line Total (NGN)', W - M - 8, y, { align: 'right' });
-    y += 18;
+    doc.setTextColor(...TEAL);
+    doc.text('Description', colDesc, y);
+    doc.text('Unit Price', colUnit, y, { align: 'right' });
+    doc.text('Qty', colQty, y, { align: 'right' });
+    doc.text('Amount', colAmount, y, { align: 'right' });
+    y += 8;
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.8);
+    doc.line(M, y, W - M, y);
+    y += 16;
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
     items.forEach((it) => {
-      if (y > H - 180) { doc.addPage(); y = 50; }
-      const p = it.productId ? getProduct(it.productId) : null;
-      const name = it.name || (p ? p.name : 'Item');
-      const sku = p ? p.sku : '';
-      const line = it.lineNgn != null ? it.lineNgn : (it.qty || 0) * (it.unitNgn || 0);
-      doc.setDrawColor(...LINE);
-      doc.setLineWidth(0.6);
-      doc.line(M, y + 10, W - M, y + 10);
+      if (y > H - 160) { doc.addPage(); y = 48; }
+      const prod = it.productId ? getProduct(it.productId) : null;
+      const name = it.name || (prod ? prod.name : 'Item');
+      const desc = (it.description || (prod && prod.description) || '').trim();
+      const qty = Number(it.qty) || 0;
+      const unit = Number(it.unitNgn) || 0;
+      const line = it.lineNgn != null ? it.lineNgn : qty * unit;
+
+      // Name (left)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10.5);
       doc.setTextColor(...INK);
-      if (sku) {
-        doc.setFontSize(8);
+      const nameLines = doc.splitTextToSize(String(name), descMaxW);
+      doc.text(nameLines[0] || '', colDesc, y);
+
+      // Numbers on same baseline as first name line (right-aligned)
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(...INK);
+      doc.text(formatNairaPlain(unit), colUnit, y, { align: 'right' });
+      doc.text(String(qty), colQty, y, { align: 'right' });
+      doc.setFont('helvetica', 'bold');
+      doc.text(formatNairaPlain(line), colAmount, y, { align: 'right' });
+
+      let rowH = 12;
+      // Optional description under name
+      if (desc) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
         doc.setTextColor(...GRAY);
-        doc.text(String(sku), M + 8, y - 2);
-        doc.setFontSize(10);
+        const dLines = doc.splitTextToSize(desc, descMaxW).slice(0, 2);
+        dLines.forEach((ln, i) => {
+          doc.text(ln, colDesc, y + 12 + i * 11);
+        });
+        rowH = 12 + dLines.length * 11;
+      } else if (nameLines.length > 1) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10.5);
         doc.setTextColor(...INK);
-        doc.text(String(name).substring(0, 42), M + 8, y + 10);
-      } else {
-        doc.text(String(name).substring(0, 42), M + 8, y + 6);
+        doc.text(nameLines[1], colDesc, y + 12);
+        rowH = 24;
       }
-      doc.text(String(it.qty || 0), M + 280, y + 6);
-      doc.text(formatNairaPlain(it.unitNgn || 0), M + 340, y + 6);
-      doc.text(formatNairaPlain(line), W - M - 8, y + 6, { align: 'right' });
-      y += 28;
+
+      y += rowH + 10;
+      doc.setDrawColor(...LINE);
+      doc.setLineWidth(0.5);
+      doc.line(M, y - 4, W - M, y - 4);
     });
 
     y += 10;
