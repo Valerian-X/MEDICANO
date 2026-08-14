@@ -3862,3 +3862,20 @@ html.dark .stat-peach {
 html.dark .stat-mint {
   background: #1a3330 !important;
 }
+
+
+/* Client history stats — white digits in dark mode */
+html.dark .stat-mini {
+  background: #1f1f1f !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+html.dark .stat-mini-label {
+  color: rgba(248,250,252,0.7) !important;
+}
+html.dark .stat-mini-value {
+  color: #ffffff !important;
+}
+html.dark #page-client-detail .stat-mini-value,
+html.dark #client-detail-root .stat-mini-value {
+  color: #ffffff !important;
+}
