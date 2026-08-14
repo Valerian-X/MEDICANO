@@ -2960,3 +2960,328 @@ section.page > div.flex.flex-col {
     width: 100%;
   }
 }
+
+
+/* ===== Filters fit within page width (no overflow past margins) ===== */
+.list-toolbar-filters {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: flex-end !important;
+  gap: 0.5rem 0.55rem !important;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+  box-sizing: border-box;
+}
+.filter-date-field,
+.filter-status-field {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 100%;
+}
+.filter-date-field .filter-control,
+.filter-status-select,
+.status-select-dark {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+/* Prefer three equal-ish columns on one row when space allows */
+@media (min-width: 480px) {
+  .list-toolbar-filters {
+    flex-wrap: nowrap !important;
+  }
+  .filter-date-field,
+  .filter-status-field {
+    flex: 1 1 0;
+    max-width: 11rem;
+  }
+}
+@media (min-width: 768px) {
+  .filter-date-field,
+  .filter-status-field {
+    max-width: 12rem;
+  }
+}
+/* Parent toolbar row must respect page padding */
+section.page > .flex.flex-col.sm\:flex-row.sm\:items-center.justify-between.gap-3.mb-5,
+section.page > div.flex.flex-col {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+section.page > .flex.flex-col.sm\:flex-row.sm\:items-center.justify-between.gap-3.mb-5 > button,
+section.page > div.flex > button {
+  flex-shrink: 0;
+}
+
+
+
+/* =========================================================
+   DARK MODE — full contrast pass (readable on every page)
+   ========================================================= */
+html.dark body,
+html.dark #app,
+html.dark #app > div.flex-1,
+html.dark main {
+  background: #121212 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Header / top bar */
+html.dark .app-topbar {
+  background: rgba(18, 18, 18, 0.94) !important;
+  border-bottom-color: rgba(255,255,255,0.08) !important;
+}
+html.dark .app-page-title,
+html.dark #page-title {
+  color: #f8fafc !important;
+}
+html.dark #menu-btn,
+html.dark .app-topbar-menu,
+html.dark #dark-toggle {
+  color: #f1f5f9 !important;
+}
+html.dark #menu-btn:hover,
+html.dark #dark-toggle:hover {
+  background: rgba(255,255,255,0.08) !important;
+}
+html.dark .offline-badge {
+  background: rgba(34, 197, 94, 0.18) !important;
+  color: #86efac !important;
+}
+html.dark .offline-dot {
+  background: #22c55e !important;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+}
+html.dark .global-search-input {
+  background: #1e1e1e !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: #f1f5f9 !important;
+}
+html.dark .global-search-wrap .search-icon {
+  color: #94a3b8 !important;
+}
+
+/* Surfaces / cards */
+html.dark .bg-white,
+html.dark .panel-soft,
+html.dark .dash-panel,
+html.dark .dash-intel-side,
+html.dark .settings-card,
+html.dark .entity-card,
+html.dark .line-card,
+html.dark .client-mini-card,
+html.dark .pay-summary-item,
+html.dark .pay-list-row,
+html.dark .stat-mini {
+  background: #1c1c1c !important;
+  color: #f1f5f9 !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35) !important;
+}
+
+html.dark .entity-card-header,
+html.dark .line-card-header {
+  color: #f1f5f9 !important;
+}
+html.dark .entity-card-title,
+html.dark .line-card-title,
+html.dark .client-mini-card-title,
+html.dark .entity-detail-value {
+  color: #f8fafc !important;
+}
+html.dark .entity-card-sub,
+html.dark .entity-detail-label,
+html.dark .client-mini-card-sub,
+html.dark .filter-date-label,
+html.dark .pay-label,
+html.dark .pay-summary-label {
+  color: #94a3b8 !important;
+}
+html.dark .entity-card-price,
+html.dark .client-mini-card-price,
+html.dark .pay-summary-value {
+  color: #f8fafc !important;
+}
+html.dark .entity-empty {
+  color: #94a3b8 !important;
+  background: #1c1c1c !important;
+}
+
+/* Stat cards — keep pastels, force dark ink for contrast */
+html.dark .stat-card .stat-label {
+  color: rgba(15, 23, 42, 0.65) !important;
+}
+html.dark .stat-card .stat-value {
+  color: #0f172a !important;
+}
+
+/* Quick action buttons — readable */
+html.dark .qa-soft {
+  background: #2a2a2a !important;
+  color: #f8fafc !important;
+}
+html.dark .qa-pink {
+  background: #5c3a4a !important;
+  color: #fce7f3 !important;
+}
+html.dark .qa-blue {
+  background: #2a3a55 !important;
+  color: #dbeafe !important;
+}
+html.dark .qa-dark {
+  background: #0a0a0a !important;
+  color: #fff !important;
+}
+
+/* Company card */
+html.dark .dash-company-card {
+  background: linear-gradient(145deg, #1a3a34 0%, #234840 100%) !important;
+  color: #e2e8f0 !important;
+  box-shadow: none !important;
+}
+html.dark .dash-company-kicker {
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+html.dark .dash-company-name {
+  color: #f8fafc !important;
+}
+html.dark .dash-company-line {
+  color: #cbd5e1 !important;
+  opacity: 1 !important;
+}
+
+/* Dashboard greeting / timeline */
+html.dark .dash-greeting h2,
+html.dark .dash-full-date,
+html.dark .cal-month-title,
+html.dark .cal-day-title {
+  color: #f8fafc !important;
+}
+html.dark .dash-greeting p,
+html.dark .dash-greeting-eyebrow,
+html.dark .cal-day-kicker,
+html.dark .cal-dow {
+  color: #94a3b8 !important;
+}
+html.dark .dash-tl-body {
+  background: #252525 !important;
+  color: #f1f5f9 !important;
+}
+html.dark .dash-tl-title { color: #f8fafc !important; }
+html.dark .dash-tl-time,
+html.dark .dash-tl-meta { color: #94a3b8 !important; opacity: 1 !important; }
+
+/* Calendar */
+html.dark .cal-month-panel,
+html.dark .cal-day-panel {
+  background: #1c1c1c !important;
+  color: #f1f5f9 !important;
+}
+html.dark .cal-day {
+  color: #e2e8f0 !important;
+}
+html.dark .cal-day.empty {
+  color: transparent !important;
+}
+html.dark .cal-day:hover:not(.empty) {
+  background: rgba(255,255,255,0.08) !important;
+}
+html.dark .cal-day.today {
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.25) !important;
+}
+html.dark .cal-day.selected {
+  background: #5c3a4a !important;
+  color: #fce7f3 !important;
+}
+html.dark .cal-nav-btn {
+  background: #2a2a2a !important;
+  color: #f1f5f9 !important;
+}
+html.dark .cal-nav-btn:hover {
+  background: #333 !important;
+}
+html.dark .cal-num {
+  color: inherit !important;
+}
+
+/* Filters / form controls */
+html.dark .filter-control,
+html.dark .field-search-input,
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background: #1e1e1e !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: #f1f5f9 !important;
+}
+html.dark .status-select-dark {
+  background: #0f172a !important;
+  color: #fff !important;
+  border-color: #334155 !important;
+}
+html.dark .status-select-dark option {
+  background: #0f172a;
+  color: #fff;
+}
+
+/* Entity action buttons */
+html.dark .entity-card-actions button {
+  background: #2a2a2a !important;
+  color: #f1f5f9 !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+html.dark .entity-card-actions button.danger {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #fca5a5 !important;
+}
+
+/* Select rows / line items */
+html.dark .select-row {
+  background: #1c1c1c !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  color: #f1f5f9 !important;
+}
+html.dark .select-row-title { color: #f8fafc !important; }
+html.dark .select-row-sub { color: #94a3b8 !important; }
+
+/* Text utilities that stay dark in dark mode */
+html.dark .text-slate-800,
+html.dark .text-slate-700,
+html.dark .text-slate-900 {
+  color: #f1f5f9 !important;
+}
+html.dark .text-slate-600,
+html.dark .text-slate-500,
+html.dark .text-slate-400 {
+  color: #94a3b8 !important;
+}
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300 {
+  border-color: rgba(255,255,255,0.1) !important;
+}
+html.dark .bg-slate-50,
+html.dark .bg-slate-100 {
+  background: #252525 !important;
+}
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-slate-100:hover {
+  background: #2a2a2a !important;
+}
+
+/* Backup reminder / empty states */
+html.dark .backup-reminder {
+  background: #1c1c1c !important;
+  color: #f1f5f9 !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+
+/* Scrollbar */
+html.dark ::-webkit-scrollbar-thumb {
+  background: #444 !important;
+}
