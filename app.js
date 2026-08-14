@@ -412,7 +412,13 @@ function runGlobalSearch(q) {
     return;
   }
   box.innerHTML = hits.slice(0, 20).map((h, i) =>
-    `<button type="button" class="global-search-hit" data-i="${i}"><span class="gs-type">${escHtml(h.type)}</span><span class="gs-title">${escHtml(h.title)}</span><span class="gs-sub">${escHtml(h.sub || '')}</span></button>`
+    `<button type="button" class="global-search-hit" data-i="${i}">
+      <span class="gs-type gs-type-${escHtml(h.type).toLowerCase()}">${escHtml(h.type)}</span>
+      <span class="gs-body">
+        <span class="gs-title">${escHtml(h.title)}</span>
+        ${h.sub ? `<span class="gs-sub">${escHtml(h.sub)}</span>` : ''}
+      </span>
+    </button>`
   ).join('');
   box._hits = hits.slice(0, 20);
   box.classList.remove('hidden');
@@ -1629,10 +1635,7 @@ function exportStockMovementsCsv() {
 
 // -------------------- Clients --------------------
 function renderClients() {
-  const search = (document.getElementById('client-search')?.value || '').toLowerCase();
-  const list = data.clients.filter(c =>
-    !search || c.name.toLowerCase().includes(search) || (c.contact || '').toLowerCase().includes(search)
-  );
+  const list = data.clients.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const el = document.getElementById('clients-list');
   if (!el) return;
   if (!list.length) {
@@ -1835,14 +1838,28 @@ function deleteClient(id) {
 }
 
 // -------------------- Quotes --------------------
+function dateInRange(dateStr, from, to) {
+  if (!from && !to) return true;
+  if (!dateStr) return false;
+  const d = String(dateStr).slice(0, 10);
+  if (from && d < from) return false;
+  if (to && d > to) return false;
+  return true;
+}
+
 function renderQuotes() {
   const status = document.getElementById('quote-status-filter')?.value || '';
+  const from = document.getElementById('quote-date-from')?.value || '';
+  const to = document.getElementById('quote-date-to')?.value || '';
   let list = [...data.quotes].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   if (status) list = list.filter(q => q.status === status);
+  if (from || to) {
+    list = list.filter(q => dateInRange(q.createdAt || q.validUntil, from, to));
+  }
   const el = document.getElementById('quotes-list');
   if (!el) return;
   if (!list.length) {
-    el.innerHTML = '<div class="entity-empty">No quotes yet. <button type="button" class="text-brand-600 underline" onclick="showNewQuote()">Create a quote</button></div>';
+    el.innerHTML = '<div class="entity-empty">No quotes match these filters. <button type="button" class="text-brand-600 underline" onclick="showNewQuote()">Create a quote</button></div>';
     return;
   }
   el.innerHTML = list.map(q => {
@@ -2420,10 +2437,15 @@ function renderInvoices() {
   const el = document.getElementById('invoices-list');
   if (!el) return;
   const filter = document.getElementById('invoice-status-filter')?.value || '';
+  const from = document.getElementById('invoice-date-from')?.value || '';
+  const to = document.getElementById('invoice-date-to')?.value || '';
   let list = (data.invoices || []).slice().sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
   if (filter) list = list.filter(inv => inv.status === filter);
+  if (from || to) {
+    list = list.filter(inv => dateInRange(inv.date || inv.createdAt, from, to));
+  }
   if (!list.length) {
-    el.innerHTML = '<div class="entity-empty">No invoices yet. <button type="button" class="text-brand-600 underline" onclick="showNewInvoice()">New invoice</button> or convert an accepted quote.</div>';
+    el.innerHTML = '<div class="entity-empty">No invoices match these filters. <button type="button" class="text-brand-600 underline" onclick="showNewInvoice()">New invoice</button> or convert an accepted quote.</div>';
     return;
   }
   const statusColors = {
@@ -5218,12 +5240,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Search listeners
   document.getElementById('product-search')?.addEventListener('input', renderProducts);
   document.getElementById('product-category-filter')?.addEventListener('change', renderProducts);
-  document.getElementById('client-search')?.addEventListener('input', renderClients);
   document.getElementById('quote-status-filter')?.addEventListener('change', renderQuotes);
-  document.getElementById('quote-search')?.addEventListener('input', renderQuotes);
   document.getElementById('quote-date-from')?.addEventListener('change', renderQuotes);
   document.getElementById('quote-date-to')?.addEventListener('change', renderQuotes);
-  document.getElementById('invoice-search')?.addEventListener('input', renderInvoices);
   document.getElementById('invoice-date-from')?.addEventListener('change', renderInvoices);
   document.getElementById('invoice-date-to')?.addEventListener('change', renderInvoices);
   document.getElementById('global-search')?.addEventListener('input', (e) => runGlobalSearch(e.target.value));

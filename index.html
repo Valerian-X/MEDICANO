@@ -2152,10 +2152,6 @@ html.dark textarea {
           <div class="app-topbar-actions">
             <span id="current-rates" class="hidden sm:inline text-slate-500 text-xs"></span>
             <button id="dark-toggle" onclick="toggleDarkMode()" class="p-2 rounded-lg hover:bg-slate-100 text-lg" title="Toggle dark mode">🌙</button>
-            <span class="offline-badge" title="Works offline">
-              <span class="offline-dot" aria-hidden="true"></span>
-              <span class="offline-text">Offline</span>
-            </span>
           </div>
         </div>
         <div class="global-search-wrap">
@@ -2268,7 +2264,6 @@ html.dark textarea {
                 <h2>Good day, Medicano team</h2>
                 <p>Here is a quick overview of your catalog, quotes, clients, and stock.</p>
               </div>
-              <div class="dash-greeting-badge">Offline ready</div>
             </div>
           </div>
 
@@ -2400,11 +2395,7 @@ html.dark textarea {
 
         <!-- CLIENTS -->
         <section id="page-clients" class="page hidden">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-            <label class="field-search flex-1 min-w-[10rem]">
-              <span class="search-icon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span>
-              <input id="client-search" type="search" placeholder="Search hospitals..." class="field-search-input" />
-            </label>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-end gap-3 mb-5">
             <button onclick="showClientForm()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium shrink-0">+ Add Client</button>
           </div>
           <div id="clients-list" class="entity-cards"></div>
@@ -2419,15 +2410,17 @@ html.dark textarea {
         <section id="page-quotes" class="page hidden">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             <div class="list-toolbar-filters">
-              <label class="field-search">
-                <span class="search-icon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span>
-                <input id="quote-search" type="search" placeholder="Search quotes…" class="field-search-input" />
+              <label class="filter-date-field">
+                <span class="filter-date-label">Start date</span>
+                <input id="quote-date-from" type="date" class="filter-control" placeholder="Start date" title="Start date" />
               </label>
-              <label class="filter-date-field"><span class="filter-date-label">Start date</span><input id="quote-date-from" type="date" class="filter-control" /></label>
-              <label class="filter-date-field"><span class="filter-date-label">End date</span><input id="quote-date-to" type="date" class="filter-control" /></label>
+              <label class="filter-date-field">
+                <span class="filter-date-label">End date</span>
+                <input id="quote-date-to" type="date" class="filter-control" placeholder="End date" title="End date" />
+              </label>
               <label class="filter-status-field">
                 <span class="filter-date-label">Status</span>
-                <select id="quote-status-filter" class="filter-control filter-status-select">
+                <select id="quote-status-filter" class="filter-control filter-status-select status-select-dark">
                   <option value="">All statuses</option>
                   <option value="draft">Draft</option>
                   <option value="sent">Sent</option>
@@ -2592,15 +2585,17 @@ html.dark textarea {
         <section id="page-invoices" class="page hidden">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             <div class="list-toolbar-filters">
-              <label class="field-search">
-                <span class="search-icon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span>
-                <input id="invoice-search" type="search" placeholder="Search invoices…" class="field-search-input" />
+              <label class="filter-date-field">
+                <span class="filter-date-label">Start date</span>
+                <input id="invoice-date-from" type="date" class="filter-control" placeholder="Start date" title="Start date" />
               </label>
-              <label class="filter-date-field"><span class="filter-date-label">Start date</span><input id="invoice-date-from" type="date" class="filter-control" /></label>
-              <label class="filter-date-field"><span class="filter-date-label">End date</span><input id="invoice-date-to" type="date" class="filter-control" /></label>
+              <label class="filter-date-field">
+                <span class="filter-date-label">End date</span>
+                <input id="invoice-date-to" type="date" class="filter-control" placeholder="End date" title="End date" />
+              </label>
               <label class="filter-status-field">
                 <span class="filter-date-label">Status</span>
-                <select id="invoice-status-filter" onchange="renderInvoices()" class="filter-control filter-status-select">
+                <select id="invoice-status-filter" onchange="renderInvoices()" class="filter-control filter-status-select status-select-dark">
                   <option value="">All statuses</option>
                   <option value="draft">Draft</option>
                   <option value="sent">Sent</option>
