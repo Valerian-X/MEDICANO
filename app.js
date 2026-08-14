@@ -516,6 +516,34 @@ function clientHistoryHtml(clientId) {
 
 
 
+function readClientExtraFields(prefix) {
+  return {
+    contact: (document.getElementById(prefix + '-contact')?.value || '').trim(),
+    phone: (document.getElementById(prefix + '-phone')?.value || '').trim(),
+    email: (document.getElementById(prefix + '-email')?.value || '').trim(),
+    address: (document.getElementById(prefix + '-address')?.value || '').trim()
+  };
+}
+
+function fillClientExtraFields(prefix, client) {
+  const set = (suffix, val) => {
+    const el = document.getElementById(prefix + '-' + suffix);
+    if (el) el.value = val || '';
+  };
+  set('contact', client && client.contact);
+  set('phone', client && client.phone);
+  set('email', client && client.email);
+  set('address', client && client.address);
+}
+
+function applyClientExtrasToRecord(client, extras) {
+  if (!client || !extras) return;
+  if (extras.contact) client.contact = extras.contact;
+  if (extras.phone) client.phone = extras.phone;
+  if (extras.email) client.email = extras.email;
+  if (extras.address) client.address = extras.address;
+}
+
 function onQuoteClientSelect() {
   const sel = document.getElementById('quote-client');
   const man = document.getElementById('quote-client-manual');
@@ -523,7 +551,9 @@ function onQuoteClientSelect() {
   if (sel.value) {
     const c = getClient(sel.value);
     man.value = c ? c.name : '';
+    fillClientExtraFields('quote-client', c);
   }
+  toggleQuoteClientExtras();
 }
 function onInvClientSelect() {
   const sel = document.getElementById('inv-client');
@@ -532,30 +562,40 @@ function onInvClientSelect() {
   if (sel.value) {
     const c = getClient(sel.value);
     man.value = c ? c.name : '';
+    fillClientExtraFields('inv-client', c);
   }
+  toggleInvClientExtras();
+}
+function toggleQuoteClientExtras() {
+  const box = document.getElementById('quote-client-extras');
+  if (box) box.classList.remove('hidden');
+}
+function toggleInvClientExtras() {
+  const box = document.getElementById('inv-client-extras');
+  if (box) box.classList.remove('hidden');
 }
 
-/** Resolve client from select or manual name; create if needed. Returns client id or null. */
-function resolveClientForSave(selectId, manualId) {
+/** Resolve client from select or manual name; create/update contact details. Returns client id or null. */
+function resolveClientForSave(selectId, manualId, extrasPrefix) {
   const sel = document.getElementById(selectId);
   const man = document.getElementById(manualId);
   const selected = sel ? sel.value : '';
   const typed = (man ? man.value : '').trim();
+  const extras = extrasPrefix ? readClientExtraFields(extrasPrefix) : {};
+
   if (selected) {
-    // If user typed a different name, update the client name
-    if (typed) {
-      const c = getClient(selected);
-      if (c && typed !== c.name) {
-        c.name = typed;
-      }
+    const c = getClient(selected);
+    if (c) {
+      if (typed && typed !== c.name) c.name = typed;
+      applyClientExtrasToRecord(c, extras);
     }
     return selected;
   }
   if (!typed) return null;
   const existing = (data.clients || []).find(c => (c.name || '').toLowerCase() === typed.toLowerCase());
   if (existing) {
+    applyClientExtrasToRecord(existing, extras);
     if (sel) {
-      // refresh options and select
       const still = [...sel.options].some(o => o.value === existing.id);
       if (!still) {
         const opt = document.createElement('option');
@@ -571,10 +611,10 @@ function resolveClientForSave(selectId, manualId) {
   data.clients.push({
     id,
     name: typed,
-    contact: '',
-    phone: '',
-    email: '',
-    address: ''
+    contact: extras.contact || '',
+    phone: extras.phone || '',
+    email: extras.email || '',
+    address: extras.address || ''
   });
   logAudit('client_create', typed + ' (from document)');
   if (sel) {
@@ -1845,6 +1885,7 @@ function showNewQuote() {
     data.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   const qcm = document.getElementById('quote-client-manual');
   if (qcm) qcm.value = '';
+  fillClientExtraFields('quote-client', null);
   document.getElementById('quote-title').value = '';
   document.getElementById('quote-valid').value = '';
   document.getElementById('quote-status').value = 'draft';
@@ -1873,6 +1914,7 @@ function openQuote(id) {
   if (qcm2) {
     const qc = getClient(q.clientId);
     qcm2.value = qc ? qc.name : '';
+    fillClientExtraFields('quote-client', qc);
   }
   document.getElementById('quote-title').value = q.title;
   document.getElementById('quote-valid').value = q.validUntil || '';
@@ -2065,7 +2107,7 @@ function recalcQuote() {
 }
 
 function saveQuote() {
-  const clientId = resolveClientForSave('quote-client', 'quote-client-manual');
+  const clientId = resolveClientForSave('quote-client', 'quote-client-manual', 'quote-client');
   const title = document.getElementById('quote-title').value.trim();
   if (!clientId || !title) {
     alert('Please select or type a client name, and enter a quote title.');
@@ -2437,9 +2479,11 @@ function populateInvoiceClientSelect(selectedId) {
     const man = document.getElementById('inv-client-manual');
     const c = getClient(selectedId);
     if (man) man.value = c ? c.name : '';
+    fillClientExtraFields('inv-client', c);
   } else {
     const man = document.getElementById('inv-client-manual');
     if (man) man.value = '';
+    fillClientExtraFields('inv-client', null);
   }
 }
 
@@ -2599,7 +2643,7 @@ function recalcInvoiceTotal() {
 }
 
 function saveInvoice() {
-  const clientId = resolveClientForSave('inv-client', 'inv-client-manual');
+  const clientId = resolveClientForSave('inv-client', 'inv-client-manual', 'inv-client');
   if (!clientId) { alert('Please select or type a client name.'); return; }
   // Ensure products for custom lines before collect
   document.querySelectorAll('#invoice-items-list .line-card').forEach(tr => {
@@ -3000,30 +3044,30 @@ function generateInvoicePdf(inv) {
     });
 
     y += 14;
-    // Totals — amounts align with Unit Price column; rule starts at same left as labels
-    const totalsLeft = colUnit - 8;
+    // Totals: values right-aligned with Amount column; labels right-aligned so trailing "L" sits on the same edge as amount digits above
     const totalsRight = colAmount;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    doc.setTextColor(...INK);
-    doc.text('Subtotal', totalsLeft, y, { align: 'right' });
-    doc.text(formatNairaPlain(subtotal), totalsRight, y, { align: 'right' });
+    const drawTotalLine = (label, value, yPos, bold) => {
+      const amountStr = formatNairaPlain(value);
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      doc.setFontSize(bold ? 13 : 11);
+      doc.setTextColor(...(bold ? TEAL : INK));
+      doc.text(amountStr, totalsRight, yPos, { align: 'right' });
+      const amountW = doc.getTextWidth(amountStr);
+      const gap = 14;
+      doc.text(label, totalsRight - amountW - gap, yPos, { align: 'right' });
+      return totalsRight - amountW - gap - doc.getTextWidth(label);
+    };
+    const leftEdge = drawTotalLine('Subtotal', subtotal, y, false);
     if (discount > 0) {
       y += 16;
-      doc.text('Discount (' + discount + '%)', totalsLeft, y, { align: 'right' });
-      doc.text('-' + formatNairaPlain(subtotal * discount / 100), totalsRight, y, { align: 'right' });
+      drawTotalLine('Discount (' + discount + '%)', -(subtotal * discount / 100), y, false);
     }
     y += 10;
     doc.setDrawColor(...TEAL);
     doc.setLineWidth(1.5);
-    // Divider starts where the TOTAL label block starts (under unit-price column)
-    doc.line(totalsLeft - 70, y, totalsRight, y);
+    doc.line(Math.min(leftEdge, totalsRight - 120), y, totalsRight, y);
     y += 16;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(...TEAL);
-    doc.text('TOTAL', totalsLeft, y, { align: 'right' });
-    doc.text(formatNairaPlain(total), totalsRight, y, { align: 'right' });
+    drawTotalLine('TOTAL', total, y, true);
     y += 28;
 
     // Bank / payment details — skip when invoice is already paid
@@ -5089,28 +5133,28 @@ function generateQuotePdf(q) {
     });
 
     y += 12;
-    const totalsLeft = colUnit - 8;
     const totalsRight = colAmount;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    doc.setTextColor(...INK);
-    doc.text('Subtotal', totalsLeft, y, { align: 'right' });
-    doc.text(formatNairaPlain(subtotal), totalsRight, y, { align: 'right' });
+    const drawQTotal = (label, value, yPos, bold) => {
+      const amountStr = formatNairaPlain(value);
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      doc.setFontSize(bold ? 13 : 11);
+      doc.setTextColor(...(bold ? TEAL : INK));
+      doc.text(amountStr, totalsRight, yPos, { align: 'right' });
+      const amountW = doc.getTextWidth(amountStr);
+      doc.text(label, totalsRight - amountW - 14, yPos, { align: 'right' });
+      return totalsRight - amountW - 14 - doc.getTextWidth(label);
+    };
+    const qLeft = drawQTotal('Subtotal', subtotal, y, false);
     if (discount > 0) {
       y += 14;
-      doc.text('Discount (' + discount + '%)', totalsLeft, y, { align: 'right' });
-      doc.text('-' + formatNairaPlain(subtotal * discount / 100), totalsRight, y, { align: 'right' });
+      drawQTotal('Discount (' + discount + '%)', -(subtotal * discount / 100), y, false);
     }
     y += 8;
     doc.setDrawColor(...TEAL);
     doc.setLineWidth(1.2);
-    doc.line(totalsLeft - 70, y, totalsRight, y);
+    doc.line(Math.min(qLeft, totalsRight - 120), y, totalsRight, y);
     y += 16;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(...TEAL);
-    doc.text('TOTAL', totalsLeft, y, { align: 'right' });
-    doc.text(formatNairaPlain(total), totalsRight, y, { align: 'right' });
+    drawQTotal('TOTAL', total, y, true);
     y += 28;
     if (q.notes) {
       doc.setFont('helvetica', 'bold');
