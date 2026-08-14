@@ -257,20 +257,51 @@ function logAudit(action, detail) {
   if (data.auditLog.length > 500) data.auditLog = data.auditLog.slice(0, 500);
 }
 
+function ensureNumbering() {
+  if (!data.numbering) {
+    data.numbering = {
+      quotePrefix: 'MQ-',
+      invoicePrefix: 'INV-',
+      nextQuoteNum: data.nextQuoteNum || 1001,
+      nextInvoiceNum: data.nextInvoiceNum || 2001
+    };
+  }
+  return data.numbering;
+}
+
+function numberExists(kind, full) {
+  const list = kind === 'quote' ? (data.quotes || []) : (data.invoices || []);
+  const key = kind === 'quote' ? 'quoteNumber' : 'invoiceNumber';
+  return list.some(x => String(x[key] || '') === String(full));
+}
+
 function nextQuoteNumber() {
-  if (!data.numbering) data.numbering = { quotePrefix: 'MQ-', invoicePrefix: 'INV-', nextQuoteNum: data.nextQuoteNum || 1001, nextInvoiceNum: data.nextInvoiceNum || 2001 };
-  const n = data.numbering.nextQuoteNum || data.nextQuoteNum || 1001;
-  data.numbering.nextQuoteNum = n + 1;
-  data.nextQuoteNum = data.numbering.nextQuoteNum;
-  return (data.numbering.quotePrefix || 'MQ-') + n;
+  const ncfg = ensureNumbering();
+  let n = ncfg.nextQuoteNum || data.nextQuoteNum || 1001;
+  let full;
+  // Skip any numbers already used so codes never clash
+  for (let guard = 0; guard < 10000; guard++) {
+    full = (ncfg.quotePrefix || 'MQ-') + n;
+    n += 1;
+    if (!numberExists('quote', full)) break;
+  }
+  ncfg.nextQuoteNum = n;
+  data.nextQuoteNum = n;
+  return full;
 }
 
 function nextInvoiceNumber() {
-  if (!data.numbering) data.numbering = { quotePrefix: 'MQ-', invoicePrefix: 'INV-', nextQuoteNum: data.nextQuoteNum || 1001, nextInvoiceNum: data.nextInvoiceNum || 2001 };
-  const n = data.numbering.nextInvoiceNum || data.nextInvoiceNum || 2001;
-  data.numbering.nextInvoiceNum = n + 1;
-  data.nextInvoiceNum = data.numbering.nextInvoiceNum;
-  return (data.numbering.invoicePrefix || 'INV-') + n;
+  const ncfg = ensureNumbering();
+  let n = ncfg.nextInvoiceNum || data.nextInvoiceNum || 2001;
+  let full;
+  for (let guard = 0; guard < 10000; guard++) {
+    full = (ncfg.invoicePrefix || 'INV-') + n;
+    n += 1;
+    if (!numberExists('invoice', full)) break;
+  }
+  ncfg.nextInvoiceNum = n;
+  data.nextInvoiceNum = n;
+  return full;
 }
 
 function invoicePaidTotal(inv) {
@@ -317,6 +348,7 @@ function refreshInvoicePaymentStatus(inv, { silent } = {}) {
 function deductStockForInvoice(inv) {
   if (!inv || inv.stockDeducted) return;
   const items = inv.items || [];
+  const lines = [];
   items.forEach(it => {
     const pid = it.productId;
     if (!pid) return;
@@ -336,9 +368,28 @@ function deductStockForInvoice(inv) {
       balanceAfter: p.stock,
       createdAt: new Date().toISOString()
     });
+    lines.push({ name: p.name || p.sku || 'Item', qty, balance: p.stock, low: p.stock <= (Number(p.lowStock) || 0), id: p.id });
   });
   inv.stockDeducted = true;
   logAudit('stock_deduct', 'Auto stock-out for ' + (inv.invoiceNumber || inv.id));
+  if (lines.length) {
+    const summary = lines.map(l => l.name + ' −' + l.qty + ' (now ' + l.balance + ')').join('; ');
+    showStockToast('Stock updated for ' + (inv.invoiceNumber || 'invoice') + ': ' + summary, lines.some(l => l.low));
+  }
+}
+
+function showStockToast(message, hasLow) {
+  let el = document.getElementById('stock-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'stock-toast';
+    el.className = 'stock-toast';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = escHtml(message) + (hasLow ? ' <a href="#products" onclick="navigate(\'products\');return false;">View low stock</a>' : '');
+  el.classList.add('show');
+  clearTimeout(showStockToast._t);
+  showStockToast._t = setTimeout(() => el.classList.remove('show'), 6000);
 }
 
 function addInvoicePayment(invId, amount, method, note, dateStr) {
@@ -813,6 +864,7 @@ function navigate(page) {
     'quote-editor': 'Quote Editor',
     invoices: 'Invoices',
     'invoice-editor': 'Invoice Editor',
+    reports: 'Reports',
     inventory: 'In Stock',
     presentation: 'Client Presentation',
     rates: 'Exchange Rates',
@@ -836,6 +888,7 @@ function navigate(page) {
   if (page === 'clients') renderClients();
   if (page === 'quotes') renderQuotes();
   if (page === 'invoices') renderInvoices();
+  if (page === 'reports') initReportsPage();
   if (page === 'inventory') renderInventory();
   if (page === 'presentation') renderPresPicker();
   if (page === 'rates') renderRates();
@@ -895,6 +948,27 @@ function renderDashboard() {
   renderDashCalendar();
   renderDashUpcomingEvents();
   updateRatesDisplay();
+  renderLowStockPanel();
+}
+
+function renderLowStockPanel() {
+  const panel = document.getElementById('lowstock-panel');
+  const list = document.getElementById('lowstock-list');
+  if (!panel || !list) return;
+  const lows = (data.products || []).filter(p => p.active !== false && (Number(p.stock) || 0) <= (Number(p.lowStock) || 0))
+    .sort((a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0));
+  if (!lows.length) {
+    panel.classList.add('hidden');
+    list.innerHTML = '';
+    return;
+  }
+  panel.classList.remove('hidden');
+  list.innerHTML = lows.slice(0, 8).map(p => `
+    <div class="lowstock-row" onclick="navigate('products'); setTimeout(()=>{ const s=document.getElementById('product-search'); if(s){ s.value=${JSON.stringify('')}; } const el=document.querySelector('[data-product-id=\'${p.id}\']'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('is-open'); } }, 80)">
+      <span>${escHtml(p.name || p.sku || 'Item')}</span>
+      <span class="lowstock-qty">${Number(p.stock) || 0} left</span>
+    </div>
+  `).join('');
 }
 
 let dashCalView = new Date();
@@ -4889,6 +4963,327 @@ function closeModal(id) {
   document.getElementById(id).classList.add('hidden');
 }
 
+
+
+// -------------------- Transaction Reports --------------------
+
+const REPORT_FILTERS_KEY = 'medicano_report_filters_v1';
+
+function collectLedgerRows({ from, to, clientIds, method, type } = {}) {
+  const rows = [];
+  const clientSet = (clientIds && clientIds.length) ? new Set(clientIds) : null;
+  const wantPay = !type || type === 'payments' || type === 'both';
+  const wantInv = type === 'invoices' || type === 'both';
+
+  (data.invoices || []).forEach(inv => {
+    if (clientSet && !clientSet.has(inv.clientId)) return;
+    const client = getClient(inv.clientId);
+    const clientName = client ? client.name : (inv.clientName || '—');
+
+    if (wantInv) {
+      const d = (inv.date || (inv.createdAt || '').slice(0, 10) || '');
+      if (from && d && d < from) { /* skip */ }
+      else if (to && d && d > to) { /* skip */ }
+      else {
+        rows.push({
+          kind: 'invoice',
+          date: d || '—',
+          clientId: inv.clientId || '',
+          clientName,
+          ref: inv.invoiceNumber || '—',
+          title: inv.title || '',
+          method: (inv.status || '').toString(),
+          note: 'Invoice issued',
+          amount: Number(inv.totalNGN) || 0,
+          signedAmount: Number(inv.totalNGN) || 0
+        });
+      }
+    }
+
+    if (wantPay) {
+      (inv.payments || []).forEach(p => {
+        const d = (p.date || (p.createdAt || '').slice(0, 10) || '');
+        if (from && d && d < from) return;
+        if (to && d && d > to) return;
+        const m = (p.method || '').toLowerCase();
+        if (method && m !== method) return;
+        rows.push({
+          kind: 'payment',
+          date: d || '—',
+          clientId: inv.clientId || '',
+          clientName,
+          ref: inv.invoiceNumber || '—',
+          title: inv.title || '',
+          method: p.method || '—',
+          note: p.note || '',
+          amount: Number(p.amount) || 0,
+          signedAmount: Number(p.amount) || 0
+        });
+      });
+    }
+  });
+
+  rows.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.ref).localeCompare(String(a.ref)));
+  return rows;
+}
+
+// Back-compat alias
+function collectPaymentTransactions(opts) {
+  return collectLedgerRows({ ...opts, type: 'payments', clientIds: opts.clientId ? [opts.clientId] : (opts.clientIds || null) });
+}
+
+function reportSelectAllClients(on) {
+  document.querySelectorAll('#report-client-list input[type=checkbox]').forEach(cb => {
+    cb.checked = !!on;
+    const chip = cb.closest('.report-client-chip');
+    if (chip) chip.classList.toggle('is-on', !!on);
+  });
+}
+
+function getSelectedReportClientIds() {
+  return [...document.querySelectorAll('#report-client-list input[type=checkbox]:checked')].map(cb => cb.value);
+}
+
+function getReportFilterState() {
+  return {
+    from: document.getElementById('report-date-from')?.value || '',
+    to: document.getElementById('report-date-to')?.value || '',
+    clientIds: getSelectedReportClientIds(),
+    method: document.getElementById('report-method')?.value || '',
+    type: document.getElementById('report-type')?.value || 'payments'
+  };
+}
+
+function saveReportFilters() {
+  try {
+    const f = getReportFilterState();
+    localStorage.setItem(REPORT_FILTERS_KEY, JSON.stringify(f));
+  } catch (e) {}
+}
+
+function loadReportFilters() {
+  try {
+    return JSON.parse(localStorage.getItem(REPORT_FILTERS_KEY) || 'null');
+  } catch (e) { return null; }
+}
+
+function initReportsPage() {
+  const list = document.getElementById('report-client-list');
+  const saved = loadReportFilters() || {};
+  const clients = (data.clients || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const selected = new Set(saved.clientIds || []);
+
+  if (list) {
+    list.innerHTML = clients.map(c => {
+      const on = selected.size ? selected.has(c.id) : false;
+      return `<label class="report-client-chip ${on ? 'is-on' : ''}">
+        <input type="checkbox" value="${c.id}" ${on ? 'checked' : ''} onchange="this.closest('.report-client-chip').classList.toggle('is-on', this.checked)" />
+        <span>${escHtml(c.name)}</span>
+      </label>`;
+    }).join('') || '<span class="text-slate-400 text-sm">No clients yet</span>';
+  }
+
+  const from = document.getElementById('report-date-from');
+  const to = document.getElementById('report-date-to');
+  const method = document.getElementById('report-method');
+  const type = document.getElementById('report-type');
+
+  if (from) {
+    if (saved.from) from.value = saved.from;
+    else if (!from.value) {
+      const now = new Date();
+      from.value = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    }
+  }
+  if (to) {
+    if (saved.to) to.value = saved.to;
+    else if (!to.value) to.value = new Date().toISOString().slice(0, 10);
+  }
+  if (method && saved.method) method.value = saved.method;
+  if (type && saved.type) type.value = saved.type;
+
+  renderTransactionReport();
+}
+
+function renderTransactionReport() {
+  const filters = getReportFilterState();
+  saveReportFilters();
+  const rows = collectLedgerRows(filters);
+  const summary = document.getElementById('report-summary');
+  const preview = document.getElementById('report-preview');
+  if (!preview) return;
+
+  const payments = rows.filter(r => r.kind === 'payment');
+  const invoices = rows.filter(r => r.kind === 'invoice');
+  const collected = payments.reduce((s, r) => s + r.amount, 0);
+  const invoiced = invoices.reduce((s, r) => s + r.amount, 0);
+  const clientCount = new Set(rows.map(r => r.clientId || r.clientName)).size;
+
+  if (summary) {
+    summary.innerHTML = `
+      <div class="report-summary-card"><p class="rsl">Rows</p><p class="rsv">${rows.length}</p></div>
+      <div class="report-summary-card"><p class="rsl">Collected</p><p class="rsv">${formatNGN(collected)}</p></div>
+      <div class="report-summary-card"><p class="rsl">Invoiced</p><p class="rsv">${formatNGN(invoiced)}</p></div>
+      <div class="report-summary-card"><p class="rsl">Clients</p><p class="rsv">${clientCount}</p></div>
+    `;
+  }
+
+  if (!rows.length) {
+    preview.innerHTML = `<div class="report-empty">No transactions in this period for the selected filters.</div>`;
+    return;
+  }
+
+  preview.innerHTML = `
+    <div class="report-table-wrap">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Client</th>
+            <th>Reference</th>
+            <th>Detail</th>
+            <th class="num">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td>${escHtml(r.date)}</td>
+              <td><span class="report-type-pill ${r.kind === 'payment' ? 'pay' : 'inv'}">${r.kind === 'payment' ? 'Payment' : 'Invoice'}</span></td>
+              <td>${escHtml(r.clientName)}</td>
+              <td>${escHtml(r.ref)}${r.title ? `<br><span class="text-xs text-slate-400">${escHtml(r.title)}</span>` : ''}</td>
+              <td>${escHtml(r.kind === 'payment' ? ((r.method || '') + (r.note ? ' · ' + r.note : '')) : (r.method || 'issued'))}</td>
+              <td class="num">${formatNGN(r.amount)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5" style="text-align:right;font-weight:700;padding:0.85rem">Total collected (payments)</td>
+            <td class="num" style="font-weight:800">${formatNGN(collected)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function ensureBackupBeforeSensitiveAction(actionLabel) {
+  const last = data.lastBackupAt ? new Date(data.lastBackupAt) : null;
+  const days = last ? Math.floor((Date.now() - last.getTime()) / 86400000) : 999;
+  if (days < 7) return true;
+  const msg = (last
+    ? ('Last backup was ' + days + ' day(s) ago. ')
+    : 'No backup yet. ') +
+    'Download a backup before ' + actionLabel + '?' + String.fromCharCode(10, 10) +
+    'OK = backup now, Cancel = continue without backup.';
+  if (confirm(msg)) {
+    exportDataQuiet();
+  }
+  return true;
+}
+
+function exportDataQuiet() {
+  data.lastBackupAt = new Date().toISOString();
+  saveData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `medicano-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  logAudit('backup', 'Full data export');
+  saveData();
+  updateBackupBanner();
+}
+
+function printTransactionReport() {
+  ensureBackupBeforeSensitiveAction('printing this statement');
+  const filters = getReportFilterState();
+  const rows = collectLedgerRows(filters);
+  const co = data.company || (data.settings && data.settings.company) || {};
+  let clientLabel = 'All clients';
+  if (filters.clientIds && filters.clientIds.length === 1) {
+    clientLabel = (getClient(filters.clientIds[0]) || {}).name || 'Client';
+  } else if (filters.clientIds && filters.clientIds.length > 1) {
+    clientLabel = filters.clientIds.length + ' selected clients';
+  }
+  const collected = rows.filter(r => r.kind === 'payment').reduce((s, r) => s + r.amount, 0);
+  const period = `${filters.from || '…'} to ${filters.to || '…'}`;
+  const area = document.getElementById('print-area');
+  if (!area) { alert('Print area not found.'); return; }
+  area.innerHTML = `
+    <div class="report-print-sheet">
+      <h1>${escHtml(co.name || 'Medicano Resources Limited')}</h1>
+      <div class="meta">
+        <div>Transaction Statement (${escHtml(filters.type || 'payments')})</div>
+        <div>Client: ${escHtml(clientLabel)}</div>
+        <div>Period: ${escHtml(period)}</div>
+        <div>Generated: ${escHtml(new Date().toLocaleString())}</div>
+        ${co.address ? `<div>${escHtml(co.address)}</div>` : ''}
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Client</th>
+            <th>Reference</th>
+            <th>Detail</th>
+            <th class="num">Amount (₦)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.length ? rows.map(r => `
+            <tr>
+              <td>${escHtml(r.date)}</td>
+              <td>${r.kind === 'payment' ? 'Payment' : 'Invoice'}</td>
+              <td>${escHtml(r.clientName)}</td>
+              <td>${escHtml(r.ref)}</td>
+              <td>${escHtml(r.kind === 'payment' ? ((r.method || '') + (r.note ? ' · ' + r.note : '')) : (r.method || ''))}</td>
+              <td class="num">${(r.amount || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>
+          `).join('') : `<tr><td colspan="6">No transactions in this period.</td></tr>`}
+        </tbody>
+      </table>
+      <div class="totals">Payments collected: ₦${collected.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · ${rows.length} row(s)</div>
+    </div>
+  `;
+  window.print();
+}
+
+function exportTransactionReportCsv() {
+  ensureBackupBeforeSensitiveAction('exporting this CSV');
+  const filters = getReportFilterState();
+  const rows = collectLedgerRows(filters);
+  const header = ['Date', 'Type', 'Client', 'Reference', 'Title', 'Detail', 'Amount NGN'];
+  const lines = [header];
+  rows.forEach(r => {
+    lines.push([
+      r.date,
+      r.kind,
+      r.clientName,
+      r.ref,
+      r.title,
+      r.kind === 'payment' ? ((r.method || '') + (r.note ? ' · ' + r.note : '')) : (r.method || ''),
+      (Number(r.amount) || 0).toFixed(2)
+    ]);
+  });
+  const escape = (v) => {
+    const s = String(v ?? '');
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  };
+  const csv = lines.map(row => row.map(escape).join(',')).join(String.fromCharCode(10));
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `medicano-ledger-${filters.from || 'all'}-to-${filters.to || 'all'}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 function promptAddPayment(invId) {
   const inv = (data.invoices || []).find(x => x.id === invId);
