@@ -1700,10 +1700,9 @@ function renderClientDetailPage() {
 
   root.innerHTML = `
     <div class="client-page-top">
-      <button type="button" onclick="navigate('clients')" class="text-sm text-brand-600 hover:underline">← Back to Clients</button>
-      <h1 class="client-page-name">${escHtml(c.name)}</h1>
+      <button type="button" onclick="navigate('clients')" class="client-back-link">← Back to Clients</button>
       <div class="client-page-actions">
-        <button type="button" onclick="editClient('${c.id}')" class="px-3 py-1.5 bg-slate-100 rounded-lg text-sm font-medium">Edit</button>
+        <button type="button" onclick="editClient('${c.id}')" class="client-edit-btn">Edit</button>
         <button type="button" onclick="showNewQuote(); setTimeout(()=>{ const s=document.getElementById('quote-client'); if(s){ s.value='${c.id}'; onQuoteClientSelect(); } }, 50)" class="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-medium">New quote</button>
         <button type="button" onclick="showNewInvoice(); populateInvoiceClientSelect('${c.id}')" class="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm font-medium">New invoice</button>
       </div>
