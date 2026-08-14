@@ -808,8 +808,7 @@ html.dark input, html.dark select, html.dark textarea {
 }
 html.dark thead { background: #252525 !important; }
 html.dark tbody tr:hover { background: #252525 !important; }
-html.dark .stat-card .stat-label { color: rgba(0,0,0,0.55); }
-html.dark .stat-card .stat-value { color: #1a1a1a; }
+
 
 /* Scrollbar soft */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -3111,13 +3110,7 @@ html.dark .entity-empty {
   background: #1c1c1c !important;
 }
 
-/* Stat cards — keep pastels, force dark ink for contrast */
-html.dark .stat-card .stat-label {
-  color: rgba(15, 23, 42, 0.65) !important;
-}
-html.dark .stat-card .stat-value {
-  color: #0f172a !important;
-}
+
 
 /* Quick action buttons — readable */
 html.dark .qa-soft {
@@ -3168,13 +3161,7 @@ html.dark .cal-day-kicker,
 html.dark .cal-dow {
   color: #94a3b8 !important;
 }
-html.dark .dash-tl-body {
-  background: #252525 !important;
-  color: #f1f5f9 !important;
-}
-html.dark .dash-tl-title { color: #f8fafc !important; }
-html.dark .dash-tl-time,
-html.dark .dash-tl-meta { color: #94a3b8 !important; opacity: 1 !important; }
+
 
 /* Calendar */
 html.dark .cal-month-panel,
@@ -3582,31 +3569,7 @@ html.dark .entity-card.is-open .entity-card-chevron {
   color: #fff !important;
 }
 
-/* Timeline / event cards — pastel stays, text stays dark (readable) */
-html.dark .dash-tl-body,
-html.dark .dash-tl-body.pink,
-html.dark .dash-tl-body.yellow,
-html.dark .dash-tl-body.green,
-html.dark .dash-tl-body.blue,
-html.dark .dash-tl-body.lavender,
-html.dark .dash-tl-body.peach {
-  color: #0f172a !important;
-}
-html.dark .dash-tl-body .dash-tl-title,
-html.dark .dash-tl-body .dash-tl-time,
-html.dark .dash-tl-body .dash-tl-meta {
-  color: #0f172a !important;
-  opacity: 1 !important;
-}
-html.dark .dash-tl-body .dash-tl-time,
-html.dark .dash-tl-body .dash-tl-meta {
-  opacity: 0.75 !important;
-}
-/* Event chips inside timeline */
-html.dark .dash-tl-body span,
-html.dark .dash-tl-body button {
-  color: #0f172a !important;
-}
+
 
 /* Quote: Select Equipment to Add — dark mode readable */
 html.dark .quote-equip-panel {
@@ -3693,12 +3656,7 @@ html.dark #page-presentation .bg-slate-100 {
   color: #f8fafc !important;
 }
 
-/* Calendar event cards on Events page (same pastel + dark text rule) */
-html.dark .cal-event-card,
-html.dark .cal-timeline-item,
-html.dark [class*="cal-"][class*="event"] {
-  color: #0f172a !important;
-}
+
 
 
 /* =========================================================
@@ -3717,60 +3675,13 @@ html.dark .entity-card:not(.is-open) .entity-card-chevron {
 }
 
 /* Events cards — pastel backgrounds, always dark text */
-html.dark .cal-event-card,
-html.dark .cal-event-card.pink,
-html.dark .cal-event-card.yellow,
-html.dark .cal-event-card.green,
-html.dark .cal-event-card.blue,
-html.dark .cal-event-card.lavender,
-html.dark .cal-event-card.peach {
-  color: #0f172a !important;
-}
-html.dark .cal-event-title,
-html.dark .cal-event-time,
-html.dark .cal-event-notes,
-html.dark .cal-event-meta,
-html.dark .cal-event-body {
-  color: #0f172a !important;
-  opacity: 1 !important;
-}
-html.dark .cal-event-time,
-html.dark .cal-event-notes {
-  opacity: 0.8 !important;
-}
-html.dark .cal-pill {
-  background: rgba(255,255,255,0.65) !important;
-  color: #0f172a !important;
-}
-html.dark .cal-pill.soft {
-  background: rgba(0,0,0,0.08) !important;
-  color: #0f172a !important;
-}
-html.dark .cal-event-del {
-  background: rgba(0,0,0,0.1) !important;
-  color: #0f172a !important;
-}
+
 html.dark .cal-empty-day {
   background: #252525 !important;
   color: #94a3b8 !important;
 }
 
-/* Dashboard timeline events — same rule */
-html.dark .dash-tl-body,
-html.dark .dash-tl-body.pink,
-html.dark .dash-tl-body.yellow,
-html.dark .dash-tl-body.green,
-html.dark .dash-tl-body.blue,
-html.dark .dash-tl-body.lavender,
-html.dark .dash-tl-body.peach {
-  color: #0f172a !important;
-}
-html.dark .dash-tl-body .dash-tl-title,
-html.dark .dash-tl-body .dash-tl-time,
-html.dark .dash-tl-body .dash-tl-meta {
-  color: #0f172a !important;
-  opacity: 1 !important;
-}
+
 
 /* Quote equipment picker list */
 html.dark #quote-product-picker,
@@ -3839,4 +3750,115 @@ html.dark #page-presentation .select-row-check {
   justify-content: center !important;
   font-size: clamp(1.55rem, 3.5vw, 2.1rem) !important;
   font-weight: 800 !important;
+}
+
+
+/* Event cards (dashboard + events): white text on tinted dark cards */
+html.dark .dash-tl-body,
+html.dark .dash-tl-body.pink,
+html.dark .dash-tl-body.yellow,
+html.dark .dash-tl-body.green,
+html.dark .dash-tl-body.blue,
+html.dark .dash-tl-body.lavender,
+html.dark .dash-tl-body.peach {
+  background: #252525 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+html.dark .dash-tl-body.pink { background: #2a2430 !important; border-color: rgba(232,145,184,0.35) !important; }
+html.dark .dash-tl-body.yellow { background: #2a2820 !important; border-color: rgba(212,184,74,0.35) !important; }
+html.dark .dash-tl-body.green { background: #1f2a22 !important; border-color: rgba(106,170,95,0.35) !important; }
+html.dark .dash-tl-body.blue { background: #1e2430 !important; border-color: rgba(107,143,212,0.35) !important; }
+html.dark .dash-tl-body.lavender { background: #262230 !important; border-color: rgba(155,127,212,0.35) !important; }
+html.dark .dash-tl-body.peach { background: #2a2420 !important; border-color: rgba(232,160,120,0.35) !important; }
+
+html.dark .dash-tl-body,
+html.dark .dash-tl-body * {
+  color: #ffffff !important;
+  opacity: 1 !important;
+}
+html.dark .dash-tl-body .dash-tl-meta,
+html.dark .dash-tl-body .dash-tl-time {
+  color: rgba(255,255,255,0.78) !important;
+}
+
+html.dark .cal-event-card,
+html.dark .cal-event-card.pink,
+html.dark .cal-event-card.yellow,
+html.dark .cal-event-card.green,
+html.dark .cal-event-card.blue,
+html.dark .cal-event-card.lavender,
+html.dark .cal-event-card.peach {
+  background: #252525 !important;
+  color: #ffffff !important;
+}
+html.dark .cal-event-card.pink { background: #2a2430 !important; }
+html.dark .cal-event-card.yellow { background: #2a2820 !important; }
+html.dark .cal-event-card.green { background: #1f2a22 !important; }
+html.dark .cal-event-card.blue { background: #1e2430 !important; }
+html.dark .cal-event-card.lavender { background: #262230 !important; }
+html.dark .cal-event-card.peach { background: #2a2420 !important; }
+
+html.dark .cal-event-card,
+html.dark .cal-event-card * {
+  color: #ffffff !important;
+}
+html.dark .cal-event-time,
+html.dark .cal-event-notes,
+html.dark .cal-event-meta {
+  color: rgba(255,255,255,0.8) !important;
+  opacity: 1 !important;
+}
+html.dark .cal-pill {
+  background: rgba(255,255,255,0.14) !important;
+  color: #ffffff !important;
+}
+html.dark .cal-pill.soft {
+  background: rgba(255,255,255,0.1) !important;
+  color: rgba(255,255,255,0.9) !important;
+}
+html.dark .cal-event-del {
+  background: rgba(255,255,255,0.12) !important;
+  color: #ffffff !important;
+}
+
+
+/* Dashboard stat cards — match In Stock dark metric theme */
+html.dark .stat-card,
+html.dark .stat-card.stat-yellow,
+html.dark .stat-card.stat-pink,
+html.dark .stat-card.stat-blue,
+html.dark .stat-card.stat-green,
+html.dark .stat-card.stat-lavender,
+html.dark .stat-card.stat-peach,
+html.dark .stat-card.stat-mint {
+  color: #f8fafc !important;
+}
+html.dark .stat-card .stat-label {
+  color: rgba(248, 250, 252, 0.75) !important;
+}
+html.dark .stat-card .stat-value {
+  color: #ffffff !important;
+}
+/* Map each pastel variant to In Stock–style dark tints */
+html.dark .stat-yellow {
+  background: #3a3420 !important; /* low-stock gold/olive */
+}
+html.dark .stat-pink {
+  background: #3a1e28 !important; /* out maroon */
+}
+html.dark .stat-blue {
+  background: #1e2a3a !important; /* skus navy-blue */
+}
+html.dark .stat-green {
+  background: #1e3a2f !important; /* in green */
+}
+html.dark .stat-lavender {
+  background: #2a2438 !important;
+}
+html.dark .stat-peach {
+  background: #3a2820 !important;
+}
+html.dark .stat-mint {
+  background: #1a3330 !important;
 }
