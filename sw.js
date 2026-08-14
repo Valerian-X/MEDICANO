@@ -1,11 +1,14 @@
 /* Medicano PWA Service Worker */
-const CACHE = 'medicano-v5';
+const CACHE = 'medicano-v11';
 const ASSETS = [
   './',
   './index.html',
   './app.js',
   './styles.css',
-  './manifest.json'
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (event) => {

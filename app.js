@@ -242,6 +242,279 @@ let data = null;
 let currentQuoteId = null;
 let quoteItemCounter = 0;
 
+
+// -------------------- Audit / numbering / payments helpers --------------------
+function logAudit(action, detail) {
+  if (!data) return;
+  if (!data.auditLog) data.auditLog = [];
+  data.auditLog.unshift({
+    id: uid(),
+    at: new Date().toISOString(),
+    action: String(action || ''),
+    detail: String(detail || ''),
+    device: (data.deviceProfile && data.deviceProfile.name) || 'device'
+  });
+  if (data.auditLog.length > 500) data.auditLog = data.auditLog.slice(0, 500);
+}
+
+function nextQuoteNumber() {
+  if (!data.numbering) data.numbering = { quotePrefix: 'MQ-', invoicePrefix: 'INV-', nextQuoteNum: data.nextQuoteNum || 1001, nextInvoiceNum: data.nextInvoiceNum || 2001 };
+  const n = data.numbering.nextQuoteNum || data.nextQuoteNum || 1001;
+  data.numbering.nextQuoteNum = n + 1;
+  data.nextQuoteNum = data.numbering.nextQuoteNum;
+  return (data.numbering.quotePrefix || 'MQ-') + n;
+}
+
+function nextInvoiceNumber() {
+  if (!data.numbering) data.numbering = { quotePrefix: 'MQ-', invoicePrefix: 'INV-', nextQuoteNum: data.nextQuoteNum || 1001, nextInvoiceNum: data.nextInvoiceNum || 2001 };
+  const n = data.numbering.nextInvoiceNum || data.nextInvoiceNum || 2001;
+  data.numbering.nextInvoiceNum = n + 1;
+  data.nextInvoiceNum = data.numbering.nextInvoiceNum;
+  return (data.numbering.invoicePrefix || 'INV-') + n;
+}
+
+function invoicePaidTotal(inv) {
+  if (!inv) return 0;
+  if (Array.isArray(inv.payments) && inv.payments.length) {
+    return inv.payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  }
+  return Number(inv.amountPaid) || 0;
+}
+
+function invoiceBalance(inv) {
+  const total = Number(inv.totalNgn != null ? inv.totalNgn : inv.totalNGN) || 0;
+  return Math.max(0, total - invoicePaidTotal(inv));
+}
+
+function refreshInvoicePaymentStatus(inv, { silent } = {}) {
+  if (!inv) return;
+  const total = Number(inv.totalNgn != null ? inv.totalNgn : inv.totalNGN) || 0;
+  const paid = invoicePaidTotal(inv);
+  inv.amountPaid = paid;
+  if (inv.status === 'cancelled' || inv.status === 'draft') return;
+
+  // Only auto-derive status when payment records exist.
+  // Otherwise keep the manually chosen status (e.g. user sets Paid without a payment line).
+  const hasPayments = Array.isArray(inv.payments) && inv.payments.length > 0;
+  if (hasPayments || paid > 0) {
+    let next;
+    if (paid <= 0) next = 'unpaid';
+    else if (total > 0 && paid + 0.009 >= total) next = 'paid';
+    else if (paid > 0) next = 'partial';
+    else next = inv.status;
+    if (next !== inv.status) {
+      const prev = inv.status;
+      inv.status = next;
+      if (!silent) logAudit('invoice_status', (inv.invoiceNumber || inv.id) + ': ' + prev + ' → ' + next);
+    }
+  }
+
+  if (inv.status === 'paid' && !inv.stockDeducted && data.settings && data.settings.autoDeductStockOnPaid) {
+    deductStockForInvoice(inv);
+  }
+}
+
+function deductStockForInvoice(inv) {
+  if (!inv || inv.stockDeducted) return;
+  const items = inv.items || [];
+  items.forEach(it => {
+    const pid = it.productId;
+    if (!pid) return;
+    const p = getProduct(pid);
+    if (!p) return;
+    const qty = Math.max(0, Math.floor(Number(it.qty) || 0));
+    if (!qty) return;
+    p.stock = Math.max(0, (Number(p.stock) || 0) - qty);
+    if (!data.stockMovements) data.stockMovements = [];
+    data.stockMovements.push({
+      id: uid(),
+      productId: pid,
+      type: 'out',
+      qty,
+      date: new Date().toISOString().slice(0, 10),
+      note: 'Invoice ' + (inv.invoiceNumber || '') + ' (auto)',
+      balanceAfter: p.stock,
+      createdAt: new Date().toISOString()
+    });
+  });
+  inv.stockDeducted = true;
+  logAudit('stock_deduct', 'Auto stock-out for ' + (inv.invoiceNumber || inv.id));
+}
+
+function addInvoicePayment(invId, amount, method, note, dateStr) {
+  const inv = (data.invoices || []).find(x => x.id === invId);
+  if (!inv) return;
+  if (!Array.isArray(inv.payments)) inv.payments = [];
+  const amt = Math.max(0, Number(amount) || 0);
+  if (amt <= 0) { alert('Enter a payment amount.'); return; }
+  inv.payments.push({
+    id: uid(),
+    amount: amt,
+    method: method || 'transfer',
+    note: note || '',
+    date: dateStr || new Date().toISOString().slice(0, 10),
+    createdAt: new Date().toISOString()
+  });
+  refreshInvoicePaymentStatus(inv);
+  logAudit('payment', (inv.invoiceNumber || '') + ' +' + formatNGN(amt));
+  saveData();
+}
+
+function removeInvoicePayment(invId, payId) {
+  const inv = (data.invoices || []).find(x => x.id === invId);
+  if (!inv || !Array.isArray(inv.payments)) return;
+  inv.payments = inv.payments.filter(p => p.id !== payId);
+  refreshInvoicePaymentStatus(inv);
+  logAudit('payment_removed', inv.invoiceNumber || invId);
+  saveData();
+}
+
+function applyNoteTemplate(selectId, targetId) {
+  const sel = document.getElementById(selectId);
+  const target = document.getElementById(targetId);
+  if (!sel || !target) return;
+  const id = sel.value;
+  if (!id) return;
+  const t = (data.noteTemplates || []).find(x => x.id === id);
+  if (!t) return;
+  const cur = (target.value || '').trim();
+  target.value = cur ? (cur + '\n\n' + t.body) : t.body;
+  sel.value = '';
+}
+
+function runGlobalSearch(q) {
+  const query = (q || '').toLowerCase().trim();
+  const box = document.getElementById('global-search-results');
+  if (!box) return;
+  if (!query) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  const hits = [];
+  (data.products || []).forEach(p => {
+    const hay = [p.sku, p.name, p.category, p.brand, p.description].join(' ').toLowerCase();
+    if (hay.includes(query)) hits.push({ type: 'Equipment', title: p.name, sub: p.sku || '', go: () => { navigate('products'); setTimeout(() => editProduct(p.id), 50); } });
+  });
+  (data.clients || []).forEach(c => {
+    const hay = [c.name, c.contact, c.email, c.phone, c.address].join(' ').toLowerCase();
+    if (hay.includes(query)) hits.push({ type: 'Client', title: c.name, sub: c.contact || '', go: () => openClientPage(c.id) });
+  });
+  (data.quotes || []).forEach(q => {
+    const client = getClient(q.clientId);
+    const hay = [q.quoteNumber, q.title, q.status, client && client.name].join(' ').toLowerCase();
+    if (hay.includes(query)) hits.push({ type: 'Quote', title: q.quoteNumber + ' — ' + (q.title || ''), sub: client ? client.name : '', go: () => openQuote(q.id) });
+  });
+  (data.invoices || []).forEach(inv => {
+    const client = getClient(inv.clientId);
+    const hay = [inv.invoiceNumber, inv.title, inv.status, client && client.name].join(' ').toLowerCase();
+    if (hay.includes(query)) hits.push({ type: 'Invoice', title: (inv.invoiceNumber || '') + ' — ' + (inv.title || ''), sub: client ? client.name : '', go: () => editInvoice(inv.id) });
+  });
+  if (!hits.length) {
+    box.innerHTML = '<div class="global-search-empty">No matches</div>';
+    box.classList.remove('hidden');
+    return;
+  }
+  box.innerHTML = hits.slice(0, 20).map((h, i) =>
+    `<button type="button" class="global-search-hit" data-i="${i}"><span class="gs-type">${escHtml(h.type)}</span><span class="gs-title">${escHtml(h.title)}</span><span class="gs-sub">${escHtml(h.sub || '')}</span></button>`
+  ).join('');
+  box._hits = hits.slice(0, 20);
+  box.classList.remove('hidden');
+  box.querySelectorAll('.global-search-hit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = Number(btn.getAttribute('data-i'));
+      const hit = box._hits[i];
+      box.classList.add('hidden');
+      if (hit && hit.go) hit.go();
+    });
+  });
+}
+
+function getFollowUpQuotes() {
+  const days = (data.settings && data.settings.followUpDays) || 14;
+  const cut = Date.now() - days * 86400000;
+  return (data.quotes || []).filter(q => {
+    if (q.followUpDone) return false;
+    if (q.status !== 'sent') return false;
+    const t = new Date(q.updatedAt || q.createdAt || 0).getTime();
+    return t && t < cut;
+  }).sort((a, b) => new Date(a.updatedAt || a.createdAt) - new Date(b.updatedAt || b.createdAt));
+}
+
+function markQuoteFollowedUp(id) {
+  const q = (data.quotes || []).find(x => x.id === id);
+  if (!q) return;
+  q.followUpDone = true;
+  logAudit('follow_up', q.quoteNumber || id);
+  saveData();
+  renderDashboard();
+}
+
+function clientHistoryHtml(clientId) {
+  const quotes = (data.quotes || []).filter(q => q.clientId === clientId)
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  const invoices = (data.invoices || []).filter(i => i.clientId === clientId)
+    .sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+  const rev = invoices.reduce((s, inv) => s + invoicePaidTotal(inv), 0);
+  const open = invoices.filter(i => i.status !== 'paid' && i.status !== 'cancelled')
+    .reduce((s, inv) => s + invoiceBalance(inv), 0);
+
+  let html = '';
+  html += `<div class="entity-detail"><span class="entity-detail-label">Quotes</span><span class="entity-detail-value">${quotes.length}</span></div>`;
+  html += `<div class="entity-detail"><span class="entity-detail-label">Invoices</span><span class="entity-detail-value">${invoices.length}</span></div>`;
+  html += `<div class="entity-detail"><span class="entity-detail-label">Collected</span><span class="entity-detail-value">${formatNGN(rev)}</span></div>`;
+  html += `<div class="entity-detail"><span class="entity-detail-label">Open balance</span><span class="entity-detail-value">${formatNGN(open)}</span></div>`;
+
+  if (quotes.length) {
+    html += '<div class="client-history-section"><p class="client-history-heading">Recent quotes</p><div class="client-history-cards">';
+    quotes.slice(0, 4).forEach(q => {
+      const dateStr = q.createdAt ? new Date(q.createdAt).toLocaleDateString() : '—';
+      html += `<div class="client-mini-card">
+        <div class="client-mini-card-top">
+          <div class="client-mini-card-main">
+            <span class="client-mini-card-title">${escHtml(q.quoteNumber || 'Quote')}</span>
+            <span class="client-mini-card-sub">${escHtml(q.title || '—')} · ${escHtml(dateStr)}</span>
+          </div>
+          <span class="client-mini-card-price">${formatNGN(q.totalNGN || 0)}</span>
+        </div>
+        <div class="client-mini-card-meta">
+          <span class="entity-detail-label">Status</span>
+          ${statusPill(q.status)}
+        </div>
+        <div class="entity-card-actions client-mini-actions">
+          <button type="button" onclick="event.stopPropagation(); openQuote('${q.id}')">Open</button>
+          <button type="button" onclick="event.stopPropagation(); printQuoteById('${q.id}')">PDF</button>
+        </div>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
+
+  if (invoices.length) {
+    html += '<div class="client-history-section"><p class="client-history-heading">Recent invoices</p><div class="client-history-cards">';
+    invoices.slice(0, 4).forEach(inv => {
+      const dateStr = (inv.date || inv.createdAt || '').toString().slice(0, 10) || '—';
+      html += `<div class="client-mini-card">
+        <div class="client-mini-card-top">
+          <div class="client-mini-card-main">
+            <span class="client-mini-card-title">${escHtml(inv.invoiceNumber || 'Invoice')}</span>
+            <span class="client-mini-card-sub">${escHtml(inv.title || '—')} · ${escHtml(dateStr)}</span>
+          </div>
+          <span class="client-mini-card-price">${formatNGN(inv.totalNgn || 0)}</span>
+        </div>
+        <div class="client-mini-card-meta">
+          <span class="entity-detail-label">Status</span>
+          ${statusPill(inv.status)}
+        </div>
+        <div class="entity-card-actions client-mini-actions">
+          <button type="button" onclick="event.stopPropagation(); editInvoice('${inv.id}')">Open</button>
+          <button type="button" onclick="event.stopPropagation(); printInvoiceById('${inv.id}')">PDF</button>
+        </div>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
+
+  return html;
+}
+
+
 // -------------------- Persistence --------------------
 function loadData() {
   try {
@@ -274,6 +547,44 @@ function loadData() {
       if (!data.calendarEvents || !Array.isArray(data.calendarEvents)) data.calendarEvents = [];
       if (!data.invoices || !Array.isArray(data.invoices)) data.invoices = [];
       if (!data.nextInvoiceNum) data.nextInvoiceNum = 2001;
+      if (!data.auditLog || !Array.isArray(data.auditLog)) data.auditLog = [];
+      if (!data.noteTemplates || !Array.isArray(data.noteTemplates)) {
+        data.noteTemplates = [
+          { id: 't1', name: 'Payment terms (standard)', body: '70% mobilisation to commence, 10% on arrival at Nigerian cargo, 20% on delivery and installation.' },
+          { id: 't2', name: 'Validity 30 days', body: 'This quotation is valid for 30 days from the date of issue and is subject to exchange-rate confirmation.' },
+          { id: 't3', name: 'Warranty 12 months', body: '12 months manufacturer warranty from date of installation and commissioning.' }
+        ];
+      }
+      if (!data.numbering) {
+        data.numbering = {
+          quotePrefix: 'MQ-',
+          invoicePrefix: 'INV-',
+          nextQuoteNum: data.nextQuoteNum || 1001,
+          nextInvoiceNum: data.nextInvoiceNum || 2001
+        };
+      } else {
+        if (data.numbering.nextQuoteNum == null) data.numbering.nextQuoteNum = data.nextQuoteNum || 1001;
+        if (data.numbering.nextInvoiceNum == null) data.numbering.nextInvoiceNum = data.nextInvoiceNum || 2001;
+      }
+      if (!data.deviceProfile) {
+        data.deviceProfile = { name: 'This device', id: 'dev_' + Date.now().toString(36) };
+      }
+      if (!data.lastBackupAt) data.lastBackupAt = null;
+      if (!data.settings) data.settings = {};
+      if (data.settings.followUpDays == null) data.settings.followUpDays = 14;
+      if (data.settings.autoDeductStockOnPaid == null) data.settings.autoDeductStockOnPaid = true;
+      // Migrate invoices: payments array
+      (data.invoices || []).forEach(inv => {
+        if (!Array.isArray(inv.payments)) inv.payments = [];
+        if (inv.amountPaid == null) {
+          inv.amountPaid = (inv.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0);
+        }
+        if (!inv.docType) inv.docType = 'tax';
+        if (inv.stockDeducted == null) inv.stockDeducted = inv.status === 'paid';
+      });
+      (data.quotes || []).forEach(q => {
+        if (q.followUpDone == null) q.followUpDone = false;
+      });
       // Ensure every product has stock / lowStock numbers
       data.products.forEach(p => {
         if (typeof p.stock !== 'number' || isNaN(p.stock)) p.stock = 0;
@@ -333,6 +644,7 @@ function navigate(page) {
 
   const sidebarPage = (page === 'quote-editor') ? 'quotes'
     : (page === 'invoice-editor') ? 'invoices'
+    : (page === 'client-detail') ? 'clients'
     : page;
   document.querySelectorAll('.sidebar-link').forEach(a => {
     a.classList.toggle('active', a.dataset.page === sidebarPage);
@@ -351,6 +663,7 @@ function navigate(page) {
     calendar: 'Events',
     products: 'Inventory',
     clients: 'Clients',
+    'client-detail': 'Client',
     quotes: 'Quotes',
     'quote-editor': 'Quote Editor',
     invoices: 'Invoices',
@@ -390,6 +703,29 @@ function renderDashboard() {
   document.getElementById('stat-quotes').textContent = data.quotes.filter(q => q.status === 'draft' || q.status === 'sent').length;
   document.getElementById('stat-clients').textContent = data.clients.length;
   document.getElementById('stat-lowstock').textContent = data.products.filter(p => p.stock <= p.lowStock).length;
+  updateBackupBanner();
+  const fu = document.getElementById('followup-list');
+  if (fu) {
+    const list = getFollowUpQuotes();
+    if (!list.length) {
+      fu.innerHTML = '<p class="text-slate-400 text-sm">No follow-ups due. Quotes marked Sent older than your threshold will appear here.</p>';
+    } else {
+      fu.innerHTML = list.slice(0, 8).map(q => {
+        const c = getClient(q.clientId);
+        const age = Math.floor((Date.now() - new Date(q.updatedAt || q.createdAt).getTime()) / 86400000);
+        return `<div class="flex justify-between items-center py-2 border-b border-slate-100 gap-2">
+          <div class="min-w-0">
+            <p class="font-medium text-sm truncate">${escHtml(q.quoteNumber || '')} · ${escHtml(c ? c.name : '—')}</p>
+            <p class="text-xs text-slate-500">Sent ${age}d ago · ${escHtml(q.title || '')}</p>
+          </div>
+          <div class="flex gap-1 shrink-0">
+            <button type="button" class="text-xs text-brand-600 underline" onclick="openQuote('${q.id}')">Open</button>
+            <button type="button" class="text-xs text-slate-500 underline" onclick="markQuoteFollowedUp('${q.id}')">Done</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
 
   const recent = [...data.quotes].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
   const container = document.getElementById('recent-quotes');
@@ -524,13 +860,24 @@ function renderDashUpcomingEvents() {
 }
 
 function statusClass(s) {
+  const key = String(s || 'draft').toLowerCase();
   const map = {
-    draft: 'bg-slate-100 text-slate-700',
-    sent: 'bg-blue-100 text-blue-800',
-    accepted: 'bg-green-100 text-green-800',
-    rejected: 'bg-red-100 text-red-800'
+    draft: 'status-pill status-draft',
+    sent: 'status-pill status-sent',
+    accepted: 'status-pill status-accepted',
+    rejected: 'status-pill status-rejected',
+    paid: 'status-pill status-paid',
+    unpaid: 'status-pill status-unpaid',
+    partial: 'status-pill status-partial',
+    overdue: 'status-pill status-overdue',
+    cancelled: 'status-pill status-cancelled'
   };
-  return map[s] || 'bg-slate-100';
+  return map[key] || 'status-pill status-draft';
+}
+
+function statusPill(s) {
+  const label = String(s || 'draft').toUpperCase();
+  return `<span class="${statusClass(s)}">${escHtml(label)}</span>`;
 }
 
 function updateRatesDisplay() {
@@ -1158,7 +1505,7 @@ function renderClients() {
     return `<div class="entity-card" id="client-card-${c.id}">
       <button type="button" class="entity-card-header"
         onclick="onEntityCardClick(event, 'client-card-${c.id}')"
-        ondblclick="editClient('${c.id}')">
+        ondblclick="openClientPage('${c.id}')">
         <span class="entity-card-chevron">▾</span>
         <span class="entity-card-main">
           <span class="entity-card-title">${escHtml(c.name)}</span>
@@ -1171,12 +1518,129 @@ function renderClients() {
         <div class="entity-detail"><span class="entity-detail-label">Email</span><span class="entity-detail-value">${escHtml(c.email || '—')}</span></div>
         <div class="entity-detail"><span class="entity-detail-label">Address</span><span class="entity-detail-value">${escHtml(c.address || '—')}</span></div>
         <div class="entity-card-actions">
-          <button type="button" onclick="editClient('${c.id}')">Edit</button>
-          <button type="button" class="danger" onclick="if(confirm('Delete client?')) deleteClient('${c.id}')">Delete</button>
+          <button type="button" onclick="event.stopPropagation(); openClientPage('${c.id}')">Open</button>
+          <button type="button" onclick="event.stopPropagation(); editClient('${c.id}')">Edit</button>
+          <button type="button" class="danger" onclick="event.stopPropagation(); if(confirm('Delete client?')) deleteClient('${c.id}')">Delete</button>
         </div>
       </div>
     </div>`;
   }).join('');
+}
+
+let currentClientId = null;
+
+function openClientPage(id) {
+  const c = getClient(id);
+  if (!c) return;
+  currentClientId = id;
+  navigate('client-detail');
+  renderClientDetailPage();
+}
+
+function renderClientDetailPage() {
+  const root = document.getElementById('client-detail-root');
+  if (!root) return;
+  const c = getClient(currentClientId);
+  if (!c) {
+    root.innerHTML = '<p class="text-slate-500">Client not found.</p>';
+    return;
+  }
+  const quotes = (data.quotes || []).filter(q => q.clientId === c.id)
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  const invoices = (data.invoices || []).filter(i => i.clientId === c.id)
+    .sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+  const collected = invoices.reduce((s, inv) => s + invoicePaidTotal(inv), 0);
+  const openBal = invoices.filter(i => i.status !== 'paid' && i.status !== 'cancelled')
+    .reduce((s, inv) => s + invoiceBalance(inv), 0);
+  const quoted = quotes.reduce((s, q) => s + (Number(q.totalNGN) || 0), 0);
+
+  root.innerHTML = `
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+      <button type="button" onclick="navigate('clients')" class="text-sm text-brand-600 hover:underline">← Back to Clients</button>
+      <h3 class="font-semibold text-lg text-slate-800">${escHtml(c.name)}</h3>
+      <div class="ml-auto flex gap-2">
+        <button type="button" onclick="editClient('${c.id}')" class="px-3 py-1.5 bg-slate-100 rounded-lg text-sm font-medium">Edit</button>
+        <button type="button" onclick="showNewQuote(); document.getElementById('quote-client').value='${c.id}'" class="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-medium">New quote</button>
+        <button type="button" onclick="showNewInvoice(); populateInvoiceClientSelect('${c.id}')" class="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm font-medium">New invoice</button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 lg:col-span-1">
+        <h4 class="font-semibold text-slate-800 mb-3">Client details</h4>
+        <div class="entity-detail"><span class="entity-detail-label">Contact</span><span class="entity-detail-value">${escHtml(c.contact || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Phone</span><span class="entity-detail-value">${escHtml(c.phone || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Email</span><span class="entity-detail-value">${escHtml(c.email || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Address</span><span class="entity-detail-value">${escHtml(c.address || '—')}</span></div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 lg:col-span-2">
+        <h4 class="font-semibold text-slate-800 mb-3">History with Medicano</h4>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="stat-mini"><p class="stat-mini-label">Quotes</p><p class="stat-mini-value">${quotes.length}</p></div>
+          <div class="stat-mini"><p class="stat-mini-label">Invoices</p><p class="stat-mini-value">${invoices.length}</p></div>
+          <div class="stat-mini"><p class="stat-mini-label">Quoted</p><p class="stat-mini-value">${formatNGN(quoted)}</p></div>
+          <div class="stat-mini"><p class="stat-mini-label">Collected</p><p class="stat-mini-value">${formatNGN(collected)}</p></div>
+        </div>
+        <div class="entity-detail mt-3"><span class="entity-detail-label">Open balance</span><span class="entity-detail-value">${formatNGN(openBal)}</span></div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+        <h4 class="font-semibold text-slate-800 mb-3">Quotes</h4>
+        <div class="client-history-cards">
+          ${quotes.length ? quotes.map(q => {
+            const dateStr = q.createdAt ? new Date(q.createdAt).toLocaleDateString() : '—';
+            return `<div class="client-mini-card">
+              <div class="client-mini-card-top">
+                <div class="client-mini-card-main">
+                  <span class="client-mini-card-title">${escHtml(q.quoteNumber || 'Quote')}</span>
+                  <span class="client-mini-card-sub">${escHtml(q.title || '—')} · ${escHtml(dateStr)}</span>
+                </div>
+                <span class="client-mini-card-price">${formatNGN(q.totalNGN || 0)}</span>
+              </div>
+              <div class="client-mini-card-meta">
+                <span class="entity-detail-label">Status</span>
+                ${statusPill(q.status)}
+              </div>
+              <div class="entity-card-actions client-mini-actions">
+                <button type="button" onclick="openQuote('${q.id}')">Open</button>
+                <button type="button" onclick="printQuoteById('${q.id}')">PDF</button>
+                <button type="button" onclick="createInvoiceFromQuote('${q.id}')">Invoice</button>
+              </div>
+            </div>`;
+          }).join('') : '<p class="text-sm text-slate-400">No quotes yet for this client.</p>'}
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+        <h4 class="font-semibold text-slate-800 mb-3">Invoices</h4>
+        <div class="client-history-cards">
+          ${invoices.length ? invoices.map(inv => {
+            const dateStr = (inv.date || inv.createdAt || '').toString().slice(0, 10) || '—';
+            return `<div class="client-mini-card">
+              <div class="client-mini-card-top">
+                <div class="client-mini-card-main">
+                  <span class="client-mini-card-title">${escHtml(inv.invoiceNumber || 'Invoice')}</span>
+                  <span class="client-mini-card-sub">${escHtml(inv.title || '—')} · ${escHtml(dateStr)}</span>
+                </div>
+                <span class="client-mini-card-price">${formatNGN(inv.totalNgn || 0)}</span>
+              </div>
+              <div class="client-mini-card-meta">
+                <span class="entity-detail-label">Status</span>
+                ${statusPill(inv.status)}
+              </div>
+              <div class="entity-detail"><span class="entity-detail-label">Paid</span><span class="entity-detail-value">${formatNGN(invoicePaidTotal(inv))}</span></div>
+              <div class="entity-detail"><span class="entity-detail-label">Balance</span><span class="entity-detail-value">${formatNGN(invoiceBalance(inv))}</span></div>
+              <div class="entity-card-actions client-mini-actions">
+                <button type="button" onclick="editInvoice('${inv.id}')">Open</button>
+                <button type="button" onclick="printInvoiceById('${inv.id}')">PDF</button>
+                <button type="button" onclick="promptAddPayment('${inv.id}')">Record payment</button>
+              </div>
+            </div>`;
+          }).join('') : '<p class="text-sm text-slate-400">No invoices yet for this client.</p>'}
+        </div>
+      </div>
+    </div>`;
 }
 
 function showClientForm(id = null) {
@@ -1237,7 +1701,7 @@ function renderQuotes() {
   const el = document.getElementById('quotes-list');
   if (!el) return;
   if (!list.length) {
-    el.innerHTML = '<div class="entity-empty">No quotes yet</div>';
+    el.innerHTML = '<div class="entity-empty">No quotes yet. <button type="button" class="text-brand-600 underline" onclick="showNewQuote()">Create a quote</button></div>';
     return;
   }
   el.innerHTML = list.map(q => {
@@ -1251,19 +1715,20 @@ function renderQuotes() {
         <span class="entity-card-chevron">▾</span>
         <span class="entity-card-main">
           <span class="entity-card-title">${escHtml(clientName)}</span>
-          <span class="entity-card-sub">${escHtml(q.quoteNumber || '')} · ${escHtml(q.title || '')} · ${escHtml(q.status || '')}</span>
+          <span class="entity-card-sub">${escHtml(q.quoteNumber || '')} · ${escHtml(q.title || '')}</span>
         </span>
         <span class="entity-card-price">${formatNGN(q.totalNGN)}</span>
       </button>
       <div class="entity-card-body">
         <div class="entity-detail"><span class="entity-detail-label">Quote #</span><span class="entity-detail-value">${escHtml(q.quoteNumber || '')}</span></div>
         <div class="entity-detail"><span class="entity-detail-label">Title</span><span class="entity-detail-value">${escHtml(q.title || '')}</span></div>
-        <div class="entity-detail"><span class="entity-detail-label">Status</span><span class="entity-detail-value"><span class="text-xs px-2 py-0.5 rounded-full ${statusClass(q.status)}">${escHtml(q.status || '')}</span></span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Status</span><span class="entity-detail-value">${statusPill(q.status)}</span></div>
         <div class="entity-detail"><span class="entity-detail-label">Date</span><span class="entity-detail-value">${escHtml(dateStr)}</span></div>
         <div class="entity-detail"><span class="entity-detail-label">Total</span><span class="entity-detail-value">${formatNGN(q.totalNGN)}</span></div>
         <div class="entity-card-actions">
-          <button type="button" onclick="openQuote('${q.id}')">Open</button>
-          <button type="button" onclick="createInvoiceFromQuote('${q.id}')">Invoice</button>
+          <button type="button" onclick="event.stopPropagation(); openQuote('${q.id}')">Open</button>
+          <button type="button" onclick="event.stopPropagation(); printQuoteById('${q.id}')">PDF</button>
+          <button type="button" onclick="event.stopPropagation(); createInvoiceFromQuote('${q.id}')">Invoice</button>
           <button type="button" class="danger" onclick="if(confirm('Delete quote?')) { data.quotes = data.quotes.filter(x => x.id !== '${q.id}'); saveData(); renderQuotes(); renderDashboard(); }">Delete</button>
         </div>
       </div>
@@ -1537,7 +2002,7 @@ function saveQuote() {
     id: currentQuoteId || uid(),
     quoteNumber: currentQuoteId
       ? data.quotes.find(q => q.id === currentQuoteId).quoteNumber
-      : 'MQ-' + (data.nextQuoteNum++),
+      : nextQuoteNumber(),
     clientId,
     title,
     validUntil: document.getElementById('quote-valid').value || null,
@@ -1561,6 +2026,7 @@ function saveQuote() {
     currentQuoteId = quote.id;
   }
   saveData();
+  logAudit('quote_save', quote.quoteNumber);
   alert('Quote saved successfully: ' + quote.quoteNumber);
   document.getElementById('quote-editor-title').textContent = `Quote ${quote.quoteNumber}`;
   document.getElementById('btn-delete-quote').classList.remove('hidden');
@@ -1794,7 +2260,7 @@ function renderInvoices() {
   let list = (data.invoices || []).slice().sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
   if (filter) list = list.filter(inv => inv.status === filter);
   if (!list.length) {
-    el.innerHTML = '<div class="entity-empty">No invoices yet. Create one or convert a quote.</div>';
+    el.innerHTML = '<div class="entity-empty">No invoices yet. <button type="button" class="text-brand-600 underline" onclick="showNewInvoice()">New invoice</button> or convert an accepted quote.</div>';
     return;
   }
   const statusColors = {
@@ -1817,19 +2283,22 @@ function renderInvoices() {
         <span class="entity-card-chevron">▾</span>
         <span class="entity-card-main">
           <span class="entity-card-title">${escHtml(clientName)}</span>
-          <span class="entity-card-sub">${escHtml(inv.invoiceNumber || '')} · ${escHtml(inv.title || '')} · ${(inv.status || 'draft').toUpperCase()}</span>
+          <span class="entity-card-sub">${escHtml(inv.invoiceNumber || '')} · ${escHtml(inv.title || '')}</span>
         </span>
         <span class="entity-card-price">${formatNGN(inv.totalNgn || 0)}</span>
       </button>
       <div class="entity-card-body">
         <div class="entity-detail"><span class="entity-detail-label">Invoice #</span><span class="entity-detail-value">${escHtml(inv.invoiceNumber || '')}</span></div>
         <div class="entity-detail"><span class="entity-detail-label">Title</span><span class="entity-detail-value">${escHtml(inv.title || '')}</span></div>
-        <div class="entity-detail"><span class="entity-detail-label">Status</span><span class="entity-detail-value"><span class="px-2 py-0.5 rounded text-xs font-medium ${sc}">${(inv.status || 'draft').toUpperCase()}</span></span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Status</span><span class="entity-detail-value">${statusPill(inv.status)}</span></div>
         <div class="entity-detail"><span class="entity-detail-label">Date</span><span class="entity-detail-value">${escHtml((inv.date || '').slice(0, 10))}</span></div>
         <div class="entity-detail"><span class="entity-detail-label">Total</span><span class="entity-detail-value">${formatNGN(inv.totalNgn || 0)}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Paid</span><span class="entity-detail-value">${formatNGN(invoicePaidTotal(inv))}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Balance</span><span class="entity-detail-value">${formatNGN(invoiceBalance(inv))}</span></div>
         <div class="entity-card-actions">
           <button type="button" onclick="event.stopPropagation(); editInvoice('${inv.id}')">Edit</button>
           <button type="button" onclick="event.stopPropagation(); printInvoiceById('${inv.id}')">PDF</button>
+          <button type="button" onclick="event.stopPropagation(); promptAddPayment('${inv.id}')">Record payment</button>
         </div>
       </div>
     </div>`;
@@ -1850,6 +2319,7 @@ function showNewInvoice() {
   invoiceItemCounter = 0;
   document.getElementById('invoice-editor-title').textContent = 'New Invoice';
   document.getElementById('btn-delete-invoice')?.classList.add('hidden');
+  setTimeout(renderInvoicePaymentsPanel, 0);
   populateInvoiceClientSelect();
   document.getElementById('inv-title').value = '';
   document.getElementById('inv-status').value = 'draft';
@@ -1876,6 +2346,8 @@ function editInvoice(id) {
   populateInvoiceClientSelect(inv.clientId);
   document.getElementById('inv-title').value = inv.title || '';
   document.getElementById('inv-status').value = inv.status || 'draft';
+  const dt = document.getElementById('inv-doc-type');
+  if (dt) dt.value = inv.docType || 'tax';
   document.getElementById('inv-date').value = (inv.date || '').slice(0, 10);
   document.getElementById('inv-due').value = (inv.dueDate || '').slice(0, 10);
   document.getElementById('inv-quote-ref').value = inv.quoteRef || '';
@@ -1889,6 +2361,8 @@ function editInvoice(id) {
   if (!(inv.items || []).length) addInvoiceItemRow();
   recalcInvoiceTotal();
   navigate('invoice-editor');
+  renderInvoicePaymentsPanel();
+  populateTemplateSelects();
 }
 
 function addInvoiceItemRow(item) {
@@ -2016,28 +2490,47 @@ function saveInvoice() {
     totalNgn: total,
     updatedAt: new Date().toISOString()
   };
+  payload.bankName = (document.getElementById('inv-bank-name')?.value || '').trim();
+  payload.accountName = (document.getElementById('inv-account-name')?.value || '').trim();
+  payload.accountNumber = (document.getElementById('inv-account-number')?.value || '').trim();
+  payload.bankCode = (document.getElementById('inv-bank-code')?.value || '').trim();
+  payload.docType = document.getElementById('inv-doc-type')?.value || 'tax';
   if (!data.invoices) data.invoices = [];
   if (currentInvoiceId) {
     const idx = data.invoices.findIndex(x => x.id === currentInvoiceId);
     if (idx >= 0) {
-      data.invoices[idx] = { ...data.invoices[idx], ...payload };
+      const prev = data.invoices[idx];
+      data.invoices[idx] = {
+        ...prev,
+        ...payload,
+        payments: prev.payments || [],
+        amountPaid: prev.amountPaid || 0,
+        stockDeducted: prev.stockDeducted || false
+      };
+      refreshInvoicePaymentStatus(data.invoices[idx], { silent: true });
     }
   } else {
-    const num = data.nextInvoiceNum || 2001;
-    data.nextInvoiceNum = num + 1;
     currentInvoiceId = 'inv' + Date.now();
-    data.invoices.push({
+    const invNum = nextInvoiceNumber();
+    const inv = {
       id: currentInvoiceId,
-      invoiceNumber: 'INV-' + num,
+      invoiceNumber: invNum,
       createdAt: new Date().toISOString(),
+      payments: [],
+      amountPaid: 0,
+      stockDeducted: false,
       ...payload
-    });
-    document.getElementById('invoice-editor-title').textContent = 'Invoice INV-' + num;
+    };
+    refreshInvoicePaymentStatus(inv, { silent: true });
+    data.invoices.push(inv);
+    document.getElementById('invoice-editor-title').textContent = 'Invoice ' + invNum;
     document.getElementById('btn-delete-invoice')?.classList.remove('hidden');
   }
   saveData();
+  logAudit('invoice_save', (data.invoices.find(x => x.id === currentInvoiceId) || {}).invoiceNumber || '');
   alert('Invoice saved.');
   renderInvoices();
+  renderInvoicePaymentsPanel();
 }
 
 function deleteCurrentInvoice() {
@@ -2051,14 +2544,16 @@ function deleteCurrentInvoice() {
 function createInvoiceFromQuote(quoteId) {
   const q = (data.quotes || []).find(x => x.id === quoteId);
   if (!q) { alert('Quote not found.'); return; }
+  if (!confirm('Create an invoice from quote ' + (q.quoteNumber || '') + '?')) return;
   showNewInvoice();
   populateInvoiceClientSelect(q.clientId);
   document.getElementById('inv-title').value = q.title || 'Invoice';
   document.getElementById('inv-quote-ref').value = q.quoteNumber || '';
   document.getElementById('inv-discount').value = q.discount || 0;
   document.getElementById('inv-notes').value = q.notes || '';
-  const tbody = document.getElementById('invoice-items-list');
-  tbody.innerHTML = '';
+  document.getElementById('inv-status').value = 'sent';
+  const list = document.getElementById('invoice-items-list');
+  list.innerHTML = '';
   invoiceItemCounter = 0;
   (q.items || []).forEach(it => {
     const p = getProduct(it.productId);
@@ -2072,6 +2567,15 @@ function createInvoiceFromQuote(quoteId) {
   });
   if (!(q.items || []).length) addInvoiceItemRow();
   recalcInvoiceTotal();
+  // Mark quote accepted
+  if (q.status === 'draft' || q.status === 'sent') {
+    q.status = 'accepted';
+    q.updatedAt = new Date().toISOString();
+    saveData();
+    logAudit('quote_accepted', q.quoteNumber || quoteId);
+  }
+  logAudit('quote_to_invoice', q.quoteNumber || quoteId);
+  alert('Invoice draft ready from ' + (q.quoteNumber || 'quote') + '. Review and Save.');
 }
 
 function printInvoice() {
@@ -2172,7 +2676,8 @@ function generateInvoicePdf(inv) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(20);
     doc.setTextColor(...TEAL);
-    doc.text('INVOICE', W - M, headerTop + 14, { align: 'right' });
+    const docLabel = (String(inv.docType || '').toLowerCase() === 'proforma') ? 'PROFORMA INVOICE' : 'INVOICE';
+    doc.text(docLabel, W - M, headerTop + 14, { align: 'right' });
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(...INK);
@@ -2276,11 +2781,11 @@ function generateInvoicePdf(inv) {
     const colUnit = W - M - 175;       // Unit Price column right edge
     const descMaxW = colUnit - colDesc - 24;
 
-    // Header row
+    // Header row — text sits between horizontal rules with clear padding
     doc.setDrawColor(...LINE);
     doc.setLineWidth(0.8);
     doc.line(M, y, W - M, y);
-    y += 14;
+    y += 16; // space above header text
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(...TEAL);
@@ -2288,11 +2793,11 @@ function generateInvoicePdf(inv) {
     doc.text('Unit Price', colUnit, y, { align: 'right' });
     doc.text('Qty', colQty, y, { align: 'right' });
     doc.text('Amount', colAmount, y, { align: 'right' });
-    y += 8;
+    y += 10; // space below header text before rule
     doc.setDrawColor(...LINE);
     doc.setLineWidth(0.8);
     doc.line(M, y, W - M, y);
-    y += 16;
+    y += 4; // small gap after header rule before first row
 
     items.forEach((it) => {
       if (y > H - 160) { doc.addPage(); y = 48; }
@@ -2303,48 +2808,50 @@ function generateInvoicePdf(inv) {
       const unit = Number(it.unitNgn) || 0;
       const line = it.lineNgn != null ? it.lineNgn : qty * unit;
 
-      // Name (left)
+      // Content starts with padding under the previous rule
+      y += 14;
+      const textY = y;
+
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10.5);
       doc.setTextColor(...INK);
       const nameLines = doc.splitTextToSize(String(name), descMaxW);
-      doc.text(nameLines[0] || '', colDesc, y);
+      doc.text(nameLines[0] || '', colDesc, textY);
 
-      // Numbers on same baseline as first name line (right-aligned)
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
       doc.setTextColor(...INK);
-      doc.text(formatNairaPlain(unit), colUnit, y, { align: 'right' });
-      doc.text(String(qty), colQty, y, { align: 'right' });
+      doc.text(formatNairaPlain(unit), colUnit, textY, { align: 'right' });
+      doc.text(String(qty), colQty, textY, { align: 'right' });
       doc.setFont('helvetica', 'bold');
-      doc.text(formatNairaPlain(line), colAmount, y, { align: 'right' });
+      doc.text(formatNairaPlain(line), colAmount, textY, { align: 'right' });
 
-      let rowH = 12;
-      // Optional description under name
+      let extra = 0;
       if (desc) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.5);
         doc.setTextColor(...GRAY);
         const dLines = doc.splitTextToSize(desc, descMaxW).slice(0, 2);
         dLines.forEach((ln, i) => {
-          doc.text(ln, colDesc, y + 12 + i * 11);
+          doc.text(ln, colDesc, textY + 13 + i * 11);
         });
-        rowH = 12 + dLines.length * 11;
+        extra = dLines.length * 11 + 2;
       } else if (nameLines.length > 1) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10.5);
         doc.setTextColor(...INK);
-        doc.text(nameLines[1], colDesc, y + 12);
-        rowH = 24;
+        doc.text(nameLines[1], colDesc, textY + 13);
+        extra = 13;
       }
 
-      y += rowH + 10;
+      // Keep text clearly above the rule (not sitting on it)
+      y = textY + extra + 16;
       doc.setDrawColor(...LINE);
       doc.setLineWidth(0.5);
-      doc.line(M, y - 4, W - M, y - 4);
+      doc.line(M, y, W - M, y);
     });
 
-    y += 10;
+    y += 14;
     // Totals
     const tx = W - M - 200;
     doc.setFont('helvetica', 'normal');
@@ -2365,7 +2872,7 @@ function generateInvoicePdf(inv) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.setTextColor(...TEAL);
-    doc.text('TOTAL DUE (NGN)', tx, y);
+    doc.text('TOTAL', tx, y);
     doc.text(formatNairaPlain(total), W - M, y, { align: 'right' });
     y += 28;
 
@@ -2666,6 +3173,20 @@ async function fetchAutoRates() {
 
 // -------------------- Settings --------------------
 function renderSettings() {
+  const n = data.numbering || {};
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+  set('set-quote-prefix', n.quotePrefix || 'MQ-');
+  set('set-invoice-prefix', n.invoicePrefix || 'INV-');
+  set('set-next-quote', n.nextQuoteNum || data.nextQuoteNum || 1001);
+  set('set-next-invoice', n.nextInvoiceNum || data.nextInvoiceNum || 2001);
+  set('set-followup-days', (data.settings && data.settings.followUpDays) || 14);
+  set('set-device-name', (data.deviceProfile && data.deviceProfile.name) || '');
+  const stockEl = document.getElementById('set-auto-stock');
+  if (stockEl) stockEl.checked = !data.settings || data.settings.autoDeductStockOnPaid !== false;
+  renderNoteTemplatesEditor();
+  renderAuditLog();
+  populateTemplateSelects();
+
   const c = data.company;
   document.getElementById('set-company').value = c.name || '';
   document.getElementById('set-email').value = c.email || '';
@@ -2818,6 +3339,8 @@ function populateCategorySelect(selectedValue) {
 
 // -------------------- Data import/export --------------------
 function exportData() {
+  data.lastBackupAt = new Date().toISOString();
+  saveData();
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2825,6 +3348,25 @@ function exportData() {
   a.download = `medicano-backup-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
+  logAudit('backup', 'Full data export');
+  saveData();
+  updateBackupBanner();
+  alert('Backup downloaded. Keep this file somewhere safe.');
+}
+
+function updateBackupBanner() {
+  const el = document.getElementById('backup-reminder');
+  if (!el) return;
+  const last = data.lastBackupAt ? new Date(data.lastBackupAt) : null;
+  const days = last ? Math.floor((Date.now() - last.getTime()) / 86400000) : 999;
+  if (days >= 7) {
+    el.classList.remove('hidden');
+    el.innerHTML = last
+      ? `Last backup was <strong>${days} day(s)</strong> ago. <button type="button" class="text-brand-700 font-semibold underline" onclick="exportData()">Download backup now</button>`
+      : `No backup yet. <button type="button" class="text-brand-700 font-semibold underline" onclick="exportData()">Download backup now</button>`;
+  } else {
+    el.classList.add('hidden');
+  }
 }
 
 function downloadCsv(filename, rows) {
@@ -4132,6 +4674,307 @@ function closeModal(id) {
   document.getElementById(id).classList.add('hidden');
 }
 
+
+function promptAddPayment(invId) {
+  const inv = (data.invoices || []).find(x => x.id === invId);
+  if (!inv) return;
+  const bal = invoiceBalance(inv);
+  const amount = prompt('Payment amount (NGN). Balance: ' + formatNGN(bal), String(Math.round(bal)));
+  if (amount == null) return;
+  const method = prompt('Method (transfer / cash / cheque / other)', 'transfer') || 'transfer';
+  const note = prompt('Note (optional)', '') || '';
+  addInvoicePayment(invId, amount, method, note);
+  renderInvoices();
+  if (currentInvoiceId === invId) renderInvoicePaymentsPanel();
+  renderDashboard();
+}
+
+function renderInvoicePaymentsPanel() {
+  const panel = document.getElementById('inv-payments-panel');
+  if (!panel) return;
+  const inv = currentInvoiceId ? (data.invoices || []).find(x => x.id === currentInvoiceId) : null;
+  if (!inv) {
+    panel.innerHTML = '<h4 class="font-semibold text-slate-800 mb-1">Payment tracking</h4><p class="text-sm text-slate-400">Save the invoice first, then record payments here.</p>';
+    return;
+  }
+  const paid = invoicePaidTotal(inv);
+  const bal = invoiceBalance(inv);
+  const rows = (inv.payments || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  panel.innerHTML = `
+    <div class="flex items-center justify-between gap-2 mb-3">
+      <h4 class="font-semibold text-slate-800">Payment tracking</h4>
+      <span class="text-xs text-slate-500">Partial payments update status automatically</span>
+    </div>
+    <div class="flex flex-wrap gap-3 text-sm mb-3">
+      <span>Total: <strong>${formatNGN(inv.totalNgn || 0)}</strong></span>
+      <span>Paid: <strong class="text-emerald-700">${formatNGN(paid)}</strong></span>
+      <span>Balance: <strong class="text-rose-700">${formatNGN(bal)}</strong></span>
+    </div>
+    <div class="flex flex-wrap gap-2 mb-3">
+      <input id="pay-amount" type="number" min="0" step="0.01" placeholder="Amount" class="input-compact" style="width:7rem" />
+      <select id="pay-method" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm">
+        <option value="transfer">Transfer</option>
+        <option value="cash">Cash</option>
+        <option value="cheque">Cheque</option>
+        <option value="other">Other</option>
+      </select>
+      <input id="pay-date" type="date" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm" />
+      <input id="pay-note" type="text" placeholder="Note" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm flex-1 min-w-[8rem]" />
+      <button type="button" class="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm" onclick="submitInvoicePayment()">Add</button>
+    </div>
+    <div class="space-y-1 text-sm">
+      ${rows.length ? rows.map(p => `<div class="flex justify-between gap-2 border-b border-slate-100 py-1">
+        <span>${escHtml(p.date || '')} · ${escHtml(p.method || '')} · ${escHtml(p.note || '')}</span>
+        <span class="font-semibold">${formatNGN(p.amount)}
+          <button type="button" class="text-rose-500 text-xs ml-2" onclick="removeInvoicePayment('${inv.id}','${p.id}'); renderInvoicePaymentsPanel(); renderInvoices();">✕</button>
+        </span>
+      </div>`).join('') : '<p class="text-slate-400">No payments yet.</p>'}
+    </div>`;
+  const d = document.getElementById('pay-date');
+  if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);
+}
+
+function submitInvoicePayment() {
+  if (!currentInvoiceId) { alert('Save the invoice first.'); return; }
+  const amount = document.getElementById('pay-amount')?.value;
+  const method = document.getElementById('pay-method')?.value || 'transfer';
+  const note = document.getElementById('pay-note')?.value || '';
+  const date = document.getElementById('pay-date')?.value || '';
+  addInvoicePayment(currentInvoiceId, amount, method, note, date);
+  renderInvoicePaymentsPanel();
+  renderInvoices();
+  renderDashboard();
+}
+
+function saveNumberingSettings() {
+  if (!data.numbering) data.numbering = {};
+  data.numbering.quotePrefix = document.getElementById('set-quote-prefix')?.value || 'MQ-';
+  data.numbering.invoicePrefix = document.getElementById('set-invoice-prefix')?.value || 'INV-';
+  const nq = parseInt(document.getElementById('set-next-quote')?.value, 10);
+  const ni = parseInt(document.getElementById('set-next-invoice')?.value, 10);
+  if (!isNaN(nq)) { data.numbering.nextQuoteNum = nq; data.nextQuoteNum = nq; }
+  if (!isNaN(ni)) { data.numbering.nextInvoiceNum = ni; data.nextInvoiceNum = ni; }
+  data.settings = data.settings || {};
+  data.settings.followUpDays = parseInt(document.getElementById('set-followup-days')?.value, 10) || 14;
+  data.settings.autoDeductStockOnPaid = !!document.getElementById('set-auto-stock')?.checked;
+  if (data.deviceProfile) data.deviceProfile.name = document.getElementById('set-device-name')?.value || data.deviceProfile.name;
+  saveData();
+  logAudit('settings', 'Numbering / workflow settings saved');
+  alert('Settings saved.');
+}
+
+function renderNoteTemplatesEditor() {
+  const el = document.getElementById('note-templates-editor');
+  if (!el) return;
+  const list = data.noteTemplates || [];
+  el.innerHTML = list.map(t => `
+    <div class="settings-term-row" data-id="${t.id}">
+      <input class="settings-input nt-name" value="${escHtml(t.name)}" placeholder="Template name" />
+      <textarea class="settings-input nt-body" rows="2" placeholder="Body">${escHtml(t.body)}</textarea>
+      <button type="button" class="settings-secondary-btn" onclick="this.closest('[data-id]').remove()">Remove</button>
+    </div>`).join('') || '<p class="settings-help">No templates yet.</p>';
+}
+
+function saveNoteTemplates() {
+  const rows = document.querySelectorAll('#note-templates-editor [data-id]');
+  data.noteTemplates = [...rows].map(row => ({
+    id: row.getAttribute('data-id') || uid(),
+    name: row.querySelector('.nt-name')?.value.trim() || 'Template',
+    body: row.querySelector('.nt-body')?.value.trim() || ''
+  })).filter(t => t.body);
+  saveData();
+  logAudit('templates', 'Note templates saved');
+  alert('Templates saved.');
+  populateTemplateSelects();
+}
+
+function addNoteTemplateRow() {
+  if (!data.noteTemplates) data.noteTemplates = [];
+  data.noteTemplates.push({ id: uid(), name: 'New template', body: '' });
+  renderNoteTemplatesEditor();
+}
+
+function populateTemplateSelects() {
+  const opts = '<option value="">Insert template…</option>' +
+    (data.noteTemplates || []).map(t => `<option value="${t.id}">${escHtml(t.name)}</option>`).join('');
+  ['quote-template-select', 'inv-template-select'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = opts;
+  });
+}
+
+function renderAuditLog() {
+  const el = document.getElementById('audit-log-list');
+  if (!el) return;
+  const log = (data.auditLog || []).slice(0, 80);
+  if (!log.length) { el.innerHTML = '<p class="text-slate-400 text-sm">No activity yet.</p>'; return; }
+  el.innerHTML = log.map(a => `
+    <div class="audit-row">
+      <span class="audit-time">${escHtml((a.at || '').replace('T', ' ').slice(0, 19))}</span>
+      <span class="audit-action">${escHtml(a.action)}</span>
+      <span class="audit-detail">${escHtml(a.detail || '')}</span>
+      <span class="audit-device">${escHtml(a.device || '')}</span>
+    </div>`).join('');
+}
+
+// jsPDF quote PDF (aligned with invoice layout)
+function generateQuotePdf(q) {
+  const co = data.company || {};
+  const client = getClient(q.clientId);
+  const logo = (typeof COMPANY_LOGO_DATAURL !== 'undefined') ? COMPANY_LOGO_DATAURL : null;
+  const discount = Number(q.discount) || 0;
+  const items = q.items || [];
+  const subtotal = q.subtotalNGN != null ? q.subtotalNGN : items.reduce((s, it) => s + (it.lineNGN || it.lineNgn || 0), 0);
+  const total = q.totalNGN != null ? q.totalNGN : subtotal * (1 - discount / 100);
+
+  loadJsPdf().then(JsPDF => {
+    const doc = new JsPDF({ unit: 'pt', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const M = 42;
+    const TEAL = [15, 118, 110];
+    const GRAY = [100, 116, 139];
+    const INK = [30, 41, 59];
+    const LINE = [226, 232, 240];
+    let y = 36;
+    try {
+      if (logo) {
+        const fmt = logo.indexOf('image/jpeg') >= 0 ? 'JPEG' : 'PNG';
+        doc.addImage(logo, fmt, M, y, 200, 40);
+      }
+    } catch (e) {}
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(...TEAL);
+    doc.text('QUOTATION', W - M, y + 14, { align: 'right' });
+    doc.setFontSize(11);
+    doc.setTextColor(...INK);
+    doc.text(String(q.quoteNumber || 'DRAFT'), W - M, y + 30, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...GRAY);
+    doc.text('Date: ' + new Date(q.createdAt || Date.now()).toLocaleDateString(), W - M, y + 44, { align: 'right' });
+    if (q.validUntil) doc.text('Valid until: ' + q.validUntil, W - M, y + 56, { align: 'right' });
+    y = 100;
+    doc.setDrawColor(...TEAL);
+    doc.setLineWidth(2);
+    doc.line(M, y, W - M, y);
+    y += 20;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...TEAL);
+    doc.text(co.name || 'Medicano Resources Limited', M, y);
+    y += 14;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...GRAY);
+    if (co.address) { doc.splitTextToSize(co.address, W * 0.65).forEach(ln => { doc.text(ln, M, y); y += 11; }); }
+    y += 8;
+    doc.setFontSize(9);
+    doc.text('BILL TO', M, y); y += 12;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...INK);
+    doc.text(client ? client.name : '—', M, y); y += 14;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...GRAY);
+    if (client && client.contact) { doc.text('Attn: ' + client.contact, M, y); y += 12; }
+    if (client && client.address) { doc.text(String(client.address), M, y); y += 12; }
+    y += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...INK);
+    doc.text('Project: ' + (q.title || ''), M, y); y += 16;
+
+    const colDesc = M, colAmount = W - M, colQty = W - M - 90, colUnit = W - M - 170;
+    const descMaxW = colUnit - colDesc - 20;
+    doc.setDrawColor(...LINE);
+    doc.line(M, y, W - M, y); y += 12;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...TEAL);
+    doc.text('Description', colDesc, y);
+    doc.text('Unit Price', colUnit, y, { align: 'right' });
+    doc.text('Qty', colQty, y, { align: 'right' });
+    doc.text('Amount', colAmount, y, { align: 'right' });
+    y += 6; doc.setDrawColor(...LINE); doc.line(M, y, W - M, y); y += 14;
+
+    items.forEach(it => {
+      if (y > H - 100) { doc.addPage(); y = 50; }
+      const name = it.name || 'Item';
+      const qty = Number(it.qty) || 0;
+      const unit = Number(it.unitNGN != null ? it.unitNGN : it.unitNgn) || 0;
+      const line = Number(it.lineNGN != null ? it.lineNGN : it.lineNgn) || (qty * unit);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...INK);
+      const nl = doc.splitTextToSize(String(name), descMaxW);
+      doc.text(nl[0] || '', colDesc, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatNairaPlain(unit), colUnit, y, { align: 'right' });
+      doc.text(String(qty), colQty, y, { align: 'right' });
+      doc.setFont('helvetica', 'bold');
+      doc.text(formatNairaPlain(line), colAmount, y, { align: 'right' });
+      y += 16;
+      doc.setDrawColor(...LINE);
+      doc.setLineWidth(0.4);
+      doc.line(M, y - 4, W - M, y - 4);
+    });
+
+    y += 12;
+    const tx = W - M - 180;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(...INK);
+    doc.text('Subtotal', tx, y);
+    doc.text(formatNairaPlain(subtotal), W - M, y, { align: 'right' });
+    if (discount > 0) {
+      y += 14;
+      doc.text('Discount (' + discount + '%)', tx, y);
+      doc.text('-' + formatNairaPlain(subtotal * discount / 100), W - M, y, { align: 'right' });
+    }
+    y += 8;
+    doc.setDrawColor(...TEAL);
+    doc.setLineWidth(1.2);
+    doc.line(tx, y, W - M, y);
+    y += 16;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...TEAL);
+    doc.text('TOTAL (NGN)', tx, y);
+    doc.text(formatNairaPlain(total), W - M, y, { align: 'right' });
+    y += 28;
+    if (q.notes) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...GRAY);
+      doc.text('NOTES', M, y); y += 12;
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...INK);
+      doc.splitTextToSize(String(q.notes), W - 2 * M).forEach(ln => { doc.text(ln, M, y); y += 11; });
+      y += 10;
+    }
+    // Signature block
+    if (y > H - 90) { doc.addPage(); y = 50; }
+    doc.setDrawColor(...LINE);
+    doc.line(M, y + 40, M + 180, y + 40);
+    doc.line(W - M - 180, y + 40, W - M, y + 40);
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY);
+    doc.text('Prepared by / Signature', M, y + 52);
+    doc.text('Client acknowledgement', W - M - 180, y + 52);
+
+    const safe = (s) => String(s || 'Quote').replace(/[\\/:*?"<>|]/g, ' ').trim().slice(0, 40);
+    doc.save(safe(client && client.name) + ' - ' + safe(q.quoteNumber) + '.pdf');
+  }).catch(err => alert(err.message || 'Could not generate quote PDF'));
+}
+
+function printQuoteById(id) {
+  const q = (data.quotes || []).find(x => x.id === id);
+  if (!q) { alert('Quote not found'); return; }
+  generateQuotePdf(q);
+}
+
 // -------------------- Init --------------------
 document.addEventListener('DOMContentLoaded', () => {
   loadData();
@@ -4165,6 +5008,20 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('product-category-filter')?.addEventListener('change', renderProducts);
   document.getElementById('client-search')?.addEventListener('input', renderClients);
   document.getElementById('quote-status-filter')?.addEventListener('change', renderQuotes);
+  document.getElementById('quote-search')?.addEventListener('input', renderQuotes);
+  document.getElementById('quote-date-from')?.addEventListener('change', renderQuotes);
+  document.getElementById('quote-date-to')?.addEventListener('change', renderQuotes);
+  document.getElementById('invoice-search')?.addEventListener('input', renderInvoices);
+  document.getElementById('invoice-date-from')?.addEventListener('change', renderInvoices);
+  document.getElementById('invoice-date-to')?.addEventListener('change', renderInvoices);
+  document.getElementById('global-search')?.addEventListener('input', (e) => runGlobalSearch(e.target.value));
+  document.getElementById('global-search')?.addEventListener('focus', (e) => runGlobalSearch(e.target.value));
+  document.addEventListener('click', (e) => {
+    const box = document.getElementById('global-search-results');
+    const input = document.getElementById('global-search');
+    if (box && input && !box.contains(e.target) && e.target !== input) box.classList.add('hidden');
+  });
+
 
   // Close modals on backdrop click
   ['modal-product', 'modal-client'].forEach(id => {
@@ -4193,6 +5050,39 @@ function closeSidebar() {
 }
 
 // PWA service worker (works when served over https or localhost)
+
+
+// -------------------- PWA install prompt (Chrome) --------------------
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('btn-install-app');
+  if (btn) btn.classList.remove('hidden');
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  const btn = document.getElementById('btn-install-app');
+  if (btn) btn.classList.add('hidden');
+});
+
+async function installMedicanoApp() {
+  if (!deferredInstallPrompt) {
+    alert('Install is not available right now.\n\nIn Chrome: Menu (⋮) → Save and share → Install page as app…\n\nRequirements: HTTPS (or localhost), and open the site in Chrome a few times.');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  const choice = await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  const btn = document.getElementById('btn-install-app');
+  if (btn) btn.classList.add('hidden');
+  if (choice && choice.outcome === 'accepted') {
+    console.log('Medicano installed');
+  }
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch((err) => {
