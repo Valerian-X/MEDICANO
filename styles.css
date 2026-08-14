@@ -3285,3 +3285,260 @@ html.dark .backup-reminder {
 html.dark ::-webkit-scrollbar-thumb {
   background: #444 !important;
 }
+
+
+/* =========================================================
+   FINAL POLISH — title, dark palette, calendars, surfaces
+   ========================================================= */
+
+/* Page title: larger + truly centered in header row */
+.app-topbar-row {
+  display: grid !important;
+  grid-template-columns: auto 1fr auto !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}
+.app-topbar-menu { grid-column: 1; justify-self: start; }
+.app-page-title,
+#page-title {
+  grid-column: 2 !important;
+  justify-self: center !important;
+  text-align: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 0.25rem !important;
+  font-size: clamp(1.55rem, 3.5vw, 2.1rem) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.035em !important;
+  line-height: 1.15 !important;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  order: unset !important;
+  flex: unset !important;
+}
+.app-topbar-actions {
+  grid-column: 3 !important;
+  justify-self: end !important;
+  margin-left: 0 !important;
+  order: unset !important;
+}
+
+/* Entity expanded body — same surface as card */
+.entity-card-body {
+  background: transparent !important;
+  border-top-color: rgba(26,26,26,0.06) !important;
+}
+
+/* ---------- Dark mode palette (match reference QA + company) ---------- */
+html.dark .app-page-title,
+html.dark #page-title {
+  color: #f8fafc !important;
+}
+
+/* Quick actions — exact palette family from reference */
+html.dark .qa-dark {
+  background: #0a0a0a !important;
+  color: #ffffff !important;
+}
+html.dark .qa-soft {
+  background: #2f2f2f !important;
+  color: #ffffff !important;
+}
+html.dark .qa-pink {
+  background: #5a3d4a !important;
+  color: #f5e6ec !important;
+}
+html.dark .qa-blue {
+  background: #2c3d55 !important;
+  color: #e8eef8 !important;
+}
+html.dark .dash-company-card {
+  background: linear-gradient(160deg, #163a34 0%, #1a4540 100%) !important;
+  color: #e8f0ee !important;
+}
+html.dark .dash-company-name { color: #ffffff !important; }
+html.dark .dash-company-kicker { color: #a7c4bc !important; opacity: 1 !important; }
+html.dark .dash-company-line { color: #c5d9d3 !important; opacity: 1 !important; }
+
+/* Dashboard mini-calendar matches Events calendar */
+html.dark .dash-side-grid .d,
+html.dark .dash-side-grid .dow {
+  color: #e2e8f0 !important;
+}
+html.dark .dash-side-grid .d.muted {
+  color: #475569 !important;
+  opacity: 1 !important;
+}
+html.dark .dash-side-grid .d:hover {
+  background: rgba(255,255,255,0.08) !important;
+}
+html.dark .dash-side-grid .d.today {
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.28) !important;
+}
+html.dark .dash-side-grid .d.selected {
+  background: #5a3d4a !important;
+  color: #fce7f3 !important;
+}
+html.dark .dash-side-month {
+  color: #f8fafc !important;
+}
+html.dark .dash-add-event-btn {
+  background: #f5cfe0 !important;
+  color: #1a1a1a !important;
+}
+
+/* Events calendar already uses .cal-day — reinforce */
+html.dark .cal-day {
+  color: #e2e8f0 !important;
+}
+html.dark .cal-day.empty { color: transparent !important; }
+html.dark .cal-day:hover:not(.empty) {
+  background: rgba(255,255,255,0.08) !important;
+}
+html.dark .cal-day.selected {
+  background: #5a3d4a !important;
+  color: #fce7f3 !important;
+}
+html.dark .cal-month-panel,
+html.dark .cal-day-panel,
+html.dark .dash-intel-side {
+  background: #1c1c1c !important;
+  color: #f1f5f9 !important;
+}
+
+/* Entity cards — no light-grey expanded body */
+html.dark .entity-card {
+  background: #1c1c1c !important;
+  color: #f1f5f9 !important;
+}
+html.dark .entity-card-body {
+  background: #1c1c1c !important;
+  border-top-color: rgba(255,255,255,0.08) !important;
+}
+html.dark .entity-detail {
+  border-bottom-color: rgba(255,255,255,0.08) !important;
+}
+html.dark .entity-detail-label { color: #94a3b8 !important; }
+html.dark .entity-detail-value { color: #f8fafc !important; }
+html.dark .entity-card-title { color: #f8fafc !important; }
+html.dark .entity-card-sub { color: #94a3b8 !important; }
+html.dark .entity-card-price { color: #f8fafc !important; }
+html.dark .entity-card-header { color: #f8fafc !important; }
+html.dark .entity-card-actions button {
+  background: #2a2a2a !important;
+  color: #f1f5f9 !important;
+}
+html.dark .entity-card-actions button.danger {
+  background: rgba(239,68,68,0.18) !important;
+  color: #fca5a5 !important;
+}
+
+/* Inventory metrics — dark surfaces, light text (not washed pastels) */
+html.dark .inv-metric-period {
+  background: #2a2a2a !important;
+  color: #f8fafc !important;
+}
+html.dark .inv-metric-in {
+  background: #1e3a2f !important;
+  color: #d1fae5 !important;
+}
+html.dark .inv-metric-out {
+  background: #3a1e28 !important;
+  color: #fce7f3 !important;
+}
+html.dark .inv-metric-sku {
+  background: #1e2a3a !important;
+  color: #dbeafe !important;
+}
+html.dark .inv-metric-low {
+  background: #3a3420 !important;
+  color: #fef3c7 !important;
+}
+html.dark .inv-metric-label {
+  color: inherit !important;
+  opacity: 0.75 !important;
+}
+html.dark .inv-metric-value {
+  color: inherit !important;
+}
+html.dark .inv-period-select {
+  background: #0f172a !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+/* Settings — no cream flash / light panels with light text */
+html.dark .settings-card {
+  background: #1c1c1c !important;
+  color: #f1f5f9 !important;
+}
+html.dark .settings-card-title {
+  color: #f8fafc !important;
+}
+html.dark .settings-panel-toggle {
+  background: transparent !important;
+  color: #f8fafc !important;
+}
+html.dark .settings-panel-toggle:hover,
+html.dark .settings-panel-toggle:focus {
+  background: rgba(255,255,255,0.06) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+html.dark .settings-panel-body {
+  background: #1c1c1c !important;
+  border-top-color: rgba(255,255,255,0.08) !important;
+  color: #f1f5f9 !important;
+}
+html.dark .settings-list {
+  background: #161616 !important;
+  border-radius: 0.85rem;
+  overflow: hidden;
+}
+html.dark .settings-list li {
+  color: #f1f5f9 !important;
+  border-bottom-color: rgba(255,255,255,0.08) !important;
+  background: transparent !important;
+}
+html.dark .settings-list li button,
+html.dark .settings-list .text-red-500,
+html.dark .settings-list [class*="delete"] {
+  color: #f87171 !important;
+}
+html.dark .settings-terms-editor,
+html.dark .settings-term-row {
+  background: #161616 !important;
+  color: #f1f5f9 !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+html.dark .settings-input,
+html.dark .settings-term-row input,
+html.dark .settings-term-row textarea {
+  background: #222 !important;
+  color: #f1f5f9 !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+html.dark .settings-label,
+html.dark .settings-help {
+  color: #94a3b8 !important;
+}
+html.dark .settings-secondary-btn {
+  background: #2a2a2a !important;
+  color: #f1f5f9 !important;
+}
+html.dark .settings-section-label {
+  color: #f1f5f9 !important;
+}
+
+/* Kill light selection highlight rectangles */
+html.dark .settings-panel-toggle:active,
+html.dark .settings-card:focus-within {
+  outline: none !important;
+}
+html.dark ::selection {
+  background: rgba(94, 61, 74, 0.45);
+  color: #fff;
+}
