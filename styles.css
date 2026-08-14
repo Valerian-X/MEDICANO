@@ -3542,3 +3542,301 @@ html.dark ::selection {
   background: rgba(94, 61, 74, 0.45);
   color: #fff;
 }
+
+
+/* =========================================================
+   FIX PASS — title box, events, equipment picker, presentation
+   ========================================================= */
+
+/* Page title: center text inside its own box */
+.app-page-title,
+#page-title {
+  display: block !important;
+  width: 100% !important;
+  text-align: center !important;
+  text-align-last: center !important;
+  justify-self: center !important;
+  margin-inline: auto !important;
+}
+
+/* Entity chevron / dropdown icons — visible in light + dark */
+.entity-card-chevron {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: #e8eef3 !important;
+  color: #0f172a !important;
+  font-size: 0.7rem !important;
+  line-height: 1;
+}
+html.dark .entity-card-chevron {
+  background: #3f3f46 !important;
+  color: #f8fafc !important;
+}
+html.dark .entity-card.is-open .entity-card-chevron {
+  background: #52525b !important;
+  color: #fff !important;
+}
+
+/* Timeline / event cards — pastel stays, text stays dark (readable) */
+html.dark .dash-tl-body,
+html.dark .dash-tl-body.pink,
+html.dark .dash-tl-body.yellow,
+html.dark .dash-tl-body.green,
+html.dark .dash-tl-body.blue,
+html.dark .dash-tl-body.lavender,
+html.dark .dash-tl-body.peach {
+  color: #0f172a !important;
+}
+html.dark .dash-tl-body .dash-tl-title,
+html.dark .dash-tl-body .dash-tl-time,
+html.dark .dash-tl-body .dash-tl-meta {
+  color: #0f172a !important;
+  opacity: 1 !important;
+}
+html.dark .dash-tl-body .dash-tl-time,
+html.dark .dash-tl-body .dash-tl-meta {
+  opacity: 0.75 !important;
+}
+/* Event chips inside timeline */
+html.dark .dash-tl-body span,
+html.dark .dash-tl-body button {
+  color: #0f172a !important;
+}
+
+/* Quote: Select Equipment to Add — dark mode readable */
+html.dark .quote-equip-panel {
+  background: #1c1c1c !important;
+  color: #f1f5f9 !important;
+}
+html.dark .quote-equip-toggle,
+html.dark .quote-equip-body {
+  background: #1c1c1c !important;
+  color: #f1f5f9 !important;
+}
+html.dark .quote-equip-help {
+  color: #94a3b8 !important;
+}
+html.dark .quote-equip-search {
+  background: #2a2a2a !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: #f8fafc !important;
+}
+html.dark .quote-equip-btn.soft {
+  background: #3f3f46 !important;
+  color: #f8fafc !important;
+}
+html.dark .quote-equip-btn.primary {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}
+html.dark .qp-row {
+  background: #252525 !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  color: #f1f5f9 !important;
+}
+html.dark .qp-row:nth-child(odd) {
+  background: #2a2a2a !important;
+}
+html.dark .qp-meta p,
+html.dark .qp-meta .font-medium {
+  color: #f8fafc !important;
+}
+html.dark .qp-meta .text-xs,
+html.dark .qp-meta .text-slate-500,
+html.dark .qp-meta .text-slate-400 {
+  color: #94a3b8 !important;
+}
+html.dark .qp-units span {
+  color: #94a3b8 !important;
+}
+html.dark .qp-qty {
+  background: #0f172a !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+/* Client presentation picker — dark text on surfaces / strong contrast */
+html.dark #page-presentation .pres-check + span,
+html.dark #page-presentation label,
+html.dark #page-presentation .font-medium,
+html.dark #page-presentation p.font-medium {
+  color: #f8fafc !important;
+}
+html.dark #page-presentation .text-xs,
+html.dark #page-presentation .text-slate-500,
+html.dark #page-presentation .text-slate-400,
+html.dark #page-presentation .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+/* Presentation item cards */
+html.dark #pres-picker > div,
+html.dark #pres-picker .pres-row,
+html.dark #page-presentation .border.rounded-xl,
+html.dark #page-presentation .bg-white {
+  background: #1c1c1c !important;
+  border-color: rgba(255,255,255,0.1) !important;
+  color: #f8fafc !important;
+}
+html.dark #page-presentation .text-brand-700,
+html.dark #page-presentation .font-semibold {
+  color: #5eead4 !important;
+}
+/* Select All / Clear on presentation */
+html.dark #page-presentation button.bg-slate-100,
+html.dark #page-presentation .bg-slate-100 {
+  background: #2a2a2a !important;
+  color: #f8fafc !important;
+}
+
+/* Calendar event cards on Events page (same pastel + dark text rule) */
+html.dark .cal-event-card,
+html.dark .cal-timeline-item,
+html.dark [class*="cal-"][class*="event"] {
+  color: #0f172a !important;
+}
+
+
+/* =========================================================
+   DARK MODE OVERRIDES (beat index.html inline styles)
+   ========================================================= */
+
+/* Chevron / dropdown icons */
+html.dark .entity-card-chevron {
+  background: #52525b !important;
+  color: #fafafa !important;
+  opacity: 1 !important;
+}
+html.dark .entity-card:not(.is-open) .entity-card-chevron {
+  background: #3f3f46 !important;
+  color: #e4e4e7 !important;
+}
+
+/* Events cards — pastel backgrounds, always dark text */
+html.dark .cal-event-card,
+html.dark .cal-event-card.pink,
+html.dark .cal-event-card.yellow,
+html.dark .cal-event-card.green,
+html.dark .cal-event-card.blue,
+html.dark .cal-event-card.lavender,
+html.dark .cal-event-card.peach {
+  color: #0f172a !important;
+}
+html.dark .cal-event-title,
+html.dark .cal-event-time,
+html.dark .cal-event-notes,
+html.dark .cal-event-meta,
+html.dark .cal-event-body {
+  color: #0f172a !important;
+  opacity: 1 !important;
+}
+html.dark .cal-event-time,
+html.dark .cal-event-notes {
+  opacity: 0.8 !important;
+}
+html.dark .cal-pill {
+  background: rgba(255,255,255,0.65) !important;
+  color: #0f172a !important;
+}
+html.dark .cal-pill.soft {
+  background: rgba(0,0,0,0.08) !important;
+  color: #0f172a !important;
+}
+html.dark .cal-event-del {
+  background: rgba(0,0,0,0.1) !important;
+  color: #0f172a !important;
+}
+html.dark .cal-empty-day {
+  background: #252525 !important;
+  color: #94a3b8 !important;
+}
+
+/* Dashboard timeline events — same rule */
+html.dark .dash-tl-body,
+html.dark .dash-tl-body.pink,
+html.dark .dash-tl-body.yellow,
+html.dark .dash-tl-body.green,
+html.dark .dash-tl-body.blue,
+html.dark .dash-tl-body.lavender,
+html.dark .dash-tl-body.peach {
+  color: #0f172a !important;
+}
+html.dark .dash-tl-body .dash-tl-title,
+html.dark .dash-tl-body .dash-tl-time,
+html.dark .dash-tl-body .dash-tl-meta {
+  color: #0f172a !important;
+  opacity: 1 !important;
+}
+
+/* Quote equipment picker list */
+html.dark #quote-product-picker,
+html.dark .quote-equip-body {
+  background: #1a1a1a !important;
+}
+html.dark .qp-row,
+html.dark .qp-row:nth-child(odd),
+html.dark .qp-row:nth-child(even) {
+  background: #252525 !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  color: #f8fafc !important;
+}
+html.dark .qp-meta p.font-medium,
+html.dark .qp-meta .font-medium {
+  color: #f8fafc !important;
+}
+html.dark .qp-meta .text-xs,
+html.dark .qp-meta .text-slate-500,
+html.dark .qp-meta .text-slate-400 {
+  color: #a1a1aa !important;
+}
+
+/* Presentation select rows */
+html.dark #pres-picker .select-row,
+html.dark #pres-picker .pres-pick-row,
+html.dark #page-presentation .select-row {
+  background: #252525 !important;
+  border-color: rgba(255,255,255,0.1) !important;
+  color: #f8fafc !important;
+}
+html.dark #pres-picker .select-row-title,
+html.dark #page-presentation .select-row-title {
+  color: #fafafa !important;
+}
+html.dark #pres-picker .select-row-sub,
+html.dark #page-presentation .select-row-sub {
+  color: #d4d4d8 !important;
+}
+html.dark #pres-picker .pres-pick-price,
+html.dark #page-presentation .pres-pick-price {
+  color: #5eead4 !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+html.dark #page-presentation .select-row-check {
+  accent-color: #5eead4;
+  border-color: #a1a1aa !important;
+}
+
+/* Title text centered in its grid cell box */
+.app-topbar-row {
+  display: grid !important;
+  grid-template-columns: 2.75rem minmax(0, 1fr) auto !important;
+  align-items: center !important;
+}
+.app-page-title,
+#page-title {
+  grid-column: 2 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  text-align: center !important;
+  justify-self: stretch !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: clamp(1.55rem, 3.5vw, 2.1rem) !important;
+  font-weight: 800 !important;
+}
