@@ -2377,3 +2377,143 @@ tbody tr {
   font-weight: 700;
   color: #0f172a;
 }
+
+/* Filter date fields with visible labels */
+.filter-date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 9.5rem;
+}
+.filter-date-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Payment tracking panel — roomy layout */
+.pay-panel-head { margin-bottom: 0.85rem; }
+.pay-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.pay-summary-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  padding: 0.85rem 1rem;
+}
+.pay-summary-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.25rem;
+}
+.pay-summary-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.pay-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 0.85rem;
+  margin-bottom: 1rem;
+  align-items: end;
+}
+@media (min-width: 640px) {
+  .pay-form-grid {
+    grid-template-columns: 1.1fr 1fr 1fr 1.4fr auto;
+  }
+}
+.pay-field { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.pay-field-note { grid-column: 1 / -1; }
+@media (min-width: 640px) {
+  .pay-field-note { grid-column: auto; }
+}
+.pay-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+}
+.pay-input {
+  width: 100%;
+  min-height: 2.6rem !important;
+  padding: 0.55rem 0.75rem !important;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.65rem;
+  font-size: 0.875rem;
+  background: #fff;
+  box-sizing: border-box;
+}
+.pay-add-btn {
+  width: 100%;
+  min-height: 2.6rem;
+  padding: 0.55rem 1rem;
+  background: #0f766e;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border: none;
+  border-radius: 0.65rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pay-add-btn:hover { background: #0d9488; }
+.pay-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.pay-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+}
+.pay-list-main { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.pay-list-amount { font-weight: 700; font-size: 0.95rem; color: #0f172a; }
+.pay-list-meta { font-size: 0.75rem; color: #64748b; }
+.pay-list-note { font-size: 0.75rem; color: #94a3b8; }
+.pay-list-remove {
+  border: none;
+  background: #fee2e2;
+  color: #b91c1c;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 999px;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}
+
+/* Client detail page title across top */
+.client-page-top {
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.client-page-name {
+  margin: 0;
+  font-size: clamp(1.45rem, 3.5vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+  line-height: 1.2;
+  width: 100%;
+  border-bottom: 2px solid #0f766e;
+  padding-bottom: 0.65rem;
+}
+.client-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

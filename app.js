@@ -515,6 +515,105 @@ function clientHistoryHtml(clientId) {
 }
 
 
+
+function onQuoteClientSelect() {
+  const sel = document.getElementById('quote-client');
+  const man = document.getElementById('quote-client-manual');
+  if (!sel || !man) return;
+  if (sel.value) {
+    const c = getClient(sel.value);
+    man.value = c ? c.name : '';
+  }
+}
+function onInvClientSelect() {
+  const sel = document.getElementById('inv-client');
+  const man = document.getElementById('inv-client-manual');
+  if (!sel || !man) return;
+  if (sel.value) {
+    const c = getClient(sel.value);
+    man.value = c ? c.name : '';
+  }
+}
+
+/** Resolve client from select or manual name; create if needed. Returns client id or null. */
+function resolveClientForSave(selectId, manualId) {
+  const sel = document.getElementById(selectId);
+  const man = document.getElementById(manualId);
+  const selected = sel ? sel.value : '';
+  const typed = (man ? man.value : '').trim();
+  if (selected) {
+    // If user typed a different name, update the client name
+    if (typed) {
+      const c = getClient(selected);
+      if (c && typed !== c.name) {
+        c.name = typed;
+      }
+    }
+    return selected;
+  }
+  if (!typed) return null;
+  const existing = (data.clients || []).find(c => (c.name || '').toLowerCase() === typed.toLowerCase());
+  if (existing) {
+    if (sel) {
+      // refresh options and select
+      const still = [...sel.options].some(o => o.value === existing.id);
+      if (!still) {
+        const opt = document.createElement('option');
+        opt.value = existing.id;
+        opt.textContent = existing.name;
+        sel.appendChild(opt);
+      }
+      sel.value = existing.id;
+    }
+    return existing.id;
+  }
+  const id = uid();
+  data.clients.push({
+    id,
+    name: typed,
+    contact: '',
+    phone: '',
+    email: '',
+    address: ''
+  });
+  logAudit('client_create', typed + ' (from document)');
+  if (sel) {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = typed;
+    sel.appendChild(opt);
+    sel.value = id;
+  }
+  return id;
+}
+
+/** Ensure a product exists for a line item; create from name/price if needed. Returns productId. */
+function ensureProductForLine(productId, name, unitNgn) {
+  if (productId && getProduct(productId)) return productId;
+  const n = (name || '').trim();
+  if (!n) return productId || '';
+  const existing = (data.products || []).find(p => (p.name || '').toLowerCase() === n.toLowerCase());
+  if (existing) return existing.id;
+  const id = uid();
+  const sku = 'AUTO-' + Date.now().toString(36).slice(-6).toUpperCase();
+  data.products.push({
+    id,
+    sku,
+    name: n,
+    description: '',
+    category: '',
+    brand: '',
+    price: Number(unitNgn) || 0,
+    currency: 'NGN',
+    stock: 0,
+    lowStock: 1,
+    active: true
+  });
+  logAudit('product_create', n + ' (from document)');
+  return id;
+}
+
+
 // -------------------- Persistence --------------------
 function loadData() {
   try {
@@ -1535,6 +1634,8 @@ function openClientPage(id) {
   currentClientId = id;
   navigate('client-detail');
   renderClientDetailPage();
+  const titleEl = document.getElementById('page-title');
+  if (titleEl && c) titleEl.textContent = c.name;
 }
 
 function renderClientDetailPage() {
@@ -1555,12 +1656,12 @@ function renderClientDetailPage() {
   const quoted = quotes.reduce((s, q) => s + (Number(q.totalNGN) || 0), 0);
 
   root.innerHTML = `
-    <div class="mb-4 flex flex-wrap items-center gap-3">
+    <div class="client-page-top">
       <button type="button" onclick="navigate('clients')" class="text-sm text-brand-600 hover:underline">← Back to Clients</button>
-      <h3 class="font-semibold text-lg text-slate-800">${escHtml(c.name)}</h3>
-      <div class="ml-auto flex gap-2">
+      <h1 class="client-page-name">${escHtml(c.name)}</h1>
+      <div class="client-page-actions">
         <button type="button" onclick="editClient('${c.id}')" class="px-3 py-1.5 bg-slate-100 rounded-lg text-sm font-medium">Edit</button>
-        <button type="button" onclick="showNewQuote(); document.getElementById('quote-client').value='${c.id}'" class="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-medium">New quote</button>
+        <button type="button" onclick="showNewQuote(); setTimeout(()=>{ const s=document.getElementById('quote-client'); if(s){ s.value='${c.id}'; onQuoteClientSelect(); } }, 50)" class="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-medium">New quote</button>
         <button type="button" onclick="showNewInvoice(); populateInvoiceClientSelect('${c.id}')" class="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm font-medium">New invoice</button>
       </div>
     </div>
@@ -1742,6 +1843,8 @@ function showNewQuote() {
   document.getElementById('btn-delete-quote').classList.add('hidden');
   document.getElementById('quote-client').innerHTML = '<option value="">Select hospital...</option>' +
     data.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  const qcm = document.getElementById('quote-client-manual');
+  if (qcm) qcm.value = '';
   document.getElementById('quote-title').value = '';
   document.getElementById('quote-valid').value = '';
   document.getElementById('quote-status').value = 'draft';
@@ -1766,6 +1869,11 @@ function openQuote(id) {
 
   document.getElementById('quote-client').innerHTML = '<option value="">Select hospital...</option>' +
     data.clients.map(c => `<option value="${c.id}" ${c.id === q.clientId ? 'selected' : ''}>${c.name}</option>`).join('');
+  const qcm2 = document.getElementById('quote-client-manual');
+  if (qcm2) {
+    const qc = getClient(q.clientId);
+    qcm2.value = qc ? qc.name : '';
+  }
   document.getElementById('quote-title').value = q.title;
   document.getElementById('quote-valid').value = q.validUntil || '';
   document.getElementById('quote-status').value = q.status;
@@ -1957,24 +2065,35 @@ function recalcQuote() {
 }
 
 function saveQuote() {
-  const clientId = document.getElementById('quote-client').value;
+  const clientId = resolveClientForSave('quote-client', 'quote-client-manual');
   const title = document.getElementById('quote-title').value.trim();
   if (!clientId || !title) {
-    alert('Please select a client and enter a quote title.');
+    alert('Please select or type a client name, and enter a quote title.');
     return;
   }
 
   const items = [];
   document.querySelectorAll('#quote-items-list .line-card').forEach(row => {
-    const productId = row.querySelector('.qi-product')?.value || '';
+    let productId = row.querySelector('.qi-product')?.value || '';
     const name = (row.querySelector('.qi-name')?.value || '').trim();
-    const p = productId ? getProduct(productId) : null;
-    const displayName = name || (p ? p.name : '');
-    if (!displayName && !productId) return;
     const qty = parseFloat(row.querySelector('.qi-qty')?.value) || 1;
     const baseNGN = parseFloat(row.querySelector('.qi-base')?.value) || 0;
     const markupPct = parseFloat(row.querySelector('.qi-markup')?.value) || 0;
     const unitNGN = quoteFinalUnit(baseNGN, markupPct);
+    productId = ensureProductForLine(productId, name, unitNGN);
+    const p = productId ? getProduct(productId) : null;
+    const displayName = name || (p ? p.name : '');
+    if (!displayName && !productId) return;
+    if (productId && row.querySelector('.qi-product')) {
+      const sel = row.querySelector('.qi-product');
+      if (![...sel.options].some(o => o.value === productId)) {
+        const opt = document.createElement('option');
+        opt.value = productId;
+        opt.textContent = displayName;
+        sel.appendChild(opt);
+      }
+      sel.value = productId;
+    }
     items.push({
       productId: productId || '',
       sku: p ? p.sku : (row.dataset.sku || ''),
@@ -2031,6 +2150,8 @@ function saveQuote() {
   document.getElementById('quote-editor-title').textContent = `Quote ${quote.quoteNumber}`;
   document.getElementById('btn-delete-quote').classList.remove('hidden');
   renderDashboard();
+  if (typeof renderClients === 'function') renderClients();
+  if (typeof renderProducts === 'function') renderProducts();
 }
 
 function downloadQuoteItemsTemplate() {
@@ -2308,10 +2429,18 @@ function renderInvoices() {
 function populateInvoiceClientSelect(selectedId) {
   const sel = document.getElementById('inv-client');
   if (!sel) return;
-  sel.innerHTML = (data.clients || []).map(c =>
+  sel.innerHTML = '<option value="">Select hospital...</option>' + ((data.clients || []).map(c =>
     `<option value="${c.id}">${escHtml(c.name)}</option>`
-  ).join('') || '<option value="">No clients</option>';
-  if (selectedId) sel.value = selectedId;
+  ).join('') || '');
+  if (selectedId) {
+    sel.value = selectedId;
+    const man = document.getElementById('inv-client-manual');
+    const c = getClient(selectedId);
+    if (man) man.value = c ? c.name : '';
+  } else {
+    const man = document.getElementById('inv-client-manual');
+    if (man) man.value = '';
+  }
 }
 
 function showNewInvoice() {
@@ -2470,8 +2599,25 @@ function recalcInvoiceTotal() {
 }
 
 function saveInvoice() {
-  const clientId = document.getElementById('inv-client')?.value;
-  if (!clientId) { alert('Please select a client.'); return; }
+  const clientId = resolveClientForSave('inv-client', 'inv-client-manual');
+  if (!clientId) { alert('Please select or type a client name.'); return; }
+  // Ensure products for custom lines before collect
+  document.querySelectorAll('#invoice-items-list .line-card').forEach(tr => {
+    let productId = tr.querySelector('.inv-product')?.value || '';
+    const name = tr.querySelector('.inv-name')?.value.trim() || '';
+    const unitNgn = parseFloat(tr.querySelector('.inv-unit')?.value) || 0;
+    productId = ensureProductForLine(productId, name, unitNgn);
+    const sel = tr.querySelector('.inv-product');
+    if (sel && productId) {
+      if (![...sel.options].some(o => o.value === productId)) {
+        const opt = document.createElement('option');
+        opt.value = productId;
+        opt.textContent = name || (getProduct(productId) || {}).name || 'Item';
+        sel.appendChild(opt);
+      }
+      sel.value = productId;
+    }
+  });
   const items = collectInvoiceItems();
   if (!items.length) { alert('Add at least one line item.'); return; }
   const { sub, total, discount } = recalcInvoiceTotal();
@@ -2531,6 +2677,8 @@ function saveInvoice() {
   alert('Invoice saved.');
   renderInvoices();
   renderInvoicePaymentsPanel();
+  if (typeof renderClients === 'function') renderClients();
+  if (typeof renderProducts === 'function') renderProducts();
 }
 
 function deleteCurrentInvoice() {
@@ -2852,28 +3000,30 @@ function generateInvoicePdf(inv) {
     });
 
     y += 14;
-    // Totals
-    const tx = W - M - 200;
+    // Totals — amounts align with Unit Price column; rule starts at same left as labels
+    const totalsLeft = colUnit - 8;
+    const totalsRight = colAmount;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
     doc.setTextColor(...INK);
-    doc.text('Subtotal', tx, y);
-    doc.text(formatNairaPlain(subtotal), W - M, y, { align: 'right' });
+    doc.text('Subtotal', totalsLeft, y, { align: 'right' });
+    doc.text(formatNairaPlain(subtotal), totalsRight, y, { align: 'right' });
     if (discount > 0) {
       y += 16;
-      doc.text('Discount (' + discount + '%)', tx, y);
-      doc.text('-' + formatNairaPlain(subtotal * discount / 100), W - M, y, { align: 'right' });
+      doc.text('Discount (' + discount + '%)', totalsLeft, y, { align: 'right' });
+      doc.text('-' + formatNairaPlain(subtotal * discount / 100), totalsRight, y, { align: 'right' });
     }
     y += 10;
     doc.setDrawColor(...TEAL);
     doc.setLineWidth(1.5);
-    doc.line(tx, y, W - M, y);
+    // Divider starts where the TOTAL label block starts (under unit-price column)
+    doc.line(totalsLeft - 70, y, totalsRight, y);
     y += 16;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.setTextColor(...TEAL);
-    doc.text('TOTAL', tx, y);
-    doc.text(formatNairaPlain(total), W - M, y, { align: 'right' });
+    doc.text('TOTAL', totalsLeft, y, { align: 'right' });
+    doc.text(formatNairaPlain(total), totalsRight, y, { align: 'right' });
     y += 28;
 
     // Bank / payment details — skip when invoice is already paid
@@ -4701,34 +4851,51 @@ function renderInvoicePaymentsPanel() {
   const bal = invoiceBalance(inv);
   const rows = (inv.payments || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   panel.innerHTML = `
-    <div class="flex items-center justify-between gap-2 mb-3">
-      <h4 class="font-semibold text-slate-800">Payment tracking</h4>
-      <span class="text-xs text-slate-500">Partial payments update status automatically</span>
+    <div class="pay-panel-head">
+      <h4 class="font-semibold text-slate-800 text-base">Payment tracking</h4>
+      <p class="text-xs text-slate-500 mt-0.5">Partial payments update status automatically</p>
     </div>
-    <div class="flex flex-wrap gap-3 text-sm mb-3">
-      <span>Total: <strong>${formatNGN(inv.totalNgn || 0)}</strong></span>
-      <span>Paid: <strong class="text-emerald-700">${formatNGN(paid)}</strong></span>
-      <span>Balance: <strong class="text-rose-700">${formatNGN(bal)}</strong></span>
+    <div class="pay-summary">
+      <div class="pay-summary-item"><span class="pay-summary-label">Total</span><span class="pay-summary-value">${formatNGN(inv.totalNgn || 0)}</span></div>
+      <div class="pay-summary-item"><span class="pay-summary-label">Paid</span><span class="pay-summary-value text-emerald-700">${formatNGN(paid)}</span></div>
+      <div class="pay-summary-item"><span class="pay-summary-label">Balance</span><span class="pay-summary-value text-rose-700">${formatNGN(bal)}</span></div>
     </div>
-    <div class="flex flex-wrap gap-2 mb-3">
-      <input id="pay-amount" type="number" min="0" step="0.01" placeholder="Amount" class="input-compact" style="width:7rem" />
-      <select id="pay-method" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm">
-        <option value="transfer">Transfer</option>
-        <option value="cash">Cash</option>
-        <option value="cheque">Cheque</option>
-        <option value="other">Other</option>
-      </select>
-      <input id="pay-date" type="date" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm" />
-      <input id="pay-note" type="text" placeholder="Note" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm flex-1 min-w-[8rem]" />
-      <button type="button" class="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm" onclick="submitInvoicePayment()">Add</button>
+    <div class="pay-form-grid">
+      <div class="pay-field">
+        <label class="pay-label">Amount (NGN)</label>
+        <input id="pay-amount" type="number" min="0" step="0.01" placeholder="0.00" class="pay-input" />
+      </div>
+      <div class="pay-field">
+        <label class="pay-label">Method</label>
+        <select id="pay-method" class="pay-input">
+          <option value="transfer">Transfer</option>
+          <option value="cash">Cash</option>
+          <option value="cheque">Cheque</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="pay-field">
+        <label class="pay-label">Date</label>
+        <input id="pay-date" type="date" class="pay-input" />
+      </div>
+      <div class="pay-field pay-field-note">
+        <label class="pay-label">Note</label>
+        <input id="pay-note" type="text" placeholder="Optional note" class="pay-input" />
+      </div>
+      <div class="pay-field pay-field-btn">
+        <label class="pay-label">&nbsp;</label>
+        <button type="button" class="pay-add-btn" onclick="submitInvoicePayment()">Add payment</button>
+      </div>
     </div>
-    <div class="space-y-1 text-sm">
-      ${rows.length ? rows.map(p => `<div class="flex justify-between gap-2 border-b border-slate-100 py-1">
-        <span>${escHtml(p.date || '')} · ${escHtml(p.method || '')} · ${escHtml(p.note || '')}</span>
-        <span class="font-semibold">${formatNGN(p.amount)}
-          <button type="button" class="text-rose-500 text-xs ml-2" onclick="removeInvoicePayment('${inv.id}','${p.id}'); renderInvoicePaymentsPanel(); renderInvoices();">✕</button>
-        </span>
-      </div>`).join('') : '<p class="text-slate-400">No payments yet.</p>'}
+    <div class="pay-list">
+      ${rows.length ? rows.map(p => `<div class="pay-list-row">
+        <div class="pay-list-main">
+          <span class="pay-list-amount">${formatNGN(p.amount)}</span>
+          <span class="pay-list-meta">${escHtml((p.method || '').toUpperCase())} · ${escHtml(p.date || '')}</span>
+          ${p.note ? `<span class="pay-list-note">${escHtml(p.note)}</span>` : ''}
+        </div>
+        <button type="button" class="pay-list-remove" onclick="removeInvoicePayment('${inv.id}','${p.id}'); renderInvoicePaymentsPanel(); renderInvoices();" aria-label="Remove">✕</button>
+      </div>`).join('') : '<p class="text-slate-400 text-sm">No payments recorded yet.</p>'}
     </div>`;
   const d = document.getElementById('pay-date');
   if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);
@@ -4922,27 +5089,28 @@ function generateQuotePdf(q) {
     });
 
     y += 12;
-    const tx = W - M - 180;
+    const totalsLeft = colUnit - 8;
+    const totalsRight = colAmount;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
     doc.setTextColor(...INK);
-    doc.text('Subtotal', tx, y);
-    doc.text(formatNairaPlain(subtotal), W - M, y, { align: 'right' });
+    doc.text('Subtotal', totalsLeft, y, { align: 'right' });
+    doc.text(formatNairaPlain(subtotal), totalsRight, y, { align: 'right' });
     if (discount > 0) {
       y += 14;
-      doc.text('Discount (' + discount + '%)', tx, y);
-      doc.text('-' + formatNairaPlain(subtotal * discount / 100), W - M, y, { align: 'right' });
+      doc.text('Discount (' + discount + '%)', totalsLeft, y, { align: 'right' });
+      doc.text('-' + formatNairaPlain(subtotal * discount / 100), totalsRight, y, { align: 'right' });
     }
     y += 8;
     doc.setDrawColor(...TEAL);
     doc.setLineWidth(1.2);
-    doc.line(tx, y, W - M, y);
+    doc.line(totalsLeft - 70, y, totalsRight, y);
     y += 16;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.setTextColor(...TEAL);
-    doc.text('TOTAL (NGN)', tx, y);
-    doc.text(formatNairaPlain(total), W - M, y, { align: 'right' });
+    doc.text('TOTAL', totalsLeft, y, { align: 'right' });
+    doc.text(formatNairaPlain(total), totalsRight, y, { align: 'right' });
     y += 28;
     if (q.notes) {
       doc.setFont('helvetica', 'bold');
