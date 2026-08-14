@@ -2150,6 +2150,20 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
 </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
+  <!-- Login gate: blocks the app until signed in -->
+  <div id="login-overlay" class="login-overlay">
+    <div class="login-card">
+      <img src="logo.png" alt="Medicano" class="login-logo" />
+      <h1>Medicano</h1>
+      <p class="login-sub">Sign in to access your quotes and inventory</p>
+      <input id="login-email" type="email" placeholder="Email" autocomplete="username" />
+      <input id="login-password" type="password" placeholder="Password" autocomplete="current-password" />
+      <p id="login-error" class="login-error hidden"></p>
+      <button type="button" class="login-btn-primary" onclick="handleLogin()">Sign In</button>
+      <button type="button" class="login-btn-secondary" onclick="handleSignup()">Create Account</button>
+      <p id="login-status" class="login-status hidden">Working…</p>
+    </div>
+  </div>
   <!-- Mobile sidebar overlay -->
   <div id="sidebar-overlay" class="no-print fixed inset-0 bg-black/50 z-30 hidden md:hidden" onclick="closeSidebar()"></div>
   <div id="app" class="min-h-screen flex">
@@ -2202,6 +2216,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
       <div class="p-4 text-xs" style="border-top:1px solid rgba(255,255,255,0.08)">
         <p class="opacity-50">Offline-ready • v1.0</p>
         <p id="sync-status" class="mt-1 opacity-70">● Local data</p>
+        <button type="button" onclick="handleLogout()" class="mt-2 opacity-70 hover:opacity-100 underline" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;font-size:inherit;">Sign out</button>
       </div>
     </aside>
 
@@ -3498,6 +3513,10 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
     <!-- filled by JS -->
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-init.js"></script>
   <script src="app.js"></script>
 
   <button id="btn-install-app" type="button" onclick="installMedicanoApp()"
