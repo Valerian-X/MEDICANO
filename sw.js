@@ -1,5 +1,5 @@
 /* Medicano PWA Service Worker */
-const CACHE = 'medicano-v26';
+const CACHE = 'medicano-v27';
 const ASSETS = [
   './',
   './index.html',
