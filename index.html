@@ -2849,6 +2849,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         <!-- REPORTS -->
         <section id="page-reports" class="page hidden">
           <div class="flex flex-col gap-4">
+            <!-- Same toolbar pattern as Quotes / Invoices -->
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div class="list-toolbar-filters">
                 <label class="filter-date-field">
@@ -2862,9 +2863,9 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 <label class="filter-status-field">
                   <span class="filter-date-label">Type</span>
                   <select id="report-type" class="filter-control filter-status-select status-select-dark">
-                    <option value="payments">Payments only</option>
-                    <option value="invoices">Invoices issued</option>
-                    <option value="both">Payments + invoices</option>
+                    <option value="payments">Payments</option>
+                    <option value="invoices">Invoices</option>
+                    <option value="both">Both</option>
                   </select>
                 </label>
                 <label class="filter-status-field">
@@ -2879,11 +2880,11 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                   </select>
                 </label>
               </div>
-              <div class="flex flex-wrap gap-2">
-                <button type="button" onclick="renderTransactionReport()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">Apply</button>
-                <button type="button" onclick="printTransactionReport()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium">Print</button>
-                <button type="button" onclick="exportTransactionReportCsv()" class="px-4 py-2 bg-slate-100 text-slate-800 rounded-lg text-sm font-medium">CSV</button>
-              </div>
+            </div>
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <button type="button" onclick="renderTransactionReport()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-900 text-white rounded-full text-sm font-semibold">Apply filters</button>
+              <button type="button" onclick="printTransactionReport()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800 text-white rounded-full text-sm font-semibold">Print statement</button>
+              <button type="button" onclick="exportTransactionReportCsv()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-100 text-slate-800 rounded-full text-sm font-semibold">Export CSV</button>
             </div>
 
             <div class="panel-soft">
@@ -2894,12 +2895,12 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                   <button type="button" class="action-chip soft" onclick="reportSelectAllClients(false)">Clear</button>
                 </div>
               </div>
-              <div id="report-client-list" class="report-client-list"></div>
-              <p class="text-xs text-slate-500 mt-2 mb-0">Leave all cleared to include every client. Filters are saved on this device.</p>
+              <div id="report-client-list" class="report-client-rows"></div>
+              <p class="text-xs text-slate-500 mt-3 mb-0">Leave all cleared to include every client. Filters are saved on this device.</p>
             </div>
 
             <div id="report-summary" class="dash-stats-row"></div>
-            <div id="report-preview" class="panel-soft report-preview-wrap"></div>
+            <div id="report-preview" class="report-preview-wrap"></div>
           </div>
         </section>
 

@@ -4211,3 +4211,132 @@ html.dark .report-type-pill.inv { background: #312e81; color: #c7d2fe; }
 }
 #sidebar { display: flex; flex-direction: column; }
 #sidebar nav { flex: 1; overflow-y: auto; }
+
+
+/* ===== Reports layout polish + responsive tables ===== */
+#page-reports .list-toolbar-filters {
+  width: 100%;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.15rem;
+}
+#page-reports .filter-date-field,
+#page-reports .filter-status-field {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+#page-reports .filter-control,
+#page-reports .filter-status-select {
+  white-space: nowrap !important;
+  text-overflow: ellipsis;
+  min-height: 2.5rem;
+  border-radius: 999px !important;
+  padding-left: 0.9rem !important;
+  padding-right: 0.9rem !important;
+  font-size: 0.85rem !important;
+  font-weight: 600;
+}
+#page-reports .status-select-dark {
+  background: #0f172a !important;
+  color: #fff !important;
+  border-color: #0f172a !important;
+}
+html.dark #page-reports .status-select-dark {
+  background: #0a0a0a !important;
+  border-color: #0a0a0a !important;
+}
+#page-reports .filter-date-field .filter-control {
+  min-width: 8.5rem;
+  max-width: 10rem;
+}
+#page-reports .filter-status-field .filter-control {
+  min-width: 7.5rem;
+  max-width: 9.5rem;
+}
+
+/* Client rows — select-row pattern (like Rates / Presentation) */
+.report-client-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.report-client-row {
+  width: 100%;
+  margin: 0;
+}
+.report-client-row .select-row-check {
+  flex-shrink: 0;
+}
+
+/* Results */
+.report-preview-wrap { width: 100%; }
+.report-mobile-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+.report-result-card .entity-card-body { border-top: 1px solid rgba(15,23,42,0.06); }
+html.dark .report-result-card .entity-card-body { border-top-color: rgba(255,255,255,0.08); }
+
+/* Global responsive tables: desktop table / mobile cards */
+.responsive-table-shell { padding: 0 !important; overflow: hidden; }
+.rt-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.data-table, .report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.data-table th, .report-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+html.dark .data-table th, html.dark .report-table th {
+  background: #252525;
+  color: #94a3b8;
+  border-bottom-color: rgba(255,255,255,0.08);
+}
+.data-table td, .report-table td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+html.dark .data-table td, html.dark .report-table td {
+  border-bottom-color: rgba(255,255,255,0.06);
+}
+.data-table .num, .report-table .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+
+.table-mobile-only { display: none; }
+.table-desktop-only { display: block; }
+
+@media (max-width: 700px) {
+  .table-desktop-only { display: none !important; }
+  .table-mobile-only { display: block !important; }
+  /* Any plain wide table not wrapped: allow horizontal scroll as fallback */
+  table.data-table, table.report-table {
+    display: table;
+  }
+  #page-reports .list-toolbar-filters {
+    gap: 0.4rem;
+  }
+  #page-reports .filter-date-field .filter-control,
+  #page-reports .filter-status-field .filter-control {
+    min-width: 6.75rem;
+  }
+}
+
+@media (min-width: 701px) {
+  .table-mobile-only { display: none !important; }
+  .table-desktop-only { display: block !important; }
+}

@@ -5138,8 +5138,8 @@ function collectPaymentTransactions(opts) {
 function reportSelectAllClients(on) {
   document.querySelectorAll('#report-client-list input[type=checkbox]').forEach(cb => {
     cb.checked = !!on;
-    const chip = cb.closest('.report-client-chip');
-    if (chip) chip.classList.toggle('is-on', !!on);
+    const row = cb.closest('.select-row');
+    if (row) row.classList.toggle('is-selected', !!on);
   });
 }
 
@@ -5179,11 +5179,16 @@ function initReportsPage() {
   if (list) {
     list.innerHTML = clients.map(c => {
       const on = selected.size ? selected.has(c.id) : false;
-      return `<label class="report-client-chip ${on ? 'is-on' : ''}">
-        <input type="checkbox" value="${c.id}" ${on ? 'checked' : ''} onchange="this.closest('.report-client-chip').classList.toggle('is-on', this.checked)" />
-        <span>${escHtml(c.name)}</span>
+      const sub = [c.contact, c.phone, c.email].filter(Boolean).join(' · ') || 'Client';
+      return `<label class="select-row report-client-row ${on ? 'is-selected' : ''}">
+        <span class="select-row-text">
+          <span class="select-row-title">${escHtml(c.name || 'Client')}</span>
+          <span class="select-row-sub">${escHtml(sub)}</span>
+        </span>
+        <input type="checkbox" class="select-row-check" value="${c.id}" ${on ? 'checked' : ''}
+          onchange="this.closest('.select-row').classList.toggle('is-selected', this.checked)" />
       </label>`;
-    }).join('') || '<span class="text-slate-400 text-sm">No clients yet</span>';
+    }).join('') || '<p class="text-slate-400 text-sm p-2">No clients yet</p>';
   }
 
   const from = document.getElementById('report-date-from');
@@ -5232,42 +5237,74 @@ function renderTransactionReport() {
   }
 
   if (!rows.length) {
-    preview.innerHTML = `<div class="report-empty">No transactions in this period for the selected filters.</div>`;
+    preview.innerHTML = '<div class="panel-soft report-empty">No transactions in this period for the selected filters.</div>';
     return;
   }
 
+  const detailOf = (r) => r.kind === 'payment'
+    ? ((r.method || '') + (r.note ? ' · ' + r.note : ''))
+    : (r.method || 'issued');
+
+  // Desktop: table · Mobile: entity-style cards (same data)
   preview.innerHTML = `
-    <div class="report-table-wrap">
-      <table class="report-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Type</th>
-            <th>Client</th>
-            <th>Reference</th>
-            <th>Detail</th>
-            <th class="num">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.map(r => `
-            <tr>
-              <td>${escHtml(r.date)}</td>
-              <td><span class="report-type-pill ${r.kind === 'payment' ? 'pay' : 'inv'}">${r.kind === 'payment' ? 'Payment' : 'Invoice'}</span></td>
-              <td>${escHtml(r.clientName)}</td>
-              <td>${escHtml(r.ref)}${r.title ? `<br><span class="text-xs text-slate-400">${escHtml(r.title)}</span>` : ''}</td>
-              <td>${escHtml(r.kind === 'payment' ? ((r.method || '') + (r.note ? ' · ' + r.note : '')) : (r.method || 'issued'))}</td>
-              <td class="num">${formatNGN(r.amount)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colspan="5" style="text-align:right;font-weight:700;padding:0.85rem">Total collected (payments)</td>
-            <td class="num" style="font-weight:800">${formatNGN(collected)}</td>
-          </tr>
-        </tfoot>
-      </table>
+    <div class="responsive-table-shell panel-soft">
+      <div class="table-desktop-only">
+        <div class="rt-scroll">
+          <table class="report-table data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Client</th>
+                <th>Reference</th>
+                <th>Detail</th>
+                <th class="num">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(r => `
+                <tr>
+                  <td>${escHtml(r.date)}</td>
+                  <td><span class="report-type-pill ${r.kind === 'payment' ? 'pay' : 'inv'}">${r.kind === 'payment' ? 'Payment' : 'Invoice'}</span></td>
+                  <td>${escHtml(r.clientName)}</td>
+                  <td>${escHtml(r.ref)}${r.title ? `<div class="text-xs text-slate-400">${escHtml(r.title)}</div>` : ''}</td>
+                  <td>${escHtml(detailOf(r))}</td>
+                  <td class="num">${formatNGN(r.amount)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="5" class="num" style="font-weight:700">Total collected (payments)</td>
+                <td class="num" style="font-weight:800">${formatNGN(collected)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      <div class="table-mobile-only entity-cards report-mobile-cards">
+        ${rows.map(r => `
+          <div class="entity-card report-result-card">
+            <div class="entity-card-header">
+              <div class="entity-card-main">
+                <span class="entity-card-title">${escHtml(r.clientName)}</span>
+                <span class="entity-card-sub">${escHtml(r.ref)} · ${escHtml(r.date)}</span>
+              </div>
+              <span class="entity-card-price">${formatNGN(r.amount)}</span>
+            </div>
+            <div class="entity-card-body is-open" style="display:block">
+              <div class="entity-detail"><span class="entity-detail-label">Type</span><span class="entity-detail-value"><span class="report-type-pill ${r.kind === 'payment' ? 'pay' : 'inv'}">${r.kind === 'payment' ? 'Payment' : 'Invoice'}</span></span></div>
+              <div class="entity-detail"><span class="entity-detail-label">Detail</span><span class="entity-detail-value">${escHtml(detailOf(r) || '—')}</span></div>
+              ${r.title ? `<div class="entity-detail"><span class="entity-detail-label">Title</span><span class="entity-detail-value">${escHtml(r.title)}</span></div>` : ''}
+              <div class="entity-detail"><span class="entity-detail-label">Amount</span><span class="entity-detail-value">${formatNGN(r.amount)}</span></div>
+            </div>
+          </div>
+        `).join('')}
+        <div class="panel-soft report-mobile-total">
+          <span class="entity-detail-label">Total collected</span>
+          <span class="entity-card-price">${formatNGN(collected)}</span>
+        </div>
+      </div>
     </div>
   `;
 }
