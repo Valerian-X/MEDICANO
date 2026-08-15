@@ -961,6 +961,7 @@ function navigate(page) {
     dashboard: 'Dashboard',
     calendar: 'Events',
     products: 'Inventory',
+    'product-editor': 'Equipment',
     clients: 'Clients',
     'client-detail': 'Client',
     quotes: 'Quotes',
@@ -988,6 +989,7 @@ function navigate(page) {
   if (page === 'dashboard') renderDashboard();
   if (page === 'calendar') renderCalendar();
   if (page === 'products') renderProducts();
+  if (page === 'product-editor') { /* form already filled by showProductForm */ }
   if (page === 'clients') renderClients();
   if (page === 'quotes') renderQuotes();
   if (page === 'invoices') renderInvoices();
@@ -999,7 +1001,27 @@ function navigate(page) {
 }
 
 // -------------------- Dashboard --------------------
+function updateDashboardGreeting() {
+  const el = document.getElementById('dash-greeting-title');
+  if (!el) return;
+  const hour = new Date().getHours();
+  let greet = 'Good day';
+  if (hour < 12) greet = 'Good morning';
+  else if (hour < 17) greet = 'Good afternoon';
+  else greet = 'Good evening';
+  let name = '';
+  try {
+    const u = window.MedicanoCloud && window.MedicanoCloud.currentUser && window.MedicanoCloud.currentUser();
+    if (u && u.email) name = (u.displayName || u.email.split('@')[0] || '').trim();
+  } catch (e) {}
+  if (!name && data && data.deviceProfile && data.deviceProfile.name) {
+    name = String(data.deviceProfile.name).trim();
+  }
+  el.textContent = name ? (greet + ', ' + name) : greet;
+}
+
 function renderDashboard() {
+  updateDashboardGreeting();
   document.getElementById('stat-products').textContent = data.products.filter(p => p.active).length;
   document.getElementById('stat-quotes').textContent = data.quotes.filter(q => q.status === 'draft' || q.status === 'sent').length;
   document.getElementById('stat-clients').textContent = data.clients.length;
@@ -1278,32 +1300,41 @@ function renderProducts() {
 }
 
 function showProductForm(id = null) {
-  document.getElementById('product-id').value = id || '';
-  document.getElementById('product-modal-title').textContent = id ? 'Edit Equipment' : 'Add Equipment';
+  navigate('product-editor');
+  const title = document.getElementById('product-editor-title');
+  const idEl = document.getElementById('product-id');
+  if (idEl) idEl.value = id || '';
+  if (title) title.textContent = id ? 'Edit Equipment' : 'Add Equipment';
+  const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = v; };
   if (id) {
     const p = getProduct(id);
-    document.getElementById('p-sku').value = p.sku;
-    document.getElementById('p-name').value = p.name;
-    document.getElementById('p-desc').value = p.description || '';
-    document.getElementById('p-features').value = p.features || '';
+    if (!p) return;
+    set('p-sku', p.sku || '');
+    set('p-name', p.name || '');
+    set('p-desc', p.description || '');
+    set('p-features', p.features || '');
     populateCategorySelect(p.category);
-    document.getElementById('p-price').value = p.price;
-    document.getElementById('p-currency').value = p.currency;
-    document.getElementById('p-stock').value = p.stock;
-    document.getElementById('p-low').value = p.lowStock;
-    document.getElementById('p-brand').value = p.brand || '';
-    document.getElementById('p-active').checked = p.active;
-    document.getElementById('p-image-data').value = p.image || '';
+    set('p-price', p.price);
+    set('p-currency', p.currency || 'USD');
+    set('p-stock', p.stock);
+    set('p-low', p.lowStock);
+    set('p-brand', p.brand || '');
+    const act = document.getElementById('p-active');
+    if (act) act.checked = p.active !== false;
+    set('p-image-data', p.image || '');
     updateImagePreview(p.image || '');
   } else {
-    document.getElementById('product-form').reset();
-    document.getElementById('p-active').checked = true;
-    document.getElementById('p-low').value = 2;
-    document.getElementById('p-image-data').value = '';
+    const form = document.getElementById('product-editor-form');
+    if (form) form.reset();
+    set('product-id', '');
+    const act = document.getElementById('p-active');
+    if (act) act.checked = true;
+    set('p-low', 2);
+    set('p-stock', 0);
+    set('p-image-data', '');
     updateImagePreview('');
     populateCategorySelect('');
   }
-  document.getElementById('modal-product').classList.remove('hidden');
 }
 
 function editProduct(id) {
@@ -1383,7 +1414,8 @@ function saveProduct(e) {
     data.products.push(item);
   }
   saveData();
-  closeModal('modal-product');
+  if (typeof logAudit === 'function') logAudit(id ? 'product_update' : 'product_create', item.sku || item.name);
+  navigate('products');
   renderProducts();
   renderDashboard();
 }
@@ -5186,7 +5218,7 @@ function initReportsPage() {
           <span class="select-row-sub">${escHtml(sub)}</span>
         </span>
         <input type="checkbox" class="select-row-check" value="${c.id}" ${on ? 'checked' : ''}
-          onchange="this.closest('.select-row').classList.toggle('is-selected', this.checked)" />
+          onchange="this.closest('.select-row').classList.toggle('is-selected', this.checked); renderTransactionReport()" />
       </label>`;
     }).join('') || '<p class="text-slate-400 text-sm p-2">No clients yet</p>';
   }

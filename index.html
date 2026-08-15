@@ -2342,7 +2342,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
             <div class="dash-greeting-row">
               <div>
                 <p class="dash-greeting-eyebrow">Medicano workspace</p>
-                <h2>Good day, Medicano team</h2>
+                <h2 id="dash-greeting-title">Good day</h2>
                 <p>Here is a quick overview of your catalog, quotes, clients, and stock.</p>
               </div>
             </div>
@@ -2436,6 +2436,107 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         </section>
 
         <!-- PRODUCTS -->
+        
+        <!-- PRODUCT / EQUIPMENT EDITOR -->
+        <section id="page-product-editor" class="page hidden">
+          <div class="mb-4 flex items-center gap-3 flex-wrap">
+            <button type="button" onclick="navigate('products')" class="back-link text-sm hover:underline">← Back to Inventory</button>
+            <h3 id="product-editor-title" class="font-semibold text-lg m-0">Add Equipment</h3>
+          </div>
+          <form id="product-editor-form" class="flex flex-col gap-4" onsubmit="saveProduct(event)">
+            <input type="hidden" id="product-id" value="" />
+            <input type="hidden" id="p-image-data" value="" />
+
+            <div class="panel-soft">
+              <h4 class="font-semibold text-sm mb-3">Basics</h4>
+              <div class="settings-form-grid">
+                <div>
+                  <label class="settings-label">SKU</label>
+                  <input id="p-sku" required class="settings-input w-full" placeholder="e.g. MRI-3T-001" />
+                </div>
+                <div>
+                  <label class="settings-label">Category</label>
+                  <select id="p-category" required class="settings-input w-full"></select>
+                </div>
+                <div class="settings-span-2">
+                  <label class="settings-label">Name</label>
+                  <input id="p-name" required class="settings-input w-full" placeholder="Equipment name" />
+                </div>
+                <div>
+                  <label class="settings-label">Brand</label>
+                  <input id="p-brand" class="settings-input w-full" />
+                </div>
+                <div>
+                  <label class="settings-label flex items-center gap-2" style="margin-top:1.4rem">
+                    <input id="p-active" type="checkbox" checked class="rounded" />
+                    <span>Active in catalog</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel-soft">
+              <h4 class="font-semibold text-sm mb-3">Description</h4>
+              <div class="settings-form-grid">
+                <div class="settings-span-2">
+                  <label class="settings-label">Description</label>
+                  <textarea id="p-desc" rows="3" class="settings-input w-full" placeholder="Technical specifications..."></textarea>
+                </div>
+                <div class="settings-span-2">
+                  <label class="settings-label">Features (one per line)</label>
+                  <textarea id="p-features" rows="3" class="settings-input w-full" placeholder="3.0 Tesla magnet&#10;Full body imaging"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel-soft">
+              <h4 class="font-semibold text-sm mb-3">Pricing &amp; stock</h4>
+              <div class="settings-form-grid">
+                <div>
+                  <label class="settings-label">Price</label>
+                  <input id="p-price" type="number" step="0.01" min="0" required class="settings-input w-full" />
+                </div>
+                <div>
+                  <label class="settings-label">Currency</label>
+                  <select id="p-currency" class="settings-input w-full">
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="NGN">NGN</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="settings-label">Stock qty</label>
+                  <input id="p-stock" type="number" min="0" value="0" class="settings-input w-full" inputmode="numeric" />
+                </div>
+                <div>
+                  <label class="settings-label">Low stock at</label>
+                  <input id="p-low" type="number" min="0" value="2" class="settings-input w-full" inputmode="numeric" />
+                </div>
+              </div>
+            </div>
+
+            <div class="panel-soft">
+              <h4 class="font-semibold text-sm mb-3">Image</h4>
+              <div class="flex items-start gap-3 flex-wrap">
+                <div id="p-image-preview" class="w-20 h-20 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <span class="text-2xl text-slate-300">📷</span>
+                </div>
+                <div class="flex-1 min-w-[12rem]">
+                  <label class="settings-label">Photo</label>
+                  <input type="file" id="p-image" accept="image/*" class="settings-input w-full" onchange="previewProductImage(event)" />
+                  <p class="text-xs text-slate-500 mt-1 mb-0">Optional. Prefer under 500 KB.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2 justify-end">
+              <button type="button" onclick="navigate('products')" class="px-4 py-2.5 rounded-full text-sm font-semibold bg-slate-100 text-slate-800">Cancel</button>
+              <button type="submit" class="px-4 py-2.5 rounded-full text-sm font-semibold bg-brand-600 text-white">Save equipment</button>
+            </div>
+          </form>
+        </section>
+
+
         <section id="page-products" class="page hidden">
           <div class="flex flex-col gap-3 mb-5">
             <div class="flex flex-col sm:flex-row gap-2 flex-1">
@@ -2849,40 +2950,41 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         <!-- REPORTS -->
         <section id="page-reports" class="page hidden">
           <div class="flex flex-col gap-4">
-            <!-- Same toolbar pattern as Quotes / Invoices -->
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div class="list-toolbar-filters">
-                <label class="filter-date-field">
-                  <span class="filter-date-label">Start date</span>
-                  <input id="report-date-from" type="date" class="filter-control" title="Start date" />
-                </label>
-                <label class="filter-date-field">
-                  <span class="filter-date-label">End date</span>
-                  <input id="report-date-to" type="date" class="filter-control" title="End date" />
-                </label>
-                <label class="filter-status-field">
-                  <span class="filter-date-label">Type</span>
-                  <select id="report-type" class="filter-control filter-status-select status-select-dark">
-                    <option value="payments">Payments</option>
-                    <option value="invoices">Invoices</option>
-                    <option value="both">Both</option>
-                  </select>
-                </label>
-                <label class="filter-status-field">
-                  <span class="filter-date-label">Method</span>
-                  <select id="report-method" class="filter-control filter-status-select">
-                    <option value="">All methods</option>
-                    <option value="transfer">Transfer</option>
-                    <option value="cash">Cash</option>
-                    <option value="cheque">Cheque</option>
-                    <option value="card">Card</option>
-                    <option value="other">Other</option>
-                  </select>
-                </label>
-              </div>
+            <div class="report-filter-grid">
+              <label class="filter-date-field">
+                <span class="filter-date-label">Start date</span>
+                <input id="report-date-from" type="date" class="filter-control" title="Start date"
+                  onchange="renderTransactionReport()" />
+              </label>
+              <label class="filter-date-field">
+                <span class="filter-date-label">End date</span>
+                <input id="report-date-to" type="date" class="filter-control" title="End date"
+                  onchange="renderTransactionReport()" />
+              </label>
+              <label class="filter-date-field">
+                <span class="filter-date-label">Type</span>
+                <select id="report-type" class="filter-control filter-status-select status-select-dark"
+                  onchange="renderTransactionReport()">
+                  <option value="payments">Payments</option>
+                  <option value="invoices">Invoices</option>
+                  <option value="both">Both</option>
+                </select>
+              </label>
+              <label class="filter-date-field">
+                <span class="filter-date-label">Method</span>
+                <select id="report-method" class="filter-control filter-status-select"
+                  onchange="renderTransactionReport()">
+                  <option value="">All methods</option>
+                  <option value="transfer">Transfer</option>
+                  <option value="cash">Cash</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="card">Card</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
             </div>
+
             <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <button type="button" onclick="renderTransactionReport()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-900 text-white rounded-full text-sm font-semibold">Apply filters</button>
               <button type="button" onclick="printTransactionReport()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800 text-white rounded-full text-sm font-semibold">Print statement</button>
               <button type="button" onclick="exportTransactionReportCsv()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-100 text-slate-800 rounded-full text-sm font-semibold">Export CSV</button>
             </div>
@@ -2891,12 +2993,12 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               <div class="flex items-center justify-between gap-2 mb-3">
                 <h4 class="font-semibold text-sm m-0">Clients</h4>
                 <div class="flex gap-2">
-                  <button type="button" class="action-chip soft" onclick="reportSelectAllClients(true)">Select all</button>
-                  <button type="button" class="action-chip soft" onclick="reportSelectAllClients(false)">Clear</button>
+                  <button type="button" class="action-chip soft" onclick="reportSelectAllClients(true); renderTransactionReport()">Select all</button>
+                  <button type="button" class="action-chip soft" onclick="reportSelectAllClients(false); renderTransactionReport()">Clear</button>
                 </div>
               </div>
               <div id="report-client-list" class="report-client-rows"></div>
-              <p class="text-xs text-slate-500 mt-3 mb-0">Leave all cleared to include every client. Filters are saved on this device.</p>
+              <p class="text-xs text-slate-500 mt-3 mb-0">Leave all cleared to include every client. Filters update live.</p>
             </div>
 
             <div id="report-summary" class="dash-stats-row"></div>
@@ -3375,94 +3477,9 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
   </div>
 
   <!-- Product Modal -->
-  <div id="modal-product" class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-      <div class="p-5 border-b flex justify-between items-center">
-        <h3 id="product-modal-title" class="font-semibold text-lg">Add Equipment</h3>
-        <button onclick="closeModal('modal-product')" class="text-slate-400 hover:text-slate-600 text-xl">×</button>
-      </div>
-      <form id="product-form" class="p-5 space-y-4" onsubmit="saveProduct(event)">
-        <input type="hidden" id="product-id" />
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">SKU *</label>
-            <input id="p-sku" required class="w-full px-3 py-2 border rounded-lg text-sm" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">Category *</label>
-            <select id="p-category" required class="w-full px-3 py-2 border rounded-lg text-sm">
-              <option value="">Select category...</option>
-            </select>
-          </div>
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">Name *</label>
-          <input id="p-name" required class="w-full px-3 py-2 border rounded-lg text-sm" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">Description / Specs</label>
-          <textarea id="p-desc" rows="3" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Technical specifications..."></textarea>
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">Key Features</label>
-          <textarea id="p-features" rows="3" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="One feature per line&#10;e.g.&#10;3.0 Tesla magnet&#10;Full body imaging&#10;Advanced coils included"></textarea>
-          <p class="text-xs text-slate-400 mt-1">One feature per line — shown as bullets in presentations</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">Product Image</label>
-          <div class="flex items-start gap-3">
-            <div id="p-image-preview" class="w-20 h-20 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-              <span class="text-2xl text-slate-300">📷</span>
-            </div>
-            <div class="flex-1">
-              <input type="file" id="p-image" accept="image/*" class="text-sm w-full" onchange="previewProductImage(event)" />
-              <p class="text-xs text-slate-400 mt-1">Recommended: under 400 KB for best performance</p>
-              <button type="button" onclick="clearProductImage()" class="text-xs text-red-500 mt-1 hover:underline">Remove image</button>
-            </div>
-          </div>
-          <input type="hidden" id="p-image-data" />
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">Price *</label>
-            <input id="p-price" type="number" step="0.01" min="0" required class="w-full px-3 py-2 border rounded-lg text-sm" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">Currency *</label>
-            <select id="p-currency" class="w-full px-3 py-2 border rounded-lg text-sm">
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-              <option value="NGN">NGN</option>
-            </select>
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">Stock Qty</label>
-            <input id="p-stock" type="number" min="0" value="0" class="input-compact" inputmode="numeric" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">Low Stock Alert</label>
-            <input id="p-low" type="number" min="0" value="2" class="input-compact" inputmode="numeric" />
-          </div>
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">Brand</label>
-          <input id="p-brand" class="w-full px-3 py-2 border rounded-lg text-sm" />
-        </div>
-        <div class="flex items-center gap-2">
-          <input id="p-active" type="checkbox" checked class="rounded" />
-          <label for="p-active" class="text-sm">Active (available for quotes)</label>
-        </div>
-        <div class="flex justify-end gap-2 pt-2">
-          <button type="button" onclick="closeModal('modal-product')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm">Save Equipment</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <!-- product modal removed: use page-product-editor -->
 
-  <!-- Client Modal -->
+<!-- Client Modal -->
   <div id="modal-client" class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
       <div class="p-5 border-b flex justify-between items-center">

@@ -4340,3 +4340,100 @@ html.dark .data-table td, html.dark .report-table td {
   .table-mobile-only { display: none !important; }
   .table-desktop-only { display: block !important; }
 }
+
+
+/* ===== Spacing, labels, report 2x2, product editor ===== */
+
+/* Cards must never overlap */
+.entity-cards,
+.report-client-rows,
+.report-mobile-cards,
+.client-history-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem !important;
+}
+.entity-card,
+.report-result-card,
+.client-mini-card,
+.line-card,
+.select-row {
+  margin: 0 !important;
+  position: relative;
+  z-index: 1;
+}
+
+/* Labels sit directly above their control */
+.filter-date-field,
+.filter-status-field,
+.settings-form-grid > div {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 0.35rem !important;
+}
+.filter-date-label,
+.settings-label {
+  display: block;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2;
+  position: static !important;
+}
+.filter-date-field .filter-control,
+.filter-status-field .filter-control,
+.settings-input {
+  width: 100%;
+  margin: 0 !important;
+}
+
+/* Reports: even 2×2 filter grid */
+.report-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 0.85rem;
+  width: 100%;
+}
+.report-filter-grid .filter-date-field {
+  min-width: 0;
+  width: 100%;
+}
+.report-filter-grid .filter-control {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 2.65rem;
+  border-radius: 999px !important;
+  box-sizing: border-box;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.report-filter-grid .status-select-dark {
+  background: #0f172a !important;
+  color: #fff !important;
+  border-color: #0f172a !important;
+}
+html.dark .report-filter-grid .status-select-dark {
+  background: #0a0a0a !important;
+  border-color: #0a0a0a !important;
+}
+@media (min-width: 900px) {
+  .report-filter-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Product editor page */
+#page-product-editor .panel-soft { margin: 0; }
+#page-product-editor .settings-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+}
+@media (min-width: 640px) {
+  #page-product-editor .settings-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  #page-product-editor .settings-span-2 { grid-column: 1 / -1; }
+}
