@@ -767,6 +767,7 @@ function loadData() {
       } else if (data.deviceProfile.name && /^this device$/i.test(String(data.deviceProfile.name).trim())) {
         data.deviceProfile.name = '';
       }
+      if (!data.userProfile) data.userProfile = { username: '' };
       if (!data.lastBackupAt) data.lastBackupAt = null;
       if (!data.settings) data.settings = {};
       if (data.settings.followUpDays == null) data.settings.followUpDays = 14;
@@ -1013,6 +1014,14 @@ function navigate(page) {
 }
 
 // -------------------- Dashboard --------------------
+function getUserDisplayName() {
+  if (data && data.userProfile && data.userProfile.username) {
+    const n = String(data.userProfile.username).trim();
+    if (n) return n;
+  }
+  return '';
+}
+
 function updateDashboardGreeting() {
   const el = document.getElementById('dash-greeting-title');
   if (!el) return;
@@ -1021,24 +1030,41 @@ function updateDashboardGreeting() {
   if (hour < 12) greet = 'Good morning';
   else if (hour < 17) greet = 'Good afternoon';
   else greet = 'Good evening';
-
-  // Prefer name from Settings → Device name (numbering & workflow)
-  let name = '';
-  if (data && data.deviceProfile && data.deviceProfile.name) {
-    name = String(data.deviceProfile.name).trim();
-  }
-  // Ignore placeholder defaults
-  if (!name || /^this device$/i.test(name) || /^device$/i.test(name)) {
-    name = '';
-  }
-  // Optional: signed-in email local-part only if settings name empty
-  if (!name) {
-    try {
-      const u = window.MedicanoCloud && window.MedicanoCloud.currentUser && window.MedicanoCloud.currentUser();
-      if (u && u.displayName) name = String(u.displayName).trim();
-    } catch (e) {}
-  }
+  const name = getUserDisplayName();
   el.textContent = name ? (greet + ', ' + name) : greet;
+}
+
+function saveUserSettings() {
+  if (!data.userProfile) data.userProfile = {};
+  data.userProfile.username = (document.getElementById('set-username')?.value || '').trim();
+  saveData();
+  updateDashboardGreeting();
+  if (typeof logAudit === 'function') logAudit('user_settings', data.userProfile.username || '(cleared)');
+  alert('User settings saved.');
+}
+
+function updateConnectionBadge() {
+  const badge = document.querySelector('.offline-badge');
+  const text = document.querySelector('.offline-text');
+  const dot = document.querySelector('.offline-badge .offline-dot');
+  if (!badge || !text) return;
+  const online = typeof navigator !== 'undefined' && navigator.onLine;
+  let signedIn = false;
+  try {
+    signedIn = !!(window.MedicanoCloud && window.MedicanoCloud.isSignedIn && window.MedicanoCloud.isSignedIn());
+  } catch (e) {}
+  badge.classList.toggle('is-online', online && signedIn);
+  badge.classList.toggle('is-offline', !(online && signedIn));
+  if (online && signedIn) {
+    text.textContent = 'Online';
+    badge.title = 'Signed in and connected — cloud sync active';
+  } else if (online) {
+    text.textContent = 'Offline';
+    badge.title = 'Online network, local data (sign in to sync)';
+  } else {
+    text.textContent = 'Offline';
+    badge.title = 'No network — working from this device';
+  }
 }
 
 function renderDashboard() {
@@ -3641,7 +3667,7 @@ function renderSettings() {
   set('set-next-quote', n.nextQuoteNum || data.nextQuoteNum || 1001);
   set('set-next-invoice', n.nextInvoiceNum || data.nextInvoiceNum || 2001);
   set('set-followup-days', (data.settings && data.settings.followUpDays) || 14);
-  set('set-device-name', (data.deviceProfile && data.deviceProfile.name) || '');
+  set('set-username', (data.userProfile && data.userProfile.username) || '');
   const stockEl = document.getElementById('set-auto-stock');
   if (stockEl) stockEl.checked = !data.settings || data.settings.autoDeductStockOnPaid !== false;
   renderNoteTemplatesEditor();
@@ -5593,10 +5619,7 @@ function saveNumberingSettings() {
   data.settings = data.settings || {};
   data.settings.followUpDays = parseInt(document.getElementById('set-followup-days')?.value, 10) || 14;
   data.settings.autoDeductStockOnPaid = !!document.getElementById('set-auto-stock')?.checked;
-  if (!data.deviceProfile) data.deviceProfile = { name: '', id: 'dev_' + Date.now().toString(36) };
-  const devName = (document.getElementById('set-device-name')?.value || '').trim();
-  data.deviceProfile.name = devName;
-  if (typeof updateDashboardGreeting === 'function') updateDashboardGreeting();
+  // device profile kept for audit trail only; username is under User settings
   saveData();
   logAudit('settings', 'Numbering / workflow settings saved');
   alert('Settings saved.');
@@ -5881,8 +5904,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Always hydrate dashboard stats first so numbers are never stuck at zero
   try { renderDashboard(); } catch (e) { console.error(e); }
   navigate(startPage);
+  try { updateConnectionBadge(); } catch (e) {}
+  window.addEventListener('online', updateConnectionBadge);
+  window.addEventListener('offline', updateConnectionBadge);
   try { window.scrollTo(0, 0); } catch (e) {}
 });
+
+window.onMedicanoAuthChanged = function () {
+  try { updateConnectionBadge(); } catch (e) {}
+  try { updateDashboardGreeting(); } catch (e) {}
+};
 
 function closeSidebar() {
   const sb = document.getElementById('sidebar');

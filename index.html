@@ -2466,9 +2466,9 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                   <label class="settings-label">Brand</label>
                   <input id="p-brand" class="settings-input w-full" />
                 </div>
-                <div>
-                  <label class="settings-label flex items-center gap-2" style="margin-top:1.4rem">
-                    <input id="p-active" type="checkbox" checked class="rounded" />
+                <div class="settings-span-2">
+                  <label class="check-inline">
+                    <input id="p-active" type="checkbox" checked />
                     <span>Active in catalog</span>
                   </label>
                 </div>
@@ -2993,8 +2993,8 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               <div class="flex items-center justify-between gap-2 mb-3">
                 <h4 class="font-semibold text-sm m-0">Clients</h4>
                 <div class="flex gap-2">
-                  <button type="button" class="action-chip soft" onclick="reportSelectAllClients(true); renderTransactionReport()">Select all</button>
-                  <button type="button" class="action-chip soft" onclick="reportSelectAllClients(false); renderTransactionReport()">Clear</button>
+                  <button type="button" class="pres-tool-btn pres-tool-select" onclick="reportSelectAllClients(true); renderTransactionReport()">Select all</button>
+                  <button type="button" class="pres-tool-btn pres-tool-clear" onclick="reportSelectAllClients(false); renderTransactionReport()">Clear</button>
                 </div>
               </div>
               <div id="report-client-list" class="report-client-rows"></div>
@@ -3205,8 +3205,8 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               <div class="flex flex-col sm:flex-row gap-2 mb-3">
                 <input id="pres-search" type="search" placeholder="Search equipment..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" oninput="renderPresPicker()" />
                 <div class="flex gap-2">
-                  <button type="button" onclick="selectAllPres(true)" class="px-3 py-2 text-sm bg-brand-100 text-brand-800 rounded-lg">Select All</button>
-                  <button type="button" onclick="selectAllPres(false)" class="px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg">Clear</button>
+                  <button type="button" onclick="selectAllPres(true)" class="pres-tool-btn pres-tool-select">Select all</button>
+                  <button type="button" onclick="selectAllPres(false)" class="pres-tool-btn pres-tool-clear">Clear</button>
                 </div>
               </div>
               <div id="pres-picker" class="pres-picker-stack max-h-80 overflow-y-auto mb-4">
@@ -3357,6 +3357,25 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
             </div>
 
 
+            
+            <!-- User profile -->
+            <div class="settings-card settings-panel collapsed" data-panel="user">
+              <button type="button" class="settings-panel-toggle" onclick="toggleSettingsPanel('user')">
+                <span class="settings-card-title">User</span>
+                <span class="settings-chevron">▼</span>
+              </button>
+              <div class="settings-panel-body">
+                <p class="settings-help">Your display name is used in the dashboard greeting on this device.</p>
+                <div class="settings-form-grid">
+                  <div class="settings-span-2">
+                    <label class="settings-label">Username</label>
+                    <input id="set-username" type="text" class="settings-input" placeholder="e.g. Valerian" maxlength="40" />
+                  </div>
+                </div>
+                <button type="button" onclick="saveUserSettings()" class="settings-primary-btn">Save user settings</button>
+              </div>
+            </div>
+
             <!-- Numbering & workflow -->
             <div class="settings-card settings-panel collapsed" data-panel="numbering">
               <button type="button" class="settings-panel-toggle" onclick="toggleSettingsPanel('numbering')">
@@ -3385,10 +3404,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                     <label class="settings-label">Follow-up after (days)</label>
                     <input id="set-followup-days" type="number" min="1" class="settings-input" value="14" />
                   </div>
-                  <div>
-                    <label class="settings-label">Device name (audit trail)</label>
-                    <input id="set-device-name" type="text" class="settings-input" placeholder="e.g. Sales laptop" />
-                  </div>
+                  
                   <div class="settings-span-2">
                     <label class="flex items-center gap-2 text-sm">
                       <input id="set-auto-stock" type="checkbox" checked />

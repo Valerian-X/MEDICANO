@@ -1,6 +1,5 @@
 /**
  * Medicano Firebase Auth + Firestore sync (compat SDK)
- * Requires: firebase-config.js + firebase-*-compat.js CDN scripts
  */
 (function () {
   const cfg = window.MEDICANO_FIREBASE || {};
@@ -26,10 +25,29 @@
       if (auth && auth.currentUser) btn.textContent = 'Sign out';
       else btn.textContent = ready ? 'Sign in to sync' : 'Cloud sync (setup)';
     }
+    if (typeof window.updateConnectionBadge === 'function') {
+      try { window.updateConnectionBadge(); } catch (e) {}
+    }
   }
 
   function workspaceRef(uid) {
     return db.collection('users').doc(uid).collection('workspace').doc('main');
+  }
+
+  /** Firestore docs max ~1MB — strip large base64 images from cloud payload */
+  function cloudSafePayload(src) {
+    const data = JSON.parse(JSON.stringify(src || {}));
+    if (Array.isArray(data.products)) {
+      data.products = data.products.map(function (p) {
+        const copy = Object.assign({}, p);
+        if (copy.image && String(copy.image).length > 2000) {
+          copy.image = '';
+          copy._imageOmittedForSync = true;
+        }
+        return copy;
+      });
+    }
+    return data;
   }
 
   async function applyRemotePayload(remote) {
@@ -41,6 +59,17 @@
       applyingRemote = true;
       const payload = typeof remote.payload === 'string' ? JSON.parse(remote.payload) : remote.payload;
       if (payload && typeof payload === 'object') {
+        // Preserve local product images if cloud omitted them
+        if (window.data && Array.isArray(window.data.products) && Array.isArray(payload.products)) {
+          const localById = {};
+          window.data.products.forEach(function (p) { localById[p.id] = p; });
+          payload.products.forEach(function (p) {
+            if ((!p.image || p._imageOmittedForSync) && localById[p.id] && localById[p.id].image) {
+              p.image = localById[p.id].image;
+            }
+            delete p._imageOmittedForSync;
+          });
+        }
         window.data = payload;
         if (typeof window.saveDataLocalOnly === 'function') window.saveDataLocalOnly();
         else localStorage.setItem('medicano_data_v1', JSON.stringify(payload));
@@ -58,20 +87,31 @@
     if (applyingRemote && !force) return { ok: false, reason: 'applying-remote' };
     status('Syncing…', 'syncing');
     try {
-      const payload = window.data;
+      const payload = cloudSafePayload(window.data);
       if (!payload) return { ok: false, reason: 'no-data' };
       payload.updatedAt = new Date().toISOString();
+      if (window.data) window.data.updatedAt = payload.updatedAt;
       await workspaceRef(auth.currentUser.uid).set({
         updatedAt: payload.updatedAt,
         email: auth.currentUser.email || '',
-        payload: JSON.parse(JSON.stringify(payload))
+        payload: payload
       }, { merge: true });
       status(auth.currentUser.email || 'Synced', 'online');
       return { ok: true };
     } catch (e) {
-      console.error(e);
-      status('Sync failed', 'error');
-      return { ok: false, error: String(e.message || e) };
+      console.error('sync push failed', e);
+      var code = (e && e.code) ? e.code : '';
+      var msg = (e && e.message) ? e.message : String(e);
+      if (code.indexOf('permission') >= 0 || /permission|insufficient/i.test(msg)) {
+        status('Sync failed: Firestore rules', 'error');
+      } else if (/size|too big|exceeds/i.test(msg)) {
+        status('Sync failed: data too large', 'error');
+      } else if (!navigator.onLine) {
+        status('Sync failed: offline', 'error');
+      } else {
+        status('Sync failed', 'error');
+      }
+      return { ok: false, error: msg, code: code };
     }
   }
 
@@ -92,11 +132,16 @@
       unsubSnap = ref.onSnapshot(function (s) {
         if (!s.exists || applyingRemote) return;
         applyRemotePayload(s.data());
+      }, function (err) {
+        console.error('snapshot error', err);
+        status('Sync failed', 'error');
       });
       status((auth.currentUser && auth.currentUser.email) || 'Synced', 'online');
     } catch (e) {
-      console.error(e);
-      status('Sync failed', 'error');
+      console.error('pull failed', e);
+      var msg = (e && e.message) ? e.message : String(e);
+      if (/permission/i.test(msg)) status('Sync failed: Firestore rules', 'error');
+      else status('Sync failed', 'error');
     }
   }
 
@@ -110,7 +155,6 @@
     }
     if (typeof firebase === 'undefined' || !firebase.initializeApp) {
       status('Firebase SDK missing', 'error');
-      console.error('Firebase compat SDK not loaded');
       window.MedicanoCloud = api;
       return;
     }
@@ -142,12 +186,12 @@
     currentUser: function () { return (auth && auth.currentUser) || null; },
     signIn: function (email, password) {
       if (!ready) return Promise.reject(new Error('Firebase is not configured.'));
-      if (!auth) return Promise.reject(new Error('Firebase Auth is not ready. Check network and refresh.'));
+      if (!auth) return Promise.reject(new Error('Firebase Auth is not ready.'));
       return auth.signInWithEmailAndPassword(email, password);
     },
     signUp: function (email, password) {
       if (!ready) return Promise.reject(new Error('Firebase is not configured.'));
-      if (!auth) return Promise.reject(new Error('Firebase Auth is not ready. Check network and refresh.'));
+      if (!auth) return Promise.reject(new Error('Firebase Auth is not ready.'));
       return auth.createUserWithEmailAndPassword(email, password);
     },
     signOut: function () {
@@ -158,7 +202,6 @@
     schedulePush: schedulePush
   };
 
-  // Expose early so UI does not say "module not loaded"
   window.MedicanoCloud = api;
 
   if (document.readyState === 'loading') {

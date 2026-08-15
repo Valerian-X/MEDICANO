@@ -4439,3 +4439,82 @@ html.dark .report-filter-grid .status-select-dark {
   }
   #page-product-editor .settings-span-2 { grid-column: 1 / -1; }
 }
+
+
+/* User settings + connection badge + form check + pres tools */
+.check-inline {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  width: auto;
+}
+.check-inline input[type="checkbox"] {
+  width: 1rem !important;
+  height: 1rem !important;
+  min-width: 1rem !important;
+  margin: 0 !important;
+  accent-color: #0f766e;
+  flex-shrink: 0;
+}
+.check-inline span { line-height: 1.2; }
+
+.offline-badge.is-online {
+  background: #d1fae5 !important;
+  color: #065f46 !important;
+}
+.offline-badge.is-online .offline-dot {
+  background: #10b981 !important;
+}
+html.dark .offline-badge.is-online {
+  background: #064e3b !important;
+  color: #a7f3d0 !important;
+}
+
+/* Presentation-style tool buttons */
+.pres-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.pres-tool-select {
+  background: #ccfbf1 !important; /* mint like presentation */
+  color: #0f172a !important; /* black text */
+}
+.pres-tool-clear {
+  background: #e2e8f0 !important;
+  color: #334155 !important;
+}
+html.dark .pres-tool-select {
+  background: #5eead4 !important;
+  color: #0f172a !important;
+}
+html.dark .pres-tool-clear {
+  background: #3f3f46 !important;
+  color: #f4f4f5 !important;
+}
+
+/* Reports Type control — teal brand instead of near-black */
+#page-reports .report-filter-grid #report-type,
+#page-reports .report-filter-grid .status-select-dark {
+  background: #0f766e !important;
+  border-color: #0f766e !important;
+  color: #ffffff !important;
+}
+html.dark #page-reports .report-filter-grid #report-type,
+html.dark #page-reports .report-filter-grid .status-select-dark {
+  background: #0d9488 !important;
+  border-color: #0d9488 !important;
+  color: #ffffff !important;
+}
