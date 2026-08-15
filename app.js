@@ -796,9 +796,112 @@ function loadData() {
   }
 }
 
-function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+function saveDataLocalOnly() {
+  try {
+    if (data && typeof data === 'object') {
+      data.updatedAt = data.updatedAt || new Date().toISOString();
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('saveDataLocalOnly', e);
+  }
 }
+
+function saveData() {
+  if (data && typeof data === 'object') {
+    data.updatedAt = new Date().toISOString();
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  if (window.MedicanoCloud && typeof window.MedicanoCloud.schedulePush === 'function') {
+    window.MedicanoCloud.schedulePush();
+  }
+}
+
+function refreshAllViews() {
+  try {
+    const page = document.querySelector('.page:not(.hidden)');
+    const id = page && page.id ? page.id.replace('page-', '') : 'dashboard';
+    if (typeof navigate === 'function') navigate(id === 'quote-editor' ? 'quotes' : id === 'invoice-editor' ? 'invoices' : id === 'client-detail' ? 'clients' : id);
+  } catch (e) {
+    if (typeof renderDashboard === 'function') renderDashboard();
+  }
+}
+
+// ---- Auth UI (Firebase bridge) ----
+let authMode = 'signin';
+
+function openAuthModal() {
+  const m = document.getElementById('auth-modal');
+  if (!m) return;
+  m.classList.remove('hidden');
+  const cloud = window.MedicanoCloud;
+  const hint = document.getElementById('auth-config-hint');
+  if (hint) {
+    if (cloud && cloud.isConfigured && cloud.isConfigured()) hint.classList.add('hidden');
+    else hint.classList.remove('hidden');
+  }
+  setAuthMode(authMode);
+}
+
+function closeAuthModal() {
+  const m = document.getElementById('auth-modal');
+  if (m) m.classList.add('hidden');
+  const err = document.getElementById('auth-error');
+  if (err) { err.textContent = ''; err.classList.add('hidden'); }
+}
+
+function setAuthMode(mode) {
+  authMode = mode === 'signup' ? 'signup' : 'signin';
+  const title = document.getElementById('auth-modal-title');
+  const submit = document.getElementById('auth-submit');
+  const tabIn = document.getElementById('auth-tab-signin');
+  const tabUp = document.getElementById('auth-tab-signup');
+  if (title) title.textContent = authMode === 'signup' ? 'Create account' : 'Sign in';
+  if (submit) submit.textContent = authMode === 'signup' ? 'Create account' : 'Sign in';
+  if (tabIn) tabIn.classList.toggle('is-active', authMode === 'signin');
+  if (tabUp) tabUp.classList.toggle('is-active', authMode === 'signup');
+  if (tabIn) tabIn.classList.toggle('soft', authMode !== 'signin');
+  if (tabUp) tabUp.classList.toggle('soft', authMode !== 'signup');
+}
+
+async function submitAuthForm(e) {
+  e.preventDefault();
+  const email = (document.getElementById('auth-email')?.value || '').trim();
+  const password = document.getElementById('auth-password')?.value || '';
+  const err = document.getElementById('auth-error');
+  const cloud = window.MedicanoCloud;
+  if (!cloud) {
+    if (err) { err.textContent = 'Cloud module not loaded yet. Check your network.'; err.classList.remove('hidden'); }
+    return;
+  }
+  try {
+    if (authMode === 'signup') await cloud.signUp(email, password);
+    else await cloud.signIn(email, password);
+    closeAuthModal();
+    if (typeof logAudit === 'function') logAudit('auth', authMode + ' ' + email);
+  } catch (ex) {
+    if (err) {
+      err.textContent = (ex && ex.message) ? ex.message : String(ex);
+      err.classList.remove('hidden');
+    }
+  }
+}
+
+async function onAuthActionClick() {
+  const cloud = window.MedicanoCloud;
+  if (cloud && cloud.isSignedIn && cloud.isSignedIn()) {
+    if (confirm('Sign out? Data stays on this device; cloud sync pauses until you sign in again.')) {
+      await cloud.signOut();
+    }
+    return;
+  }
+  openAuthModal();
+}
+
+window.onMedicanoAuthChanged = function () {
+  // optional hook for UI refresh
+};
+
 
 // -------------------- Helpers --------------------
 function formatNGN(amount) {
@@ -5121,10 +5224,10 @@ function renderTransactionReport() {
 
   if (summary) {
     summary.innerHTML = `
-      <div class="report-summary-card"><p class="rsl">Rows</p><p class="rsv">${rows.length}</p></div>
-      <div class="report-summary-card"><p class="rsl">Collected</p><p class="rsv">${formatNGN(collected)}</p></div>
-      <div class="report-summary-card"><p class="rsl">Invoiced</p><p class="rsv">${formatNGN(invoiced)}</p></div>
-      <div class="report-summary-card"><p class="rsl">Clients</p><p class="rsv">${clientCount}</p></div>
+      <div class="report-stat"><p class="rsl">Rows</p><p class="rsv">${rows.length}</p></div>
+      <div class="report-stat"><p class="rsl">Collected</p><p class="rsv">${formatNGN(collected)}</p></div>
+      <div class="report-stat"><p class="rsl">Invoiced</p><p class="rsv">${formatNGN(invoiced)}</p></div>
+      <div class="report-stat"><p class="rsl">Clients</p><p class="rsv">${clientCount}</p></div>
     `;
   }
 

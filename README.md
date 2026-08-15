@@ -59,3 +59,29 @@ All data is stored in the browser’s localStorage under the key `medicano_data_
 
 ---
 Built for Medicano Resources Limited • Offline-first • English
+
+
+## Cloud sync (Firebase)
+
+Medicano stays **offline-first**. Optional Firebase Auth + Firestore syncs the same workspace across devices.
+
+1. Create a Firebase project → enable **Email/Password** auth → create **Firestore**.
+2. Add a web app and copy the config into `firebase-config.js`, set `enabled: true`.
+3. Firestore rules (each user only reads/writes their own data):
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
+
+4. Deploy the whole `medicano` folder to **GitHub Pages** (Settings → Pages → deploy from branch `/` or `/docs`).
+5. In the app sidebar: **Sign in to sync** → create an account or sign in.
+
+Data path: `users/{uid}/workspace/main`. Local `localStorage` remains the working copy; cloud updates when you are signed in and online.
+

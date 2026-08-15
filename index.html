@@ -2150,20 +2150,6 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
 </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
-  <!-- Login gate: blocks the app until signed in -->
-  <div id="login-overlay" class="login-overlay">
-    <div class="login-card">
-      <img src="logo.png" alt="Medicano" class="login-logo" />
-      <h1>Medicano</h1>
-      <p class="login-sub">Sign in to access your quotes and inventory</p>
-      <input id="login-email" type="email" placeholder="Email" autocomplete="username" />
-      <input id="login-password" type="password" placeholder="Password" autocomplete="current-password" />
-      <p id="login-error" class="login-error hidden"></p>
-      <button type="button" class="login-btn-primary" onclick="handleLogin()">Sign In</button>
-      <button type="button" class="login-btn-secondary" onclick="handleSignup()">Create Account</button>
-      <p id="login-status" class="login-status hidden">Working…</p>
-    </div>
-  </div>
   <!-- Mobile sidebar overlay -->
   <div id="sidebar-overlay" class="no-print fixed inset-0 bg-black/50 z-30 hidden md:hidden" onclick="closeSidebar()"></div>
   <div id="app" class="min-h-screen flex">
@@ -2212,11 +2198,17 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         <a href="#settings" data-page="settings" class="sidebar-link flex items-center gap-3">
           <span>⚙️</span> Settings
         </a>
+        <div id="sidebar-account" class="sidebar-account">
+          <div id="auth-status" class="auth-status">
+            <span class="auth-status-dot" id="sync-dot" title="Sync status"></span>
+            <span id="auth-status-text" class="auth-status-text">Offline local</span>
+          </div>
+          <button type="button" id="auth-action-btn" class="auth-action-btn" onclick="onAuthActionClick()">Sign in to sync</button>
+        </div>
       </nav>
       <div class="p-4 text-xs" style="border-top:1px solid rgba(255,255,255,0.08)">
         <p class="opacity-50">Offline-ready • v1.0</p>
         <p id="sync-status" class="mt-1 opacity-70">● Local data</p>
-        <button type="button" onclick="handleLogout()" class="mt-2 opacity-70 hover:opacity-100 underline" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;font-size:inherit;">Sign out</button>
       </div>
     </aside>
 
@@ -2854,63 +2846,61 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
 
         <!-- IN STOCK / INVENTORY -->
         
-        <!-- REPORTS: transactions / payments -->
+        <!-- REPORTS -->
         <section id="page-reports" class="page hidden">
-          <div class="report-intro panel-soft mb-4">
-            <p class="text-sm text-slate-600 report-intro-text">
-              Professional ledger for any period. Filter by date, one or more clients, and type
-              (<strong>payments</strong> received and/or <strong>invoices issued</strong>). Preview, print, or export CSV.
-              Filters are remembered on this device.
-            </p>
-          </div>
-
-          <div class="report-filters panel-soft mb-4">
-            <div class="report-filters-grid">
-              <label class="filter-date-field">
-                <span class="filter-date-label">Start date</span>
-                <input id="report-date-from" type="date" class="filter-control" />
-              </label>
-              <label class="filter-date-field">
-                <span class="filter-date-label">End date</span>
-                <input id="report-date-to" type="date" class="filter-control" />
-              </label>
-              <label class="filter-date-field">
-                <span class="filter-date-label">Type</span>
-                <select id="report-type" class="filter-control">
-                  <option value="payments">Payments only</option>
-                  <option value="invoices">Invoices issued</option>
-                  <option value="both">Payments + invoices</option>
-                </select>
-              </label>
-              <label class="filter-date-field">
-                <span class="filter-date-label">Method (payments)</span>
-                <select id="report-method" class="filter-control">
-                  <option value="">All methods</option>
-                  <option value="transfer">Transfer</option>
-                  <option value="cash">Cash</option>
-                  <option value="cheque">Cheque</option>
-                  <option value="card">Card</option>
-                  <option value="other">Other</option>
-                </select>
-              </label>
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="list-toolbar-filters">
+                <label class="filter-date-field">
+                  <span class="filter-date-label">Start date</span>
+                  <input id="report-date-from" type="date" class="filter-control" title="Start date" />
+                </label>
+                <label class="filter-date-field">
+                  <span class="filter-date-label">End date</span>
+                  <input id="report-date-to" type="date" class="filter-control" title="End date" />
+                </label>
+                <label class="filter-status-field">
+                  <span class="filter-date-label">Type</span>
+                  <select id="report-type" class="filter-control filter-status-select status-select-dark">
+                    <option value="payments">Payments only</option>
+                    <option value="invoices">Invoices issued</option>
+                    <option value="both">Payments + invoices</option>
+                  </select>
+                </label>
+                <label class="filter-status-field">
+                  <span class="filter-date-label">Method</span>
+                  <select id="report-method" class="filter-control filter-status-select">
+                    <option value="">All methods</option>
+                    <option value="transfer">Transfer</option>
+                    <option value="cash">Cash</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="card">Card</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button type="button" onclick="renderTransactionReport()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">Apply</button>
+                <button type="button" onclick="printTransactionReport()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium">Print</button>
+                <button type="button" onclick="exportTransactionReportCsv()" class="px-4 py-2 bg-slate-100 text-slate-800 rounded-lg text-sm font-medium">CSV</button>
+              </div>
             </div>
-            <div class="report-client-multi">
-              <div class="filter-date-label">Clients</div>
-              <div class="report-client-toolbar">
-                <button type="button" class="text-xs font-semibold text-brand-700" onclick="reportSelectAllClients(true)">Select all</button>
-                <button type="button" class="text-xs font-semibold text-slate-500" onclick="reportSelectAllClients(false)">Clear</button>
+
+            <div class="panel-soft">
+              <div class="flex items-center justify-between gap-2 mb-3">
+                <h4 class="font-semibold text-sm m-0">Clients</h4>
+                <div class="flex gap-2">
+                  <button type="button" class="action-chip soft" onclick="reportSelectAllClients(true)">Select all</button>
+                  <button type="button" class="action-chip soft" onclick="reportSelectAllClients(false)">Clear</button>
+                </div>
               </div>
               <div id="report-client-list" class="report-client-list"></div>
+              <p class="text-xs text-slate-500 mt-2 mb-0">Leave all cleared to include every client. Filters are saved on this device.</p>
             </div>
-            <div class="report-actions">
-              <button type="button" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium" onclick="renderTransactionReport()">Apply filters</button>
-              <button type="button" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium" onclick="printTransactionReport()">Print statement</button>
-              <button type="button" class="px-4 py-2 bg-slate-100 text-slate-800 rounded-lg text-sm font-medium" onclick="exportTransactionReportCsv()">Export CSV</button>
-            </div>
-          </div>
 
-          <div class="report-summary" id="report-summary"></div>
-          <div id="report-preview" class="report-preview"></div>
+            <div id="report-summary" class="dash-stats-row"></div>
+            <div id="report-preview" class="panel-soft report-preview-wrap"></div>
+          </div>
         </section>
 
 <section id="page-inventory" class="page hidden">
@@ -3508,15 +3498,41 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
     </div>
   </div>
 
+  <!-- Auth modal -->
+  <div id="auth-modal" class="auth-modal hidden" role="dialog" aria-modal="true">
+    <div class="auth-modal-card panel-soft">
+      <div class="flex items-center justify-between mb-3">
+        <h3 id="auth-modal-title" class="font-semibold text-lg m-0">Sign in</h3>
+        <button type="button" class="auth-close" onclick="closeAuthModal()" aria-label="Close">✕</button>
+      </div>
+      <p id="auth-modal-help" class="text-sm text-slate-500 mb-3">Sign in to sync Medicano across your devices via Firebase.</p>
+      <div class="auth-tabs mb-3">
+        <button type="button" id="auth-tab-signin" class="action-chip is-active" onclick="setAuthMode('signin')">Sign in</button>
+        <button type="button" id="auth-tab-signup" class="action-chip soft" onclick="setAuthMode('signup')">Create account</button>
+      </div>
+      <form id="auth-form" class="space-y-3" onsubmit="submitAuthForm(event)">
+        <div>
+          <label class="settings-label">Email</label>
+          <input id="auth-email" type="email" required class="settings-input w-full" autocomplete="email" placeholder="you@company.com" />
+        </div>
+        <div>
+          <label class="settings-label">Password</label>
+          <input id="auth-password" type="password" required minlength="6" class="settings-input w-full" autocomplete="current-password" placeholder="At least 6 characters" />
+        </div>
+        <p id="auth-error" class="text-sm text-red-500 hidden"></p>
+        <button type="submit" id="auth-submit" class="settings-primary-btn w-full">Sign in</button>
+      </form>
+      <p id="auth-config-hint" class="text-xs text-slate-500 mt-3 hidden">
+        Firebase is not configured yet. Add your project keys to <code>firebase-config.js</code> (see README).
+      </p>
+    </div>
+  </div>
+
   <!-- Print template (hidden) -->
   <div id="print-area" class="print-only p-8 max-w-4xl mx-auto text-sm">
     <!-- filled by JS -->
   </div>
 
-  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
-  <script src="firebase-init.js"></script>
   <script src="app.js"></script>
 
   <button id="btn-install-app" type="button" onclick="installMedicanoApp()"
