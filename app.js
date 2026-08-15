@@ -763,7 +763,9 @@ function loadData() {
         if (data.numbering.nextInvoiceNum == null) data.numbering.nextInvoiceNum = data.nextInvoiceNum || 2001;
       }
       if (!data.deviceProfile) {
-        data.deviceProfile = { name: 'This device', id: 'dev_' + Date.now().toString(36) };
+        data.deviceProfile = { name: '', id: 'dev_' + Date.now().toString(36) };
+      } else if (data.deviceProfile.name && /^this device$/i.test(String(data.deviceProfile.name).trim())) {
+        data.deviceProfile.name = '';
       }
       if (!data.lastBackupAt) data.lastBackupAt = null;
       if (!data.settings) data.settings = {};
@@ -871,7 +873,17 @@ async function submitAuthForm(e) {
   const err = document.getElementById('auth-error');
   const cloud = window.MedicanoCloud;
   if (!cloud) {
-    if (err) { err.textContent = 'Cloud module not loaded yet. Check your network.'; err.classList.remove('hidden'); }
+    if (err) {
+      err.textContent = 'Cloud module not loaded. Hard-refresh the page (or update the app). You need a network connection the first time to load Firebase.';
+      err.classList.remove('hidden');
+    }
+    return;
+  }
+  if (cloud.isConfigured && !cloud.isConfigured()) {
+    if (err) {
+      err.textContent = 'Firebase is not configured or the SDK failed to load. Check firebase-config.js and your network.';
+      err.classList.remove('hidden');
+    }
     return;
   }
   try {
@@ -1009,13 +1021,22 @@ function updateDashboardGreeting() {
   if (hour < 12) greet = 'Good morning';
   else if (hour < 17) greet = 'Good afternoon';
   else greet = 'Good evening';
+
+  // Prefer name from Settings → Device name (numbering & workflow)
   let name = '';
-  try {
-    const u = window.MedicanoCloud && window.MedicanoCloud.currentUser && window.MedicanoCloud.currentUser();
-    if (u && u.email) name = (u.displayName || u.email.split('@')[0] || '').trim();
-  } catch (e) {}
-  if (!name && data && data.deviceProfile && data.deviceProfile.name) {
+  if (data && data.deviceProfile && data.deviceProfile.name) {
     name = String(data.deviceProfile.name).trim();
+  }
+  // Ignore placeholder defaults
+  if (!name || /^this device$/i.test(name) || /^device$/i.test(name)) {
+    name = '';
+  }
+  // Optional: signed-in email local-part only if settings name empty
+  if (!name) {
+    try {
+      const u = window.MedicanoCloud && window.MedicanoCloud.currentUser && window.MedicanoCloud.currentUser();
+      if (u && u.displayName) name = String(u.displayName).trim();
+    } catch (e) {}
   }
   el.textContent = name ? (greet + ', ' + name) : greet;
 }
@@ -1299,16 +1320,19 @@ function renderProducts() {
   }).join('');
 }
 
-function showProductForm(id = null) {
-  navigate('product-editor');
+function fillProductEditorForm(id) {
   const title = document.getElementById('product-editor-title');
   const idEl = document.getElementById('product-id');
   if (idEl) idEl.value = id || '';
   if (title) title.textContent = id ? 'Edit Equipment' : 'Add Equipment';
-  const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = v; };
+  const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = (v == null ? '' : v); };
   if (id) {
     const p = getProduct(id);
-    if (!p) return;
+    if (!p) {
+      alert('Equipment not found.');
+      navigate('products');
+      return;
+    }
     set('p-sku', p.sku || '');
     set('p-name', p.name || '');
     set('p-desc', p.description || '');
@@ -1331,10 +1355,23 @@ function showProductForm(id = null) {
     if (act) act.checked = true;
     set('p-low', 2);
     set('p-stock', 0);
+    set('p-currency', 'USD');
     set('p-image-data', '');
     updateImagePreview('');
     populateCategorySelect('');
   }
+}
+
+function showProductForm(id = null) {
+  const page = document.getElementById('page-product-editor');
+  if (!page) {
+    console.error('page-product-editor missing from DOM');
+    alert('Equipment editor page is missing. Please hard-refresh the app.');
+    return;
+  }
+  navigate('product-editor');
+  // Fill after navigation so the page is visible and fields exist
+  setTimeout(function () { fillProductEditorForm(id); }, 0);
 }
 
 function editProduct(id) {
@@ -5556,7 +5593,10 @@ function saveNumberingSettings() {
   data.settings = data.settings || {};
   data.settings.followUpDays = parseInt(document.getElementById('set-followup-days')?.value, 10) || 14;
   data.settings.autoDeductStockOnPaid = !!document.getElementById('set-auto-stock')?.checked;
-  if (data.deviceProfile) data.deviceProfile.name = document.getElementById('set-device-name')?.value || data.deviceProfile.name;
+  if (!data.deviceProfile) data.deviceProfile = { name: '', id: 'dev_' + Date.now().toString(36) };
+  const devName = (document.getElementById('set-device-name')?.value || '').trim();
+  data.deviceProfile.name = devName;
+  if (typeof updateDashboardGreeting === 'function') updateDashboardGreeting();
   saveData();
   logAudit('settings', 'Numbering / workflow settings saved');
   alert('Settings saved.');
@@ -5822,7 +5862,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Close modals on backdrop click
   ['modal-product', 'modal-client'].forEach(id => {
-    document.getElementById(id).addEventListener('click', (e) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', (e) => {
       if (e.target.id === id) closeModal(id);
     });
   });
@@ -5830,8 +5872,14 @@ document.addEventListener('DOMContentLoaded', () => {
   let startPage = 'dashboard';
   try {
     const saved = sessionStorage.getItem('medicano_last_page');
-    if (saved && document.getElementById('page-' + saved)) startPage = saved;
+    // Don't restore editor pages on cold start (empty forms / confusing)
+    const skipRestore = ['product-editor', 'quote-editor', 'invoice-editor', 'client-detail'];
+    if (saved && document.getElementById('page-' + saved) && skipRestore.indexOf(saved) === -1) {
+      startPage = saved;
+    }
   } catch (e) {}
+  // Always hydrate dashboard stats first so numbers are never stuck at zero
+  try { renderDashboard(); } catch (e) { console.error(e); }
   navigate(startPage);
   try { window.scrollTo(0, 0); } catch (e) {}
 });
