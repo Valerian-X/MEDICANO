@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0f766e" />
-  <meta name="description" content="Medicano Resources Limited - Medical Equipment Catalog & Quoting System" />
-  <title>Medicano Resources | Medical Equipment Quoting</title>
+  <meta name="description" content="Medicano Resources Limited - Medical Items Catalog & Quoting System" />
+  <title>Medicano Resources | Medical Catalog & Quoting</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -1098,7 +1098,7 @@ html.dark textarea {
 .dash-tl-meta { font-size: 0.72rem; opacity: 0.7; margin-top: 0.2rem; }
 </style>
 <style id="quote-equip-css">
-/* Inventory metric cards — equal, professional */
+/* Items metric cards — equal, professional */
 .inv-metrics {
   display: grid;
   grid-template-columns: 1fr;
@@ -2172,7 +2172,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
           <span>📅</span> Events
         </a>
         <a href="#products" data-page="products" class="sidebar-link flex items-center gap-3">
-          <span>🛠️</span> Inventory
+          <span>📦</span> Inventory
         </a>
         <a href="#clients" data-page="clients" class="sidebar-link flex items-center gap-3">
           <span>🏥</span> Clients
@@ -2233,7 +2233,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
           <span class="search-icon" aria-hidden="true">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
           </span>
-          <input id="global-search" type="search" placeholder="Search equipment, clients, quotes, invoices…" class="global-search-input" autocomplete="off" />
+          <input id="global-search" type="search" placeholder="Search items, clients, quotes, invoices…" class="global-search-input" autocomplete="off" />
           <div id="global-search-results" class="global-search-results hidden"></div>
         </div>
       </header>
@@ -2253,7 +2253,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               </div>
               <div class="cal-month-actions">
                 <button type="button" class="action-chip soft" onclick="calGoToday()">Today</button>
-                <button type="button" class="action-chip dark" onclick="openCalEventForm()">+ Add event</button>
+                <button type="button" class="action-chip dark cal-action-btn" onclick="openCalEventForm()">+ Add event</button>
               </div>
               <div id="cal-grid" class="cal-grid"></div>
             </div>
@@ -2265,7 +2265,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                   <p class="cal-day-kicker">Today's timeline</p>
                   <h3 id="cal-day-label" class="cal-day-title">Day</h3>
                 </div>
-                <button type="button" class="action-chip pink" onclick="openCalEventForm()">Add event</button>
+                <button type="button" class="action-chip pink cal-action-btn" onclick="openCalEventForm()">Add event</button>
               </div>
               <div id="cal-timeline" class="cal-timeline"></div>
             </div>
@@ -2354,7 +2354,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
             <div class="dash-intel-main">
               <div class="dash-stats-row">
                 <div class="stat-card stat-yellow">
-                  <p class="stat-label">Total Equipment</p>
+                  <p class="stat-label">Total Items</p>
                   <p class="stat-value" id="stat-products">0</p>
                 </div>
                 <div class="stat-card stat-pink">
@@ -2389,7 +2389,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                     </button>
                     <button type="button" class="qa-btn qa-soft" onclick="navigate('products'); showProductForm()">
                       <span class="qa-icon">🛠️</span>
-                      <span class="qa-label">Add Equipment</span>
+                      <span class="qa-label">Add Item</span>
                     </button>
                     <button type="button" class="qa-btn qa-pink" onclick="navigate('clients'); showClientForm()">
                       <span class="qa-icon">🏥</span>
@@ -2442,7 +2442,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         <section id="page-product-editor" class="page hidden">
           <div class="mb-4 flex items-center gap-3 flex-wrap">
             <button type="button" onclick="navigate('products')" class="back-link text-sm hover:underline">← Back to Inventory</button>
-            <h3 id="product-editor-title" class="font-semibold text-lg m-0">Add Equipment</h3>
+            <h3 id="product-editor-title" class="font-semibold text-lg m-0">Add Item</h3>
           </div>
           <form id="product-editor-form" class="flex flex-col gap-4" onsubmit="saveProduct(event)">
             <input type="hidden" id="product-id" value="" />
@@ -2461,7 +2461,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 </div>
                 <div class="settings-span-2">
                   <label class="settings-label">Name</label>
-                  <input id="p-name" required class="settings-input w-full" placeholder="Equipment name" />
+                  <input id="p-name" required class="settings-input w-full" placeholder="Item name" />
                 </div>
                 <div>
                   <label class="settings-label">Brand</label>
@@ -2532,7 +2532,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
 
             <div class="flex flex-wrap gap-2 justify-end">
               <button type="button" onclick="navigate('products')" class="px-4 py-2.5 rounded-full text-sm font-semibold bg-slate-100 text-slate-800">Cancel</button>
-              <button type="submit" class="px-4 py-2.5 rounded-full text-sm font-semibold bg-brand-600 text-white">Save equipment</button>
+              <button type="submit" class="px-4 py-2.5 rounded-full text-sm font-semibold bg-brand-600 text-white">Save item</button>
             </div>
           </form>
         </section>
@@ -2541,11 +2541,11 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         <section id="page-products" class="page hidden">
           <div class="flex flex-col gap-3 mb-5">
             <div class="flex flex-col sm:flex-row gap-2 flex-1">
-              <input id="product-search" type="search" placeholder="Search equipment..." class="flex-1 max-w-md px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+              <input id="product-search" type="search" placeholder="Search items..." class="flex-1 max-w-md px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
               <select id="product-category-filter" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
                 <option value="">All Categories</option>
               </select>
-              <button onclick="showProductForm()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium whitespace-nowrap">+ Add Equipment</button>
+              <button onclick="showProductForm()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium whitespace-nowrap">+ Add Item</button>
             </div>
             <div class="select-stack" style="max-width:100%">
               <label class="select-row" style="border-radius:1.1rem;cursor:pointer">
@@ -2567,7 +2567,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               <button type="button" onclick="exportProductsExcel()" class="select-row" style="border-radius:1.1rem;border:none;width:100%;text-align:left">
                 <span class="select-row-icon">💾</span>
                 <span class="select-row-text">
-                  <span class="select-row-title">Export equipment</span>
+                  <span class="select-row-title">Export items</span>
                   <span class="select-row-sub">Download current catalog as CSV</span>
                 </span>
               </button>
@@ -2682,13 +2682,13 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               <!-- Product Picker — collapsible -->
               <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden quote-equip-panel" id="quote-equip-panel">
                 <button type="button" class="quote-equip-toggle w-full flex items-center justify-between px-5 py-4 text-left" onclick="toggleQuoteEquipPanel()">
-                  <span class="font-medium">Select Equipment to Add</span>
+                  <span class="font-medium">Select items to add</span>
                   <span class="quote-equip-chevron text-slate-400 text-sm">▼</span>
                 </button>
                 <div class="quote-equip-body">
                   <p class="quote-equip-help">Tick items, set units, then tap <strong>Add Selected</strong>. Adjust quantities again in Line Items if needed.</p>
                   <div class="quote-equip-toolbar">
-                    <input id="quote-product-search" type="search" placeholder="Search tools / equipment..." class="quote-equip-search" oninput="renderQuoteProductPicker()" />
+                    <input id="quote-product-search" type="search" placeholder="Search items..." class="quote-equip-search" oninput="renderQuoteProductPicker()" />
                     <div class="quote-equip-actions">
                       <button type="button" onclick="selectAllQuoteProducts(true)" class="quote-equip-btn soft">Select All</button>
                       <button type="button" onclick="selectAllQuoteProducts(false)" class="quote-equip-btn soft">Clear</button>
@@ -3042,7 +3042,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               <h3 class="font-semibold text-lg mb-3">Record stock movement</h3>
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-sm">
                 <div class="lg:col-span-2">
-                  <label class="block text-slate-500 mb-1">Equipment</label>
+                  <label class="block text-slate-500 mb-1">Item</label>
                   <select id="inv-product" class="w-full px-3 py-2 border border-slate-300 rounded-lg"></select>
                 </div>
                 <div>
@@ -3075,7 +3075,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
             <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
               <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
                 <h3 class="font-semibold">Current stock levels</h3>
-                <input id="inv-search" type="search" placeholder="Search equipment..." oninput="renderInventoryStock()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-full sm:w-56" />
+                <input id="inv-search" type="search" placeholder="Search items..." oninput="renderInventoryStock()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-full sm:w-56" />
               </div>
               <div id="inv-stock-list" class="entity-cards"></div>
             </div>
@@ -3101,7 +3101,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label class="block text-sm font-medium text-slate-700 mb-1">Presentation Title</label>
-                  <input id="pres-title" type="text" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="e.g. Radiology Solutions 2026" value="Medical Equipment Portfolio" />
+                  <input id="pres-title" type="text" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="e.g. Radiology Solutions 2026" value="Medical Items Portfolio" />
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-slate-700 mb-1">Prepared For (optional)</label>
@@ -3204,7 +3204,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
 
             <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
               <div class="flex flex-col sm:flex-row gap-2 mb-3">
-                <input id="pres-search" type="search" placeholder="Search equipment..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" oninput="renderPresPicker()" />
+                <input id="pres-search" type="search" placeholder="Search items..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" oninput="renderPresPicker()" />
                 <div class="flex gap-2">
                   <button type="button" onclick="selectAllPres(true)" class="pres-tool-btn pres-tool-select">Select all</button>
                   <button type="button" onclick="selectAllPres(false)" class="pres-tool-btn pres-tool-clear">Clear</button>
@@ -3323,7 +3323,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
             <!-- Categories -->
             <div class="settings-card settings-panel collapsed" data-panel="categories">
               <button type="button" class="settings-panel-toggle" onclick="toggleSettingsPanel('categories')">
-                <span class="settings-card-title">Equipment Categories</span>
+                <span class="settings-card-title">Item categories</span>
                 <span class="settings-chevron">▼</span>
               </button>
               <div class="settings-panel-body">
@@ -3366,7 +3366,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 <span class="settings-chevron">▼</span>
               </button>
               <div class="settings-panel-body">
-                <p class="settings-help">Your display name is used in the dashboard greeting on this device.</p>
+                
                 <div class="settings-form-grid">
                   <div class="settings-span-2">
                     <label class="settings-label">Username</label>
@@ -3460,7 +3460,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                   </button>
                   <button type="button" class="qa-btn qa-soft" onclick="exportProductsExcel()">
                     <span class="qa-icon">🛠️</span>
-                    <span class="qa-label">Export Equipment</span>
+                    <span class="qa-label">Export items</span>
                   </button>
                   <button type="button" class="qa-btn qa-blue" onclick="exportQuotesExcel()">
                     <span class="qa-icon">📋</span>
@@ -3468,11 +3468,11 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                   </button>
                   <button type="button" class="qa-btn qa-soft" onclick="downloadEquipmentTemplate()">
                     <span class="qa-icon">📄</span>
-                    <span class="qa-label">Equipment Template</span>
+                    <span class="qa-label">Item template</span>
                   </button>
                   <label class="qa-btn qa-pink" style="cursor:pointer">
                     <span class="qa-icon">📥</span>
-                    <span class="qa-label">Import Equipment</span>
+                    <span class="qa-label">Import items</span>
                     <input type="file" accept=".csv,text/csv" class="hidden" onchange="onImportProductsFile(event)" />
                   </label>
                   <label class="qa-btn qa-blue" style="cursor:pointer">

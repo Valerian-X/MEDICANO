@@ -482,7 +482,7 @@ function runGlobalSearch(q) {
   const hits = [];
   (data.products || []).forEach(p => {
     const hay = [p.sku, p.name, p.category, p.brand, p.description].join(' ').toLowerCase();
-    if (hay.includes(query)) hits.push({ type: 'Equipment', title: p.name, sub: p.sku || '', go: () => { navigate('products'); setTimeout(() => editProduct(p.id), 50); } });
+    if (hay.includes(query)) hits.push({ type: 'Item', title: p.name, sub: p.sku || '', go: () => { navigate('products'); setTimeout(() => editProduct(p.id), 50); } });
   });
   (data.clients || []).forEach(c => {
     const hay = [c.name, c.contact, c.email, c.phone, c.address].join(' ').toLowerCase();
@@ -1037,7 +1037,7 @@ function navigate(page) {
     dashboard: 'Dashboard',
     calendar: 'Events',
     products: 'Inventory',
-    'product-editor': 'Equipment',
+    'product-editor': 'Inventory item',
     clients: 'Clients',
     'client-detail': 'Client',
     quotes: 'Quotes',
@@ -1249,7 +1249,13 @@ function renderDashCalendar() {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayKey = toDateKey(new Date());
   const selectedKey = toDateKey(dashCalSelected);
-  const eventDays = new Set((data.calendarEvents || []).map(e => (e.date || '').slice(0, 10)));
+  const eventsByDay = {};
+  (data.calendarEvents || []).forEach(e => {
+    const k = (e.date || '').slice(0, 10);
+    if (!k) return;
+    if (!eventsByDay[k]) eventsByDay[k] = [];
+    eventsByDay[k].push(e);
+  });
 
   const labels = ['MO','TU','WE','TH','FR','SA','SU'];
   let html = labels.map(l => `<div class="dow">${l}</div>`).join('');
@@ -1259,8 +1265,10 @@ function renderDashCalendar() {
     const cls = ['d'];
     if (key === todayKey) cls.push('today');
     if (key === selectedKey) cls.push('selected');
-    if (eventDays.has(key)) cls.push('has');
-    html += `<button type="button" class="${cls.join(' ')}" onclick="selectDashDay('${key}')">${d}</button>`;
+    const dayEv = eventsByDay[key] || [];
+    if (dayEv.length) cls.push('has');
+    const dots = dayEv.slice(0, 3).map(e => `<span class="cal-dot ${e.color || 'pink'}"></span>`).join('');
+    html += `<button type="button" class="${cls.join(' ')}" onclick="selectDashDay('${key}')"><span class="d-num">${d}</span><span class="cal-dots">${dots}</span></button>`;
   }
   grid.innerHTML = html;
 }
@@ -1365,7 +1373,7 @@ function renderProducts() {
   const el = document.getElementById('products-list');
   if (!el) return;
   if (!list.length) {
-    el.innerHTML = '<div class="entity-empty">No equipment found</div>';
+    el.innerHTML = '<div class="entity-empty">No items found</div>';
     return;
   }
   el.innerHTML = list.map(p => {
@@ -1413,12 +1421,12 @@ function fillProductEditorForm(id) {
   const title = document.getElementById('product-editor-title');
   const idEl = document.getElementById('product-id');
   if (idEl) idEl.value = id || '';
-  if (title) title.textContent = id ? 'Edit Equipment' : 'Add Equipment';
+  if (title) title.textContent = id ? 'Edit Item' : 'Add Item';
   const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = (v == null ? '' : v); };
   if (id) {
     const p = getProduct(id);
     if (!p) {
-      alert('Equipment not found.');
+      alert('Item not found.');
       navigate('products');
       return;
     }
@@ -1455,7 +1463,7 @@ function showProductForm(id = null) {
   const page = document.getElementById('page-product-editor');
   if (!page) {
     console.error('page-product-editor missing from DOM');
-    alert('Equipment editor page is missing. Please hard-refresh the app.');
+    alert('Item editor page is missing. Please hard-refresh the app.');
     return;
   }
   navigate('product-editor');
@@ -1772,7 +1780,7 @@ function renderInventory() {
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
       .map(p => `<option value="${p.id}">${escHtml(p.name)} (${p.stock ?? 0} in stock)</option>`)
       .join('');
-    sel.innerHTML = opts || '<option value="">No equipment yet</option>';
+    sel.innerHTML = opts || '<option value="">No items yet</option>';
     if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
   }
 
@@ -1805,7 +1813,7 @@ function renderInventoryStock() {
     );
   }
   if (!list.length) {
-    el.innerHTML = '<div class="entity-empty">No equipment found.</div>';
+    el.innerHTML = '<div class="entity-empty">No items found.</div>';
     return;
   }
   el.innerHTML = list.map(p => {
@@ -1891,7 +1899,7 @@ function saveStockMovement() {
   const note = document.getElementById('inv-note')?.value.trim() || '';
   const p = getProduct(productId);
   if (!p) {
-    alert('Please select equipment.');
+    alert('Please select an item.');
     return;
   }
   if (type !== 'adjust' && qty <= 0) {
@@ -1943,7 +1951,7 @@ function exportStockMovementsCsv() {
   const moves = movementsInPeriod()
     .slice()
     .sort((a, b) => new Date(a.date || a.createdAt) - new Date(b.date || b.createdAt));
-  const rows = [['Date', 'SKU', 'Equipment', 'Type', 'Qty', 'Balance after', 'Note']];
+  const rows = [['Date', 'SKU', 'Item', 'Type', 'Qty', 'Balance after', 'Note']];
   moves.forEach(m => {
     const p = getProduct(m.productId);
     rows.push([
@@ -2721,7 +2729,7 @@ function onImportPresItemsFile(ev) {
           productId: it.productId || '',
           name: it.name,
           sku: it.sku || (p ? p.sku : ''),
-          category: (p && p.category) || 'Equipment',
+          category: (p && p.category) || 'General',
           description: (p && p.description) || '',
           features: (p && p.features) || '',
           image: (p && p.image) || '',
@@ -3867,7 +3875,7 @@ function addCategory() {
 
 function deleteCategory(name) {
   const inUse = data.products.some(p => p.category === name);
-  if (inUse && !confirm(`"${name}" is used by some equipment. Delete anyway?`)) return;
+  if (inUse && !confirm(`"${name}" is used by some items. Delete anyway?`)) return;
   data.categories = (data.categories || []).filter(c => c !== name);
   saveData();
   renderCategoriesList();
@@ -3948,7 +3956,7 @@ function exportProductsExcel() {
     ]);
   });
   downloadCsv(`medicano-equipment-${new Date().toISOString().slice(0, 10)}.csv`, rows);
-  alert('Equipment catalog exported. Open the CSV file in Excel.');
+  alert('Item catalog exported. Open the CSV file in Excel.');
 }
 
 function downloadEquipmentTemplate() {
@@ -4248,7 +4256,7 @@ function applyQuoteToPresentation() {
       productId: it.productId || '',
       name: it.name || (p ? p.name : 'Item'),
       sku: it.sku || (p ? p.sku : ''),
-      category: (p && p.category) || 'Equipment',
+      category: (p && p.category) || 'General',
       description: (p && p.description) || '',
       features: (p && p.features) || '',
       image: (p && p.image) || '',
@@ -4287,7 +4295,7 @@ function renderPresPicker() {
   );
 
   if (list.length === 0) {
-    container.innerHTML = '<p class="p-4 text-slate-400 text-center">No equipment found</p>';
+    container.innerHTML = '<p class="p-4 text-slate-400 text-center">No items found</p>';
     return;
   }
 
@@ -5139,7 +5147,7 @@ function renderQuoteProductPicker() {
   );
 
   if (list.length === 0) {
-    container.innerHTML = '<p class="p-3 text-slate-400 text-center">No equipment found</p>';
+    container.innerHTML = '<p class="p-3 text-slate-400 text-center">No items found</p>';
     return;
   }
 

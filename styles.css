@@ -4524,3 +4524,89 @@ html.dark #page-reports .report-filter-grid .status-select-dark {
   background: rgba(16, 185, 129, 0.2) !important;
   border-color: rgba(16, 185, 129, 0.35) !important;
 }
+
+
+/* Centered calendar action buttons */
+.cal-action-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  width: 100%;
+  padding: 0.65rem 1rem !important;
+  border-radius: 999px !important;
+  font-weight: 600 !important;
+}
+
+/* Dashboard mini-cal event colour dots (match Events page) */
+#dash-mini-cal .d,
+.dash-mini-cal .d {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.15rem;
+  min-height: 2.25rem;
+  padding-top: 0.25rem;
+}
+#dash-mini-cal .d-num { line-height: 1.1; }
+#dash-mini-cal .cal-dots,
+.dash-mini-cal .cal-dots {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  min-height: 6px;
+}
+#dash-mini-cal .cal-dot,
+.dash-mini-cal .cal-dot,
+.cal-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  display: inline-block;
+}
+.cal-dot.pink { background: #f9a8d4; }
+.cal-dot.yellow { background: #fcd34d; }
+.cal-dot.green { background: #6ee7b7; }
+.cal-dot.blue { background: #93c5fd; }
+.cal-dot.lavender { background: #c4b5fd; }
+.cal-dot.peach { background: #fdba74; }
+
+/* Dark mode desktop tables */
+html.dark .responsive-table-shell,
+html.dark .report-preview-wrap .panel-soft,
+html.dark .table-desktop-only,
+html.dark .rt-scroll {
+  background: #1c1c1c !important;
+  color: #e2e8f0;
+  border-color: rgba(255,255,255,0.08);
+}
+html.dark .data-table,
+html.dark .report-table {
+  background: #1c1c1c;
+  color: #e2e8f0;
+}
+html.dark .data-table th,
+html.dark .report-table th {
+  background: #252525 !important;
+  color: #94a3b8 !important;
+  border-bottom-color: rgba(255,255,255,0.1) !important;
+}
+html.dark .data-table td,
+html.dark .report-table td {
+  border-bottom-color: rgba(255,255,255,0.06) !important;
+  color: #e2e8f0 !important;
+}
+html.dark .data-table tfoot td,
+html.dark .report-table tfoot td {
+  background: #1a1a1a;
+  color: #f8fafc !important;
+}
+html.dark .report-preview-wrap,
+html.dark .responsive-table-shell.panel-soft {
+  background: #1c1c1c !important;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 1rem;
+  overflow: hidden;
+}
