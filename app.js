@@ -239,6 +239,47 @@ const DEFAULT_DATA = {
 };
 
 let data = null;
+
+/** Keep window.data aligned — Firebase sync uses these bridges */
+function bindWindowData() {
+  window.data = data;
+}
+
+function applyCloudData(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  data = payload;
+  // Ensure required arrays exist after cloud pull
+  if (!data.clients) data.clients = [];
+  if (!data.products) data.products = [];
+  if (!data.quotes) data.quotes = [];
+  if (!data.invoices) data.invoices = [];
+  if (!data.categories) data.categories = [];
+  if (!data.calendarEvents) data.calendarEvents = [];
+  if (!data.stockMovements) data.stockMovements = [];
+  if (!data.userProfile) data.userProfile = { username: '' };
+  if (!data.company) data.company = (typeof DEFAULT_DATA !== 'undefined' && DEFAULT_DATA.company) ? JSON.parse(JSON.stringify(DEFAULT_DATA.company)) : {};
+  bindWindowData();
+  try {
+    if (typeof saveDataLocalOnly === 'function') saveDataLocalOnly();
+    else localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) { console.error(e); }
+  try {
+    if (typeof refreshAllViews === 'function') refreshAllViews();
+    else {
+      if (typeof renderDashboard === 'function') renderDashboard();
+      if (typeof renderClients === 'function') renderClients();
+      if (typeof renderProducts === 'function') renderProducts();
+      if (typeof renderQuotes === 'function') renderQuotes();
+      if (typeof renderInvoices === 'function') renderInvoices();
+    }
+  } catch (e) { console.error('refresh after cloud', e); }
+  return true;
+}
+
+window.applyCloudData = applyCloudData;
+window.getAppData = function () { return data; };
+window.bindWindowData = bindWindowData;
+
 let currentQuoteId = null;
 let quoteItemCounter = 0;
 
@@ -797,6 +838,7 @@ function loadData() {
     console.error('Load error', e);
     data = JSON.parse(JSON.stringify(DEFAULT_DATA));
   }
+  bindWindowData();
 }
 
 function saveDataLocalOnly() {
@@ -804,6 +846,7 @@ function saveDataLocalOnly() {
     if (data && typeof data === 'object') {
       data.updatedAt = data.updatedAt || new Date().toISOString();
     }
+    bindWindowData();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
     console.error('saveDataLocalOnly', e);
@@ -814,6 +857,7 @@ function saveData() {
   if (data && typeof data === 'object') {
     data.updatedAt = new Date().toISOString();
   }
+  bindWindowData();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   if (window.MedicanoCloud && typeof window.MedicanoCloud.schedulePush === 'function') {
     window.MedicanoCloud.schedulePush();
@@ -920,9 +964,10 @@ async function manualCloudSync() {
   if (typeof cloud.syncNow === 'function') {
     const r = await cloud.syncNow();
     if (r && r.ok) {
-      if (typeof refreshAllViews === 'function') refreshAllViews();
-      else if (typeof renderDashboard === 'function') renderDashboard();
-      alert('Sync complete. Cloud and this device are up to date.');
+      refreshAllViews();
+      const nClients = (data.clients || []).length;
+      const nInv = (data.invoices || []).length;
+      alert('Sync complete.' + String.fromCharCode(10) + 'Clients: ' + nClients + String.fromCharCode(10) + 'Invoices: ' + nInv);
     } else {
       alert('Sync failed. Check Firestore rules and that you are online.');
     }

@@ -96,20 +96,32 @@
           });
         }
 
-        // Prefer local username if set
-        if (window.data && window.data.userProfile && window.data.userProfile.username) {
+        var localSrc = (typeof window.getAppData === 'function' ? window.getAppData() : window.data);
+        if (localSrc && localSrc.userProfile && localSrc.userProfile.username) {
           if (!payload.userProfile) payload.userProfile = {};
           if (!payload.userProfile.username) {
-            payload.userProfile.username = window.data.userProfile.username;
+            payload.userProfile.username = localSrc.userProfile.username;
           }
         }
+        // Preserve local images
+        if (localSrc && Array.isArray(localSrc.products) && Array.isArray(payload.products)) {
+          var localById = {};
+          localSrc.products.forEach(function (p) { localById[p.id] = p; });
+          payload.products.forEach(function (p) {
+            if ((!p.image || p._imageOmittedForSync) && localById[p.id] && localById[p.id].image) {
+              p.image = localById[p.id].image;
+            }
+            delete p._imageOmittedForSync;
+          });
+        }
 
-        window.data = payload;
-        if (typeof window.saveDataLocalOnly === 'function') window.saveDataLocalOnly();
-        else localStorage.setItem('medicano_data_v1', JSON.stringify(payload));
-
-        if (typeof window.refreshAllViews === 'function') window.refreshAllViews();
-        else if (typeof window.renderDashboard === 'function') window.renderDashboard();
+        if (typeof window.applyCloudData === 'function') {
+          window.applyCloudData(payload);
+        } else {
+          window.data = payload;
+          localStorage.setItem('medicano_data_v1', JSON.stringify(payload));
+          if (typeof window.refreshAllViews === 'function') window.refreshAllViews();
+        }
 
         lastPullAt = Date.now();
         resolve(true);
@@ -127,10 +139,11 @@
     if (applyingRemote && !force) return { ok: false, reason: 'applying-remote' };
     status('Uploading…', 'syncing');
     try {
-      const payload = cloudSafePayload(window.data);
+      const src = (typeof window.getAppData === 'function' ? window.getAppData() : window.data) || window.data;
+      const payload = cloudSafePayload(src);
       if (!payload) return { ok: false, reason: 'no-data' };
       payload.updatedAt = new Date().toISOString();
-      if (window.data) window.data.updatedAt = payload.updatedAt;
+      if (src) src.updatedAt = payload.updatedAt;
       if (typeof window.saveDataLocalOnly === 'function') window.saveDataLocalOnly();
 
       await workspaceRef(auth.currentUser.uid).set({
@@ -205,9 +218,10 @@
       if (snap.exists) {
         var remote = snap.data();
         var remoteCount = remote.recordCount || countRecords(remote.payload);
-        var localCount = countRecords(window.data);
+        var localSrc = (typeof window.getAppData === 'function' ? window.getAppData() : window.data) || {};
+        var localCount = countRecords(localSrc);
         var remoteUpdated = remote.updatedAt || '';
-        var localUpdated = (window.data && window.data.updatedAt) || '';
+        var localUpdated = localSrc.updatedAt || '';
 
         // Prefer the side with more records, else newer timestamp
         if (remoteCount > localCount || (remoteCount === localCount && remoteUpdated >= localUpdated)) {
