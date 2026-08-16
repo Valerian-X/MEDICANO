@@ -911,6 +911,24 @@ async function onAuthActionClick() {
   openAuthModal();
 }
 
+async function manualCloudSync() {
+  const cloud = window.MedicanoCloud;
+  if (!cloud || !cloud.isSignedIn || !cloud.isSignedIn()) {
+    openAuthModal();
+    return;
+  }
+  if (typeof cloud.syncNow === 'function') {
+    const r = await cloud.syncNow();
+    if (r && r.ok) {
+      if (typeof refreshAllViews === 'function') refreshAllViews();
+      else if (typeof renderDashboard === 'function') renderDashboard();
+      alert('Sync complete. Cloud and this device are up to date.');
+    } else {
+      alert('Sync failed. Check Firestore rules and that you are online.');
+    }
+  }
+}
+
 window.onMedicanoAuthChanged = function () {
   // optional hook for UI refresh
 };

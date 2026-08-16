@@ -1,5 +1,7 @@
 /**
  * Medicano Firebase Auth + Firestore sync (compat SDK)
+ * On sign-in: always pull cloud workspace if it exists (force).
+ * Local default data must not block a richer cloud copy.
  */
 (function () {
   const cfg = window.MEDICANO_FIREBASE || {};
@@ -11,6 +13,7 @@
   let pushTimer = null;
   let applyingRemote = false;
   let initTried = false;
+  let lastPullAt = 0;
 
   function status(text, mode) {
     const t = document.getElementById('auth-status-text');
@@ -34,7 +37,6 @@
     return db.collection('users').doc(uid).collection('workspace').doc('main');
   }
 
-  /** Firestore docs max ~1MB — strip large base64 images from cloud payload */
   function cloudSafePayload(src) {
     const data = JSON.parse(JSON.stringify(src || {}));
     if (Array.isArray(data.products)) {
@@ -50,18 +52,41 @@
     return data;
   }
 
-  async function applyRemotePayload(remote) {
-    if (!remote || !remote.payload) return;
+  function countRecords(d) {
+    if (!d) return 0;
+    return (d.clients || []).length
+      + (d.quotes || []).length
+      + (d.invoices || []).length
+      + (d.products || []).length
+      + (d.calendarEvents || []).length;
+  }
+
+  function applyRemotePayload(remote, opts) {
+    opts = opts || {};
+    const force = !!opts.force;
+    if (!remote || remote.payload == null) return Promise.resolve(false);
+
     const localUpdated = (window.data && window.data.updatedAt) || '';
-    const remoteUpdated = remote.updatedAt || '';
-    if (remoteUpdated && localUpdated && remoteUpdated <= localUpdated) return;
-    try {
-      applyingRemote = true;
-      const payload = typeof remote.payload === 'string' ? JSON.parse(remote.payload) : remote.payload;
-      if (payload && typeof payload === 'object') {
-        // Preserve local product images if cloud omitted them
+    const remoteUpdated = remote.updatedAt || (remote.payload && remote.payload.updatedAt) || '';
+
+    // Snapshot updates: skip only if local is clearly newer AND not forced
+    if (!force && remoteUpdated && localUpdated && remoteUpdated < localUpdated) {
+      return Promise.resolve(false);
+    }
+
+    return new Promise(function (resolve) {
+      try {
+        applyingRemote = true;
+        var payload = remote.payload;
+        if (typeof payload === 'string') payload = JSON.parse(payload);
+        if (!payload || typeof payload !== 'object') {
+          resolve(false);
+          return;
+        }
+
+        // Keep local product images when cloud stripped them
         if (window.data && Array.isArray(window.data.products) && Array.isArray(payload.products)) {
-          const localById = {};
+          var localById = {};
           window.data.products.forEach(function (p) { localById[p.id] = p; });
           payload.products.forEach(function (p) {
             if ((!p.image || p._imageOmittedForSync) && localById[p.id] && localById[p.id].image) {
@@ -70,47 +95,61 @@
             delete p._imageOmittedForSync;
           });
         }
+
+        // Prefer local username if set
+        if (window.data && window.data.userProfile && window.data.userProfile.username) {
+          if (!payload.userProfile) payload.userProfile = {};
+          if (!payload.userProfile.username) {
+            payload.userProfile.username = window.data.userProfile.username;
+          }
+        }
+
         window.data = payload;
         if (typeof window.saveDataLocalOnly === 'function') window.saveDataLocalOnly();
         else localStorage.setItem('medicano_data_v1', JSON.stringify(payload));
+
         if (typeof window.refreshAllViews === 'function') window.refreshAllViews();
+        else if (typeof window.renderDashboard === 'function') window.renderDashboard();
+
+        lastPullAt = Date.now();
+        resolve(true);
+      } catch (e) {
+        console.error('apply remote', e);
+        resolve(false);
+      } finally {
+        setTimeout(function () { applyingRemote = false; }, 400);
       }
-    } catch (e) {
-      console.error('apply remote', e);
-    } finally {
-      setTimeout(function () { applyingRemote = false; }, 500);
-    }
+    });
   }
 
   async function pushNow(force) {
     if (!ready || !auth || !auth.currentUser || !db) return { ok: false, reason: 'not-ready' };
     if (applyingRemote && !force) return { ok: false, reason: 'applying-remote' };
-    status('Syncing…', 'syncing');
+    status('Uploading…', 'syncing');
     try {
       const payload = cloudSafePayload(window.data);
       if (!payload) return { ok: false, reason: 'no-data' };
       payload.updatedAt = new Date().toISOString();
       if (window.data) window.data.updatedAt = payload.updatedAt;
+      if (typeof window.saveDataLocalOnly === 'function') window.saveDataLocalOnly();
+
       await workspaceRef(auth.currentUser.uid).set({
         updatedAt: payload.updatedAt,
         email: auth.currentUser.email || '',
+        recordCount: countRecords(payload),
         payload: payload
-      }, { merge: true });
-      status(auth.currentUser.email || 'Synced', 'online');
+      }, { merge: false }); // full replace of workspace doc
+
+      status('Synced · ' + (auth.currentUser.email || ''), 'online');
       return { ok: true };
     } catch (e) {
       console.error('sync push failed', e);
-      var code = (e && e.code) ? e.code : '';
+      var code = (e && e.code) ? String(e.code) : '';
       var msg = (e && e.message) ? e.message : String(e);
-      if (code.indexOf('permission') >= 0 || /permission|insufficient/i.test(msg)) {
-        status('Sync failed: Firestore rules', 'error');
-      } else if (/size|too big|exceeds/i.test(msg)) {
-        status('Sync failed: data too large', 'error');
-      } else if (!navigator.onLine) {
-        status('Sync failed: offline', 'error');
-      } else {
-        status('Sync failed', 'error');
-      }
+      if (/permission/i.test(code + msg)) status('Sync failed: Firestore rules', 'error');
+      else if (/size|too big|exceeds/i.test(msg)) status('Sync failed: data too large', 'error');
+      else if (typeof navigator !== 'undefined' && !navigator.onLine) status('Sync failed: offline', 'error');
+      else status('Sync failed', 'error');
       return { ok: false, error: msg, code: code };
     }
   }
@@ -118,30 +157,73 @@
   function schedulePush() {
     if (!ready || !auth || !auth.currentUser) return;
     clearTimeout(pushTimer);
-    pushTimer = setTimeout(function () { pushNow(false); }, 1200);
+    pushTimer = setTimeout(function () { pushNow(false); }, 800);
   }
 
   async function pullAndListen(uid) {
-    status('Syncing…', 'syncing');
+    status('Downloading…', 'syncing');
     try {
       const ref = workspaceRef(uid);
       const snap = await ref.get();
-      if (snap.exists) await applyRemotePayload(snap.data());
-      else await pushNow(true);
+      if (snap.exists) {
+        var remote = snap.data();
+        // Always apply cloud copy on login / first pull for this session
+        await applyRemotePayload(remote, { force: true });
+        status('Synced · ' + ((auth.currentUser && auth.currentUser.email) || ''), 'online');
+      } else {
+        // Nothing in cloud yet — upload this device
+        await pushNow(true);
+      }
+
       if (unsubSnap) unsubSnap();
       unsubSnap = ref.onSnapshot(function (s) {
         if (!s.exists || applyingRemote) return;
-        applyRemotePayload(s.data());
+        // Live updates from other devices
+        applyRemotePayload(s.data(), { force: false });
       }, function (err) {
         console.error('snapshot error', err);
         status('Sync failed', 'error');
       });
-      status((auth.currentUser && auth.currentUser.email) || 'Synced', 'online');
     } catch (e) {
       console.error('pull failed', e);
       var msg = (e && e.message) ? e.message : String(e);
       if (/permission/i.test(msg)) status('Sync failed: Firestore rules', 'error');
       else status('Sync failed', 'error');
+    }
+  }
+
+  /** Manual: pull then push so both devices converge */
+  async function syncNow() {
+    if (!auth || !auth.currentUser) {
+      status('Sign in to sync', 'error');
+      return { ok: false };
+    }
+    status('Syncing…', 'syncing');
+    try {
+      const ref = workspaceRef(auth.currentUser.uid);
+      const snap = await ref.get();
+      if (snap.exists) {
+        var remote = snap.data();
+        var remoteCount = remote.recordCount || countRecords(remote.payload);
+        var localCount = countRecords(window.data);
+        var remoteUpdated = remote.updatedAt || '';
+        var localUpdated = (window.data && window.data.updatedAt) || '';
+
+        // Prefer the side with more records, else newer timestamp
+        if (remoteCount > localCount || (remoteCount === localCount && remoteUpdated >= localUpdated)) {
+          await applyRemotePayload(remote, { force: true });
+        } else {
+          await pushNow(true);
+        }
+      } else {
+        await pushNow(true);
+      }
+      status('Synced · ' + (auth.currentUser.email || ''), 'online');
+      return { ok: true };
+    } catch (e) {
+      console.error(e);
+      status('Sync failed', 'error');
+      return { ok: false };
     }
   }
 
@@ -164,7 +246,7 @@
       db = firebase.firestore();
       auth.onAuthStateChanged(function (user) {
         if (user) {
-          status(user.email || 'Signed in', 'online');
+          status('Signed in…', 'syncing');
           pullAndListen(user.uid);
         } else {
           if (unsubSnap) { unsubSnap(); unsubSnap = null; }
@@ -172,7 +254,6 @@
         }
         if (typeof window.onMedicanoAuthChanged === 'function') window.onMedicanoAuthChanged(user);
       });
-      status('Firebase ready', null);
     } catch (e) {
       console.error(e);
       status('Firebase error', 'error');
@@ -199,7 +280,9 @@
       return auth ? auth.signOut() : Promise.resolve();
     },
     pushNow: pushNow,
-    schedulePush: schedulePush
+    schedulePush: schedulePush,
+    syncNow: syncNow,
+    pullAndListen: pullAndListen
   };
 
   window.MedicanoCloud = api;

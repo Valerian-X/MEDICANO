@@ -4518,3 +4518,9 @@ html.dark #page-reports .report-filter-grid .status-select-dark {
   border-color: #0d9488 !important;
   color: #ffffff !important;
 }
+
+.auth-sync-btn {
+  margin-bottom: 0.4rem;
+  background: rgba(16, 185, 129, 0.2) !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
