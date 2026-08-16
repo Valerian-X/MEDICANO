@@ -1268,7 +1268,7 @@ function renderDashCalendar() {
     const dayEv = eventsByDay[key] || [];
     if (dayEv.length) cls.push('has');
     const dots = dayEv.slice(0, 3).map(e => `<span class="cal-dot ${e.color || 'pink'}"></span>`).join('');
-    html += `<button type="button" class="${cls.join(' ')}" onclick="selectDashDay('${key}')"><span class="d-num">${d}</span><span class="cal-dots">${dots}</span></button>`;
+    html += `<button type="button" class="${cls.join(' ')}" onclick="selectDashDay('${key}')"><span class="cal-day-core"><span class="d-num">${d}</span></span><span class="cal-dots">${dots}</span></button>`;
   }
   grid.innerHTML = html;
 }
@@ -1612,7 +1612,7 @@ function renderCalendar() {
     if (events.length) cls.push('has-events');
     const dots = events.slice(0, 3).map(e => `<span class="cal-dot ${e.color || 'pink'}"></span>`).join('');
     html += `<button type="button" class="${cls.join(' ')}" data-date="${key}" onclick="selectCalDay('${key}')">
-      <span class="cal-num">${d}</span>
+      <span class="cal-day-core"><span class="cal-num">${d}</span></span>
       <span class="cal-dots">${dots}</span>
     </button>`;
   }

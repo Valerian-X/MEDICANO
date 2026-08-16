@@ -894,8 +894,7 @@ html.dark tbody tr:hover { background: #252525 !important; }
 .cal-day:hover:not(.empty) { background: var(--cream-2, #efe8de); }
 .cal-day.today { box-shadow: inset 0 0 0 1.5px #d4c8ba; }
 .cal-day.selected {
-  background: var(--pink, #f5cfe0) !important;
-  color: var(--ink, #1a1a1a);
+  background: transparent !important;
 }
 .cal-day.has-events .cal-num { font-weight: 700; }
 .cal-dots {
@@ -1167,8 +1166,8 @@ html.dark textarea {
   color: var(--ink, #1a1a1a);
 }
 .dash-mini-cal .d.muted { opacity: 0.3; }
-.dash-mini-cal .d.today { background: var(--pink, #f5cfe0); }
-.dash-mini-cal .d.has { box-shadow: inset 0 -3px 0 #e891b8; }
+.dash-mini-cal .d.today { background: transparent; }
+.dash-mini-cal .d.has { box-shadow: none; }
 .dash-mini-cal .dow {
   text-align: center;
   font-size: 0.6rem;
@@ -1272,8 +1271,8 @@ html.dark textarea {
 }
 .dash-side-grid .d.muted { opacity: 0.25; pointer-events: none; }
 .dash-side-grid .d:hover { background: var(--cream-2, #efe8de); }
-.dash-side-grid .d.today { box-shadow: inset 0 0 0 1.5px #d4c8ba; }
-.dash-side-grid .d.selected { background: var(--pink, #f5cfe0) !important; }
+.dash-side-grid .d.today { box-shadow: none; }
+.dash-side-grid .d.selected { background: transparent !important; }
 .dash-side-grid .d.has { font-weight: 800; }
 
 .dash-add-event-btn {
@@ -4609,4 +4608,284 @@ html.dark .responsive-table-shell.panel-soft {
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 1rem;
   overflow: hidden;
+}
+
+
+/* ===== Calendar day cells: highlight circle centered on the number ===== */
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem 0.2rem;
+  align-items: start;
+}
+.cal-dow {
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  padding: 0.35rem 0;
+}
+.cal-day {
+  border: none;
+  background: transparent !important;
+  box-shadow: none !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.15rem;
+  cursor: pointer;
+  padding: 0.15rem 0 0.25rem;
+  margin: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink, #1a1a1a);
+  width: 100%;
+}
+.cal-day.empty {
+  cursor: default;
+  pointer-events: none;
+  visibility: hidden;
+}
+.cal-day-core {
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.12s, box-shadow 0.12s;
+  line-height: 1;
+}
+.cal-day .cal-num {
+  display: block;
+  text-align: center;
+  line-height: 1;
+  font-weight: 600;
+}
+.cal-day:hover:not(.empty) .cal-day-core {
+  background: var(--cream-2, #efe8de);
+}
+.cal-day.today .cal-day-core {
+  box-shadow: inset 0 0 0 1.5px #d4c8ba;
+}
+.cal-day.selected .cal-day-core {
+  background: var(--pink, #f5cfe0) !important;
+  color: var(--ink, #1a1a1a);
+}
+.cal-day.has-events .cal-num { font-weight: 700; }
+.cal-day .cal-dots {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  align-items: center;
+  min-height: 6px;
+  margin: 0;
+  width: 100%;
+}
+.cal-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #c4b5a5;
+  flex-shrink: 0;
+}
+.cal-dot.pink { background: #e891b8; }
+.cal-dot.yellow { background: #d4b84a; }
+.cal-dot.green { background: #6aaa5f; }
+.cal-dot.blue { background: #6b8fd4; }
+.cal-dot.lavender { background: #9b7fd4; }
+.cal-dot.peach { background: #e8a078; }
+
+html.dark .cal-day { color: #e2e8f0 !important; background: transparent !important; }
+html.dark .cal-day:hover:not(.empty) .cal-day-core { background: #2a2a2a !important; }
+html.dark .cal-day.today .cal-day-core { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.35); }
+html.dark .cal-day.selected .cal-day-core {
+  background: #5c3d4a !important;
+  color: #fff !important;
+}
+
+/* Dashboard mini calendar — same centered core */
+.dash-mini-cal,
+.dash-side-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.2rem;
+  margin-top: 0.75rem;
+  align-items: start;
+}
+.dash-mini-cal .dow,
+.dash-side-grid .dow {
+  text-align: center;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #9ca3af;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0;
+}
+.dash-mini-cal .d,
+.dash-side-grid .d {
+  border: none;
+  background: transparent !important;
+  box-shadow: none !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.12rem;
+  padding: 0.1rem 0 0.2rem;
+  margin: 0;
+  width: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink, #1a1a1a);
+}
+.dash-mini-cal .d.muted,
+.dash-side-grid .d.muted { opacity: 0.3; pointer-events: none; }
+.dash-mini-cal .cal-day-core,
+.dash-side-grid .cal-day-core {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.dash-mini-cal .d-num,
+.dash-side-grid .d-num {
+  line-height: 1;
+  text-align: center;
+}
+.dash-mini-cal .d.today .cal-day-core,
+.dash-side-grid .d.today .cal-day-core {
+  box-shadow: inset 0 0 0 1.5px #d4c8ba;
+}
+.dash-mini-cal .d.selected .cal-day-core,
+.dash-side-grid .d.selected .cal-day-core {
+  background: var(--pink, #f5cfe0) !important;
+}
+.dash-mini-cal .d.has .cal-day-core,
+.dash-side-grid .d.has .cal-day-core {
+  /* dots indicate events; keep core clean */
+}
+.dash-mini-cal .cal-dots,
+.dash-side-grid .cal-dots {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  min-height: 5px;
+  width: 100%;
+}
+html.dark .dash-mini-cal .d,
+html.dark .dash-side-grid .d { color: #e2e8f0 !important; background: transparent !important; }
+html.dark .dash-mini-cal .d.selected .cal-day-core,
+html.dark .dash-side-grid .d.selected .cal-day-core {
+  background: #5c3d4a !important;
+  color: #fff !important;
+}
+html.dark .dash-mini-cal .d.today .cal-day-core,
+html.dark .dash-side-grid .d.today .cal-day-core {
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.35);
+}
+
+/* Today / Add event buttons — text truly centered */
+.cal-month-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+  width: 100%;
+}
+.cal-action-btn,
+.cal-today-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  width: 100% !important;
+  padding: 0.7rem 1rem !important;
+  border-radius: 999px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  box-sizing: border-box;
+}
+.cal-today-btn {
+  margin: 0 auto;
+}
+
+
+/* ===== Dark mode: reports desktop table must stay dark ===== */
+html.dark #page-reports .responsive-table-shell,
+html.dark #page-reports .report-preview-wrap,
+html.dark #page-reports .rt-scroll,
+html.dark #page-reports .table-desktop-only {
+  background: #1c1c1c !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+html.dark #page-reports .report-table,
+html.dark #page-reports .data-table {
+  background: #1c1c1c !important;
+  color: #e2e8f0 !important;
+}
+html.dark #page-reports .report-table thead th,
+html.dark #page-reports .data-table thead th {
+  background: #252525 !important;
+  color: #94a3b8 !important;
+  border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+}
+html.dark #page-reports .report-table tbody,
+html.dark #page-reports .data-table tbody {
+  background: #1c1c1c !important;
+}
+html.dark #page-reports .report-table tbody tr,
+html.dark #page-reports .data-table tbody tr {
+  background: #1c1c1c !important;
+  color: #e2e8f0 !important;
+}
+html.dark #page-reports .report-table tbody tr:nth-child(even),
+html.dark #page-reports .data-table tbody tr:nth-child(even) {
+  background: #222222 !important;
+}
+html.dark #page-reports .report-table tbody tr:hover,
+html.dark #page-reports .data-table tbody tr:hover {
+  background: #2a2a2a !important;
+}
+html.dark #page-reports .report-table tbody td,
+html.dark #page-reports .data-table tbody td {
+  background: transparent !important;
+  color: #e2e8f0 !important;
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
+html.dark #page-reports .report-table tbody td .text-xs,
+html.dark #page-reports .report-table tbody td .text-slate-400 {
+  color: #94a3b8 !important;
+}
+html.dark #page-reports .report-table tfoot,
+html.dark #page-reports .report-table tfoot tr,
+html.dark #page-reports .report-table tfoot td {
+  background: #181818 !important;
+  color: #f8fafc !important;
+  border-top: 1px solid rgba(255,255,255,0.1) !important;
+}
+/* Kill global light tbody rules inside reports */
+html.dark #page-reports tbody tr {
+  background: #1c1c1c !important;
+}
+html.dark #page-reports tbody tr:hover {
+  background: #2a2a2a !important;
+}
+html.dark #page-reports tbody td {
+  color: #e2e8f0 !important;
+  background: transparent !important;
 }
