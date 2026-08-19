@@ -5356,8 +5356,6 @@ function openReportRowEditor(id) {
   document.getElementById('rr-date').value = row ? (row.date || '') : new Date().toISOString().slice(0, 10);
   document.getElementById('rr-type').value = row ? (row.typeLabel || 'Custom') : 'Custom';
   document.getElementById('rr-ref').value = row ? (row.ref || '') : '';
-  document.getElementById('rr-amount').value = row ? (row.amount || 0) : 0;
-  document.getElementById('rr-detail').value = row ? (row.detail || '') : '';
   document.getElementById('rr-title').value = row ? (row.title || '') : '';
   const del = document.getElementById('rr-delete-btn');
   if (del) del.classList.toggle('hidden', !row);
@@ -5369,7 +5367,74 @@ function openReportRowEditor(id) {
         return '<option value="' + c.id + '"' + (row && row.clientId === c.id ? ' selected' : '') + '>' + escHtml(c.name) + '</option>';
       }).join('');
   }
+
+  // Line items: migrate single detail/amount into one item if needed
+  let items = [];
+  if (row && Array.isArray(row.items) && row.items.length) {
+    items = row.items.map(function (it) {
+      return {
+        name: it.name || '',
+        qty: Number(it.qty) || 1,
+        unitPrice: Number(it.unitPrice) || 0
+      };
+    });
+  } else if (row && (row.detail || row.amount)) {
+    items = [{ name: row.detail || row.title || 'Item', qty: 1, unitPrice: Number(row.amount) || 0 }];
+  } else {
+    items = [{ name: '', qty: 1, unitPrice: 0 }];
+  }
+  window._rrItems = items;
+  renderReportRowItemsEditor();
   modal.classList.remove('hidden');
+}
+
+function renderReportRowItemsEditor() {
+  const list = document.getElementById('rr-items-list');
+  if (!list) return;
+  if (!Array.isArray(window._rrItems) || !window._rrItems.length) {
+    window._rrItems = [{ name: '', qty: 1, unitPrice: 0 }];
+  }
+  list.innerHTML = window._rrItems.map(function (it, i) {
+    return '<div class="rr-item-row" data-i="' + i + '">' +
+      '<input type="text" class="settings-input rr-item-name" placeholder="Item name" value="' + escHtml(it.name || '') + '" oninput="updateReportRowItem(' + i + ',\'name\',this.value)" />' +
+      '<input type="number" min="1" step="1" class="settings-input rr-item-qty" placeholder="Qty" value="' + (Number(it.qty) || 1) + '" oninput="updateReportRowItem(' + i + ',\'qty\',this.value)" />' +
+      '<input type="number" min="0" step="0.01" class="settings-input rr-item-price" placeholder="Unit ₦" value="' + (Number(it.unitPrice) || 0) + '" oninput="updateReportRowItem(' + i + ',\'unitPrice\',this.value)" />' +
+      '<button type="button" class="rr-item-remove" onclick="removeReportRowItemLine(' + i + ')" title="Remove">✕</button>' +
+      '</div>';
+  }).join('');
+  recalcReportRowItemsTotal();
+}
+
+function updateReportRowItem(i, field, val) {
+  if (!window._rrItems || !window._rrItems[i]) return;
+  if (field === 'name') window._rrItems[i].name = val;
+  else if (field === 'qty') window._rrItems[i].qty = Math.max(1, parseFloat(val) || 1);
+  else if (field === 'unitPrice') window._rrItems[i].unitPrice = parseFloat(val) || 0;
+  recalcReportRowItemsTotal();
+}
+
+function addReportRowItemLine() {
+  if (!window._rrItems) window._rrItems = [];
+  window._rrItems.push({ name: '', qty: 1, unitPrice: 0 });
+  renderReportRowItemsEditor();
+}
+
+function removeReportRowItemLine(i) {
+  if (!window._rrItems) return;
+  window._rrItems.splice(i, 1);
+  if (!window._rrItems.length) window._rrItems.push({ name: '', qty: 1, unitPrice: 0 });
+  renderReportRowItemsEditor();
+}
+
+function recalcReportRowItemsTotal() {
+  const items = window._rrItems || [];
+  let total = 0;
+  items.forEach(function (it) {
+    total += (Number(it.qty) || 1) * (Number(it.unitPrice) || 0);
+  });
+  const el = document.getElementById('rr-items-total');
+  if (el) el.textContent = formatNGN(total);
+  return total;
 }
 
 function closeReportRowEditor() {
@@ -5379,19 +5444,43 @@ function closeReportRowEditor() {
 
 function saveReportTableRow() {
   ensureReportRows();
-  const id = document.getElementById('rr-id').value;
-  const clientId = document.getElementById('rr-client').value || '';
+  const idEl = document.getElementById('rr-id');
+  const id = (idEl && idEl.value) || '';
+  const clientId = (document.getElementById('rr-client') && document.getElementById('rr-client').value) || '';
   const client = clientId ? getClient(clientId) : null;
+  const dateVal = (document.getElementById('rr-date') && document.getElementById('rr-date').value) || new Date().toISOString().slice(0, 10);
+  const titleVal = ((document.getElementById('rr-title') && document.getElementById('rr-title').value) || '').trim();
+  const typeVal = ((document.getElementById('rr-type') && document.getElementById('rr-type').value) || 'Custom').trim() || 'Custom';
+
+  const rawItems = (window._rrItems || []).map(function (it) {
+    return {
+      name: (it.name || '').trim(),
+      qty: Math.max(1, Number(it.qty) || 1),
+      unitPrice: Number(it.unitPrice) || 0,
+      lineNgn: Math.max(1, Number(it.qty) || 1) * (Number(it.unitPrice) || 0)
+    };
+  }).filter(function (it) { return it.name; });
+
+  if (!rawItems.length) {
+    alert('Add at least one line item with a name.');
+    return;
+  }
+  const amount = rawItems.reduce(function (s, it) { return s + it.lineNgn; }, 0);
+  const detailVal = rawItems.map(function (it) {
+    return it.name + (it.qty > 1 ? ' ×' + it.qty : '');
+  }).join(', ');
+
   const entry = {
     id: id || uid(),
-    date: document.getElementById('rr-date').value || new Date().toISOString().slice(0, 10),
-    typeLabel: (document.getElementById('rr-type').value || 'Custom').trim() || 'Custom',
+    date: dateVal,
+    typeLabel: typeVal,
     clientId: clientId,
-    clientName: client ? client.name : (document.getElementById('rr-detail').value || '—'),
-    ref: (document.getElementById('rr-ref').value || '').trim(),
-    title: (document.getElementById('rr-title').value || '').trim(),
-    detail: (document.getElementById('rr-detail').value || '').trim(),
-    amount: parseFloat(document.getElementById('rr-amount').value) || 0,
+    clientName: client ? client.name : '—',
+    ref: ((document.getElementById('rr-ref') && document.getElementById('rr-ref').value) || '').trim(),
+    title: titleVal,
+    detail: detailVal,
+    items: rawItems,
+    amount: amount,
     invoiceId: null,
     updatedAt: new Date().toISOString()
   };
@@ -5401,14 +5490,38 @@ function saveReportTableRow() {
       entry.invoiceId = data.reportTableRows[idx].invoiceId || null;
       entry.createdAt = data.reportTableRows[idx].createdAt;
       data.reportTableRows[idx] = entry;
-    } else data.reportTableRows.unshift(entry);
+    } else {
+      entry.createdAt = new Date().toISOString();
+      data.reportTableRows.unshift(entry);
+    }
   } else {
     entry.createdAt = new Date().toISOString();
     data.reportTableRows.unshift(entry);
   }
+  if (typeof bindWindowData === 'function') bindWindowData();
   saveData();
+
+  const fromEl = document.getElementById('report-date-from');
+  const toEl = document.getElementById('report-date-to');
+  if (fromEl && fromEl.value && dateVal && dateVal < fromEl.value) fromEl.value = dateVal;
+  if (toEl && toEl.value && dateVal && dateVal > toEl.value) toEl.value = dateVal;
+  const typeEl = document.getElementById('report-type');
+  if (typeEl && typeEl.value === 'payments') typeEl.value = 'all';
+
+  if (clientId) {
+    const cb = document.querySelector('#report-client-list input[type=checkbox][value="' + clientId + '"]');
+    if (cb) {
+      const anyChecked = document.querySelectorAll('#report-client-list input[type=checkbox]:checked').length > 0;
+      if (anyChecked) {
+        cb.checked = true;
+        const row = cb.closest('.select-row');
+        if (row) row.classList.add('is-selected');
+      }
+    }
+  }
+
   closeReportRowEditor();
-  renderTransactionReport();
+  if (typeof renderTransactionReport === 'function') renderTransactionReport();
 }
 
 function deleteReportTableRow() {
@@ -5445,15 +5558,29 @@ function addSelectedReportRowsToInvoice() {
   }
   const clientId = clientIds[0];
   const client = getClient(clientId);
-  const items = entries.map(function (e) {
-    return {
-      productId: '',
-      name: e.title || e.detail || e.typeLabel || 'Report line',
-      qty: 1,
-      unitNgn: Number(e.amount) || 0,
-      lineNgn: Number(e.amount) || 0,
-      reportRowId: e.id
-    };
+  const items = [];
+  entries.forEach(function (e) {
+    if (Array.isArray(e.items) && e.items.length) {
+      e.items.forEach(function (it) {
+        items.push({
+          productId: '',
+          name: it.name || e.title || 'Item',
+          qty: Number(it.qty) || 1,
+          unitNgn: Number(it.unitPrice) || 0,
+          lineNgn: Number(it.lineNgn) || ((Number(it.qty) || 1) * (Number(it.unitPrice) || 0)),
+          reportRowId: e.id
+        });
+      });
+    } else {
+      items.push({
+        productId: '',
+        name: e.title || e.detail || e.typeLabel || 'Report line',
+        qty: 1,
+        unitNgn: Number(e.amount) || 0,
+        lineNgn: Number(e.amount) || 0,
+        reportRowId: e.id
+      });
+    }
   });
   const sub = items.reduce(function (s, it) { return s + (Number(it.lineNgn) || 0); }, 0);
   const inv = {
@@ -5491,17 +5618,22 @@ function collectLedgerRows({ from, to, clientIds, method, type } = {}) {
   const rows = [];
   const clientSet = (clientIds && clientIds.length) ? new Set(clientIds) : null;
   const t = type || 'payments';
+  // Custom (manual) rows always appear except when user picks pure Payments or pure Invoices
   const wantPay = t === 'payments' || t === 'both' || t === 'all';
   const wantInv = t === 'invoices' || t === 'both' || t === 'all';
-  const wantCustom = t === 'custom' || t === 'all' || t === 'both';
+  const wantCustom = t === 'custom' || t === 'all' || t === 'both' || t === 'payments' || t === 'invoices';
+  // When filter is "custom", only manual rows
+  const onlyCustom = t === 'custom';
+  const doPay = wantPay && !onlyCustom;
+  const doInv = wantInv && !onlyCustom;
 
-  if (wantPay || wantInv) {
+  if (doPay || doInv) {
     (data.invoices || []).forEach(inv => {
       if (clientSet && !clientSet.has(inv.clientId)) return;
       const client = getClient(inv.clientId);
       const clientName = client ? client.name : (inv.clientName || '—');
 
-      if (wantInv) {
+      if (doInv) {
         const d = (inv.date || (inv.createdAt || '').slice(0, 10) || '');
         if (!(from && d && d < from) && !(to && d && d > to)) {
           rows.push({
@@ -5520,7 +5652,7 @@ function collectLedgerRows({ from, to, clientIds, method, type } = {}) {
         }
       }
 
-      if (wantPay) {
+      if (doPay) {
         (inv.payments || []).forEach(p => {
           const d = (p.date || (p.createdAt || '').slice(0, 10) || '');
           if (from && d && d < from) return;
@@ -5548,11 +5680,16 @@ function collectLedgerRows({ from, to, clientIds, method, type } = {}) {
   if (wantCustom) {
     ensureReportRows();
     (data.reportTableRows || []).forEach(r => {
-      if (clientSet && r.clientId && !clientSet.has(r.clientId)) return;
+      // Only filter by client when a client is set on the row
+      if (clientSet && clientSet.size && r.clientId && !clientSet.has(r.clientId)) return;
       const d = (r.date || '').slice(0, 10);
-      if (from && d && d < from) return;
-      if (to && d && d > to) return;
+      // Date filters: empty date still shows
+      if (d && from && d < from) return;
+      if (d && to && d > to) return;
       const client = r.clientId ? getClient(r.clientId) : null;
+      const itemNote = (Array.isArray(r.items) && r.items.length)
+        ? r.items.map(function (it) { return (it.name || '') + (it.qty > 1 ? ' ×' + it.qty : ''); }).filter(Boolean).join(', ')
+        : (r.detail || '');
       rows.push({
         kind: 'custom',
         id: r.id,
@@ -5562,10 +5699,11 @@ function collectLedgerRows({ from, to, clientIds, method, type } = {}) {
         ref: r.ref || '—',
         title: r.title || '',
         method: r.typeLabel || 'Custom',
-        note: r.detail || '',
+        note: itemNote,
         amount: Number(r.amount) || 0,
         editable: true,
-        invoiceId: r.invoiceId || null
+        invoiceId: r.invoiceId || null,
+        itemCount: Array.isArray(r.items) ? r.items.length : 0
       });
     });
   }
@@ -5681,13 +5819,16 @@ function renderTransactionReport() {
   }
 
   if (!rows.length) {
-    preview.innerHTML = '<div class="panel-soft report-empty">No transactions in this period for the selected filters.</div>';
+    preview.innerHTML = '<div class="panel-soft report-empty">No transactions in this period for the selected filters.</div>' +
+      '<div class="report-add-row-wrap"><button type="button" class="report-add-row-btn" onclick="openReportRowEditor()">+ Add table row</button></div>';
     return;
   }
 
-  const detailOf = (r) => r.kind === 'payment'
-    ? ((r.method || '') + (r.note ? ' · ' + r.note : ''))
-    : (r.method || 'issued');
+  const detailOf = (r) => {
+    if (r.kind === 'payment') return (r.method || '') + (r.note ? ' · ' + r.note : '');
+    if (r.kind === 'custom') return r.note || r.title || r.method || 'Custom';
+    return r.method || 'issued';
+  };
 
   // Desktop: table · Mobile: entity-style cards (same data)
   preview.innerHTML = `
@@ -5745,6 +5886,7 @@ function renderTransactionReport() {
               <div class="entity-detail"><span class="entity-detail-label">Detail</span><span class="entity-detail-value">${escHtml(detailOf(r) || '—')}</span></div>
               ${r.title ? `<div class="entity-detail"><span class="entity-detail-label">Title</span><span class="entity-detail-value">${escHtml(r.title)}</span></div>` : ''}
               <div class="entity-detail"><span class="entity-detail-label">Amount</span><span class="entity-detail-value">${formatNGN(r.amount)}</span></div>
+              ${r.editable ? `<div class="entity-detail"><span class="entity-detail-label"></span><span class="entity-detail-value"><button type="button" class="text-xs font-semibold" onclick="openReportRowEditor('${r.id}')">Edit</button></span></div>` : ''}
             </div>
           </div>
         `).join('')}
