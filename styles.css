@@ -4980,3 +4980,117 @@ html.dark .custom-report-templates {
 
 .report-type-pill.custom { background: #fef3c7; color: #92400e; }
 html.dark .report-type-pill.custom { background: #78350f; color: #fde68a; }
+
+
+/* Low-stock caution alert under greeting */
+.lowstock-alert {
+  margin: 0.75rem 0 1.1rem;
+  border-radius: 0.85rem;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+  overflow: hidden;
+}
+html.dark .lowstock-alert {
+  background: #2a2410;
+  border-color: rgba(252, 211, 77, 0.35);
+  color: #fde68a;
+}
+.lowstock-alert.hidden { display: none !important; }
+.lowstock-alert-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.9rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.lowstock-alert-icon {
+  flex-shrink: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 158, 11, 0.2);
+  font-size: 0.75rem;
+}
+.lowstock-alert-summary { flex: 1; min-width: 0; }
+.lowstock-alert-chevron {
+  font-size: 0.65rem;
+  opacity: 0.7;
+  transition: transform 0.15s ease;
+}
+.lowstock-alert.is-collapsed .lowstock-alert-chevron { transform: rotate(-90deg); }
+.lowstock-alert.is-collapsed .lowstock-alert-body,
+.lowstock-alert.is-collapsed .lowstock-alert-foot { display: none; }
+.lowstock-alert-body {
+  padding: 0 0.75rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.lowstock-alert .lowstock-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.55rem;
+  background: rgba(0,0,0,0.04);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+html.dark .lowstock-alert .lowstock-row { background: rgba(255,255,255,0.06); }
+.lowstock-alert .lowstock-qty { font-weight: 800; white-space: nowrap; }
+.lowstock-alert-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0.9rem 0.7rem;
+  border-top: 1px solid rgba(146, 64, 14, 0.12);
+}
+html.dark .lowstock-alert-foot { border-top-color: rgba(253, 230, 138, 0.12); }
+.lowstock-alert-foot button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.lowstock-toast {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  max-width: min(22rem, 92vw);
+}
+.lowstock-toast.hidden { display: none !important; }
+.lowstock-toast-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.85rem;
+  background: #1c1917;
+  color: #fde68a;
+  border: 1px solid rgba(252, 211, 77, 0.35);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.lowstock-toast-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+  margin-left: 0.25rem;
+}

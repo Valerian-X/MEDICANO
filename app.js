@@ -727,12 +727,13 @@ function resolveClientForSave(selectId, manualId, extrasPrefix) {
 }
 
 /** Ensure a product exists for a line item; create from name/price if needed. Returns productId. */
-function ensureProductForLine(productId, name, unitNgn) {
+function ensureProductForLine(productId, name, unitNgn, addToInventory) {
   if (productId && getProduct(productId)) return productId;
   const n = (name || '').trim();
   if (!n) return productId || '';
   const existing = (data.products || []).find(p => (p.name || '').toLowerCase() === n.toLowerCase());
   if (existing) return existing.id;
+  if (addToInventory === false) return productId || '';
   const id = uid();
   const sku = 'AUTO-' + Date.now().toString(36).slice(-6).toUpperCase();
   data.products.push({
@@ -1188,25 +1189,99 @@ function renderDashboard() {
   renderLowStockPanel();
 }
 
+const LOWSTOCK_DISMISS_KEY = 'medicano_lowstock_dismiss_until';
+const LOWSTOCK_POPUP_KEY = 'medicano_lowstock_last_popup';
+const LOWSTOCK_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+function getLowStockItems() {
+  return (data.products || [])
+    .filter(p => p.active !== false && (Number(p.stock) || 0) <= (Number(p.lowStock) || 0))
+    .sort((a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0));
+}
+
+function isLowStockDismissed() {
+  try {
+    const until = parseInt(localStorage.getItem(LOWSTOCK_DISMISS_KEY) || '0', 10);
+    return until && Date.now() < until;
+  } catch (e) { return false; }
+}
+
 function renderLowStockPanel() {
   const panel = document.getElementById('lowstock-panel');
   const list = document.getElementById('lowstock-list');
+  const summary = document.getElementById('lowstock-summary');
   if (!panel || !list) return;
-  const lows = (data.products || []).filter(p => p.active !== false && (Number(p.stock) || 0) <= (Number(p.lowStock) || 0))
-    .sort((a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0));
-  if (!lows.length) {
+  const lows = getLowStockItems();
+  if (!lows.length || isLowStockDismissed()) {
     panel.classList.add('hidden');
     list.innerHTML = '';
     return;
   }
   panel.classList.remove('hidden');
-  list.innerHTML = lows.slice(0, 8).map(p => `
-    <div class="lowstock-row" onclick="navigate('products'); setTimeout(()=>{ const s=document.getElementById('product-search'); if(s){ s.value=${JSON.stringify('')}; } const el=document.querySelector('[data-product-id=\'${p.id}\']'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('is-open'); } }, 80)">
+  if (summary) {
+    summary.textContent = lows.length === 1
+      ? '1 item is low on stock'
+      : (lows.length + ' items are low on stock');
+  }
+  list.innerHTML = lows.slice(0, 10).map(p => `
+    <div class="lowstock-row" onclick="navigate('products')">
       <span>${escHtml(p.name || p.sku || 'Item')}</span>
       <span class="lowstock-qty">${Number(p.stock) || 0} left</span>
     </div>
   `).join('');
+  maybeShowLowStockToast(lows.length);
 }
+
+function toggleLowStockAlert() {
+  const panel = document.getElementById('lowstock-panel');
+  if (!panel) return;
+  const open = panel.classList.toggle('is-collapsed') === false;
+  // classList.toggle returns true if class is now present
+  const collapsed = panel.classList.contains('is-collapsed');
+  const bar = panel.querySelector('.lowstock-alert-bar');
+  if (bar) bar.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+}
+
+function dismissLowStockAlert() {
+  try {
+    localStorage.setItem(LOWSTOCK_DISMISS_KEY, String(Date.now() + LOWSTOCK_INTERVAL_MS));
+  } catch (e) {}
+  const panel = document.getElementById('lowstock-panel');
+  if (panel) panel.classList.add('hidden');
+  dismissLowStockToast();
+}
+
+function maybeShowLowStockToast(count) {
+  if (!count || isLowStockDismissed()) return;
+  let last = 0;
+  try { last = parseInt(localStorage.getItem(LOWSTOCK_POPUP_KEY) || '0', 10); } catch (e) {}
+  if (last && (Date.now() - last) < LOWSTOCK_INTERVAL_MS) return;
+  showLowStockToast(count);
+}
+
+function showLowStockToast(count) {
+  const toast = document.getElementById('lowstock-toast');
+  const text = document.getElementById('lowstock-toast-text');
+  if (!toast) return;
+  if (text) text.textContent = count === 1 ? '1 item is low on stock' : (count + ' items are low on stock');
+  toast.classList.remove('hidden');
+  try { localStorage.setItem(LOWSTOCK_POPUP_KEY, String(Date.now())); } catch (e) {}
+  clearTimeout(showLowStockToast._t);
+  showLowStockToast._t = setTimeout(dismissLowStockToast, 12000);
+}
+
+function dismissLowStockToast() {
+  const toast = document.getElementById('lowstock-toast');
+  if (toast) toast.classList.add('hidden');
+}
+
+// Recheck low-stock popup on an interval while app is open
+setInterval(function () {
+  if (typeof getLowStockItems !== 'function') return;
+  const n = getLowStockItems().length;
+  if (n) maybeShowLowStockToast(n);
+}, 5 * 60 * 1000);
+
 
 let dashCalView = new Date();
 let dashCalSelected = new Date();
@@ -2483,7 +2558,8 @@ function saveQuote() {
     const baseNGN = parseFloat(row.querySelector('.qi-base')?.value) || 0;
     const markupPct = parseFloat(row.querySelector('.qi-markup')?.value) || 0;
     const unitNGN = quoteFinalUnit(baseNGN, markupPct);
-    productId = ensureProductForLine(productId, name, unitNGN);
+    const addInv = document.getElementById('quote-add-to-inventory')?.checked !== false;
+    productId = ensureProductForLine(productId, name, unitNGN, addInv);
     const p = productId ? getProduct(productId) : null;
     const displayName = name || (p ? p.name : '');
     if (!displayName && !productId) return;
@@ -3012,11 +3088,12 @@ function saveInvoice() {
   const clientId = resolveClientForSave('inv-client', 'inv-client-manual', 'inv-client');
   if (!clientId) { alert('Please select or type a client name.'); return; }
   // Ensure products for custom lines before collect
+  const addInvItems = document.getElementById('inv-add-to-inventory')?.checked !== false;
   document.querySelectorAll('#invoice-items-list .line-card').forEach(tr => {
     let productId = tr.querySelector('.inv-product')?.value || '';
     const name = tr.querySelector('.inv-name')?.value.trim() || '';
     const unitNgn = parseFloat(tr.querySelector('.inv-unit')?.value) || 0;
-    productId = ensureProductForLine(productId, name, unitNgn);
+    productId = ensureProductForLine(productId, name, unitNgn, addInvItems);
     const sel = tr.querySelector('.inv-product');
     if (sel && productId) {
       if (![...sel.options].some(o => o.value === productId)) {
