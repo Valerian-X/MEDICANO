@@ -257,8 +257,7 @@ function applyCloudData(payload) {
   if (!data.calendarEvents) data.calendarEvents = [];
   if (!data.stockMovements) data.stockMovements = [];
   if (!data.userProfile) data.userProfile = { username: '' };
-      if (!Array.isArray(data.customReportTemplates)) data.customReportTemplates = [];
-      if (!Array.isArray(data.customReports)) data.customReports = [];
+      if (!Array.isArray(data.reportTableRows)) data.reportTableRows = [];
   if (!data.company) data.company = (typeof DEFAULT_DATA !== 'undefined' && DEFAULT_DATA.company) ? JSON.parse(JSON.stringify(DEFAULT_DATA.company)) : {};
   bindWindowData();
   try {
@@ -811,8 +810,7 @@ function loadData() {
         data.deviceProfile.name = '';
       }
       if (!data.userProfile) data.userProfile = { username: '' };
-      if (!Array.isArray(data.customReportTemplates)) data.customReportTemplates = [];
-      if (!Array.isArray(data.customReports)) data.customReports = [];
+      if (!Array.isArray(data.reportTableRows)) data.reportTableRows = [];
       if (!data.lastBackupAt) data.lastBackupAt = null;
       if (!data.settings) data.settings = {};
       if (data.settings.followUpDays == null) data.settings.followUpDays = 14;
@@ -5246,245 +5244,153 @@ function closeModal(id) {
 const REPORT_FILTERS_KEY = 'medicano_report_filters_v1';
 
 
-// -------------------- Custom reports (billable → invoice) --------------------
-function ensureCustomReportData() {
-  if (!data.customReportTemplates) data.customReportTemplates = [];
-  if (!data.customReports) data.customReports = [];
-}
 
-function toggleCustomReportForm(show) {
-  const form = document.getElementById('custom-report-form');
-  if (!form) return;
-  if (show === false) {
-    form.classList.add('hidden');
-    return;
+// -------------------- Manual / editable report table rows --------------------
+function ensureReportRows() {
+  if (!Array.isArray(data.reportTableRows)) data.reportTableRows = [];
+  // migrate old customReports once
+  if (Array.isArray(data.customReports) && data.customReports.length && !data._migratedCustomReports) {
+    data.customReports.forEach(function (e) {
+      data.reportTableRows.push({
+        id: e.id || uid(),
+        date: e.date || '',
+        typeLabel: 'Custom',
+        clientId: e.clientId || '',
+        clientName: '',
+        ref: e.invoiceNumber || '',
+        title: e.name || '',
+        detail: e.notes || e.name || '',
+        amount: Number(e.lineNgn) || 0,
+        invoiceId: e.invoiceId || null,
+        createdAt: e.createdAt || new Date().toISOString()
+      });
+    });
+    data._migratedCustomReports = true;
   }
-  form.classList.remove('hidden');
-  populateCustomReportForm();
 }
 
-function toggleReportTemplatesEditor() {
-  const ed = document.getElementById('custom-report-templates-editor');
-  if (!ed) return;
-  ed.classList.toggle('hidden');
-  if (!ed.classList.contains('hidden')) renderReportTemplatesEditor();
-}
+function openReportRowEditor(id) {
+  ensureReportRows();
+  const modal = document.getElementById('modal-report-row');
+  if (!modal) return;
+  const row = id ? (data.reportTableRows || []).find(function (r) { return r.id === id; }) : null;
+  document.getElementById('report-row-modal-title').textContent = row ? 'Edit table row' : 'Add table row';
+  document.getElementById('rr-id').value = row ? row.id : '';
+  document.getElementById('rr-date').value = row ? (row.date || '') : new Date().toISOString().slice(0, 10);
+  document.getElementById('rr-type').value = row ? (row.typeLabel || 'Custom') : 'Custom';
+  document.getElementById('rr-ref').value = row ? (row.ref || '') : '';
+  document.getElementById('rr-amount').value = row ? (row.amount || 0) : 0;
+  document.getElementById('rr-detail').value = row ? (row.detail || '') : '';
+  document.getElementById('rr-title').value = row ? (row.title || '') : '';
+  const del = document.getElementById('rr-delete-btn');
+  if (del) del.classList.toggle('hidden', !row);
 
-function renderReportTemplatesEditor() {
-  ensureCustomReportData();
-  const ed = document.getElementById('custom-report-templates-editor');
-  if (!ed) return;
-  const rows = (data.customReportTemplates || []).map((t, i) => `
-    <div class="select-row" style="cursor:default">
-      <span class="select-row-text">
-        <span class="select-row-title">${escHtml(t.name || 'Template')}</span>
-        <span class="select-row-sub">${formatNGN(Number(t.unitPrice) || 0)} · ${escHtml(t.description || 'No description')}</span>
-      </span>
-      <button type="button" class="text-xs text-red-500 font-semibold" onclick="deleteReportTemplate('${t.id}')">Remove</button>
-    </div>
-  `).join('') || '<p class="text-sm text-slate-400">No templates yet. Add one below.</p>';
-
-  ed.innerHTML = `
-    <div class="mb-2 space-y-2">${rows}</div>
-    <div class="settings-form-grid">
-      <div class="settings-span-2">
-        <label class="settings-label">New template name</label>
-        <input id="crt-name" class="settings-input w-full" placeholder="e.g. Installation report" />
-      </div>
-      <div>
-        <label class="settings-label">Default unit price (₦)</label>
-        <input id="crt-price" type="number" min="0" step="0.01" class="settings-input w-full" value="0" />
-      </div>
-      <div>
-        <label class="settings-label">Description</label>
-        <input id="crt-desc" class="settings-input w-full" placeholder="Optional" />
-      </div>
-    </div>
-    <button type="button" class="mt-2 px-4 py-2 rounded-full text-sm font-semibold bg-brand-600 text-white" onclick="addReportTemplate()">Save template</button>
-  `;
-}
-
-function addReportTemplate() {
-  ensureCustomReportData();
-  const name = (document.getElementById('crt-name')?.value || '').trim();
-  if (!name) { alert('Enter a template name.'); return; }
-  const unitPrice = parseFloat(document.getElementById('crt-price')?.value) || 0;
-  const description = (document.getElementById('crt-desc')?.value || '').trim();
-  data.customReportTemplates.push({
-    id: uid(),
-    name,
-    unitPrice,
-    description,
-    createdAt: new Date().toISOString()
-  });
-  saveData();
-  logAudit('report_template', name);
-  renderReportTemplatesEditor();
-  populateCustomReportForm();
-}
-
-function deleteReportTemplate(id) {
-  ensureCustomReportData();
-  data.customReportTemplates = data.customReportTemplates.filter(t => t.id !== id);
-  saveData();
-  renderReportTemplatesEditor();
-  populateCustomReportForm();
-}
-
-function populateCustomReportForm() {
-  ensureCustomReportData();
-  const clientSel = document.getElementById('cr-client');
-  const tplSel = document.getElementById('cr-template');
+  const clientSel = document.getElementById('rr-client');
   if (clientSel) {
-    clientSel.innerHTML = '<option value="">Select client…</option>' +
-      (data.clients || []).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c =>
-        `<option value="${c.id}">${escHtml(c.name)}</option>`
-      ).join('');
+    clientSel.innerHTML = '<option value="">— No client —</option>' +
+      (data.clients || []).slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); }).map(function (c) {
+        return '<option value="' + c.id + '"' + (row && row.clientId === c.id ? ' selected' : '') + '>' + escHtml(c.name) + '</option>';
+      }).join('');
   }
-  if (tplSel) {
-    const tpls = data.customReportTemplates || [];
-    tplSel.innerHTML = '<option value="">Custom / one-off</option>' +
-      tpls.map(t => `<option value="${t.id}" data-price="${Number(t.unitPrice)||0}" data-name="${escHtml(t.name)}">${escHtml(t.name)}</option>`).join('');
-  }
-  const dateEl = document.getElementById('cr-date');
-  if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0, 10);
-  onCustomReportTemplateChange();
-  recalcCustomReportLine();
+  modal.classList.remove('hidden');
 }
 
-function onCustomReportTemplateChange() {
-  const tplSel = document.getElementById('cr-template');
-  if (!tplSel) return;
-  const opt = tplSel.selectedOptions[0];
-  if (opt && opt.value) {
-    const price = parseFloat(opt.getAttribute('data-price')) || 0;
-    const name = opt.getAttribute('data-name') || opt.textContent || '';
-    const priceEl = document.getElementById('cr-price');
-    const nameEl = document.getElementById('cr-name');
-    if (priceEl) priceEl.value = price;
-    if (nameEl && !nameEl.value) nameEl.value = name;
-  }
-  recalcCustomReportLine();
+function closeReportRowEditor() {
+  const modal = document.getElementById('modal-report-row');
+  if (modal) modal.classList.add('hidden');
 }
 
-function recalcCustomReportLine() {
-  const qty = Math.max(1, parseFloat(document.getElementById('cr-qty')?.value) || 1);
-  const price = parseFloat(document.getElementById('cr-price')?.value) || 0;
-  const totalEl = document.getElementById('cr-total');
-  if (totalEl) totalEl.value = formatNGN(qty * price);
-}
-
-function saveCustomReportEntry() {
-  ensureCustomReportData();
-  const clientId = document.getElementById('cr-client')?.value || '';
-  if (!clientId) { alert('Select a client.'); return; }
-  const name = (document.getElementById('cr-name')?.value || '').trim();
-  if (!name) { alert('Enter a description.'); return; }
-  const qty = Math.max(1, parseFloat(document.getElementById('cr-qty')?.value) || 1);
-  const unitPrice = parseFloat(document.getElementById('cr-price')?.value) || 0;
+function saveReportTableRow() {
+  ensureReportRows();
+  const id = document.getElementById('rr-id').value;
+  const clientId = document.getElementById('rr-client').value || '';
+  const client = clientId ? getClient(clientId) : null;
   const entry = {
-    id: uid(),
-    clientId,
-    templateId: document.getElementById('cr-template')?.value || '',
-    name,
-    notes: (document.getElementById('cr-notes')?.value || '').trim(),
-    date: document.getElementById('cr-date')?.value || new Date().toISOString().slice(0, 10),
-    qty,
-    unitPrice,
-    lineNgn: qty * unitPrice,
+    id: id || uid(),
+    date: document.getElementById('rr-date').value || new Date().toISOString().slice(0, 10),
+    typeLabel: (document.getElementById('rr-type').value || 'Custom').trim() || 'Custom',
+    clientId: clientId,
+    clientName: client ? client.name : (document.getElementById('rr-detail').value || '—'),
+    ref: (document.getElementById('rr-ref').value || '').trim(),
+    title: (document.getElementById('rr-title').value || '').trim(),
+    detail: (document.getElementById('rr-detail').value || '').trim(),
+    amount: parseFloat(document.getElementById('rr-amount').value) || 0,
     invoiceId: null,
-    invoiceNumber: '',
-    createdAt: new Date().toISOString()
+    updatedAt: new Date().toISOString()
   };
-  data.customReports.unshift(entry);
+  if (id) {
+    const idx = data.reportTableRows.findIndex(function (r) { return r.id === id; });
+    if (idx >= 0) {
+      entry.invoiceId = data.reportTableRows[idx].invoiceId || null;
+      entry.createdAt = data.reportTableRows[idx].createdAt;
+      data.reportTableRows[idx] = entry;
+    } else data.reportTableRows.unshift(entry);
+  } else {
+    entry.createdAt = new Date().toISOString();
+    data.reportTableRows.unshift(entry);
+  }
   saveData();
-  logAudit('custom_report', name + ' · ' + formatNGN(entry.lineNgn));
-  toggleCustomReportForm(false);
-  renderCustomReportsSection();
-  // clear name for next
-  const nameEl = document.getElementById('cr-name');
-  if (nameEl) nameEl.value = '';
+  closeReportRowEditor();
+  renderTransactionReport();
 }
 
-function renderCustomReportsSection() {
-  ensureCustomReportData();
-  const list = document.getElementById('custom-reports-list');
-  if (!list) return;
-  const from = document.getElementById('report-date-from')?.value || '';
-  const to = document.getElementById('report-date-to')?.value || '';
-  const clientIds = (typeof getSelectedReportClientIds === 'function') ? getSelectedReportClientIds() : [];
-  const clientSet = clientIds.length ? new Set(clientIds) : null;
-
-  let rows = (data.customReports || []).slice();
-  rows = rows.filter(r => {
-    const d = (r.date || '').slice(0, 10);
-    if (from && d && d < from) return false;
-    if (to && d && d > to) return false;
-    if (clientSet && !clientSet.has(r.clientId)) return false;
-    return true;
-  });
-
-  if (!rows.length) {
-    list.innerHTML = '<p class="text-sm text-slate-400 py-2">No custom reports in this period.</p>';
-    return;
-  }
-
-  list.innerHTML = rows.map(r => {
-    const client = getClient(r.clientId);
-    const billed = !!r.invoiceId;
-    return `<label class="select-row custom-report-row ${billed ? 'is-billed' : ''}">
-      <input type="checkbox" class="select-row-check cr-check" value="${r.id}" ${billed ? 'disabled' : ''} />
-      <span class="select-row-text">
-        <span class="select-row-title">${escHtml(r.name)}</span>
-        <span class="select-row-sub">${escHtml(client ? client.name : 'Client')} · ${escHtml(r.date || '')} · Qty ${r.qty || 1}${billed ? ' · Invoiced ' + escHtml(r.invoiceNumber || '') : ''}</span>
-      </span>
-      <span class="custom-report-amt">${formatNGN(r.lineNgn || 0)}</span>
-    </label>`;
-  }).join('');
+function deleteReportTableRow() {
+  const id = document.getElementById('rr-id').value;
+  if (!id) return;
+  if (!confirm('Delete this table row?')) return;
+  ensureReportRows();
+  data.reportTableRows = data.reportTableRows.filter(function (r) { return r.id !== id; });
+  saveData();
+  closeReportRowEditor();
+  renderTransactionReport();
 }
 
-function addSelectedCustomReportsToInvoice() {
-  ensureCustomReportData();
-  const ids = [...document.querySelectorAll('.cr-check:checked')].map(cb => cb.value);
+function addSelectedReportRowsToInvoice() {
+  ensureReportRows();
+  const ids = [...document.querySelectorAll('.rr-row-check:checked')].map(function (cb) { return cb.value; });
   if (!ids.length) {
-    alert('Select one or more unbilled custom reports.');
+    alert('Select one or more custom table rows first.');
     return;
   }
-  const entries = (data.customReports || []).filter(r => ids.includes(r.id) && !r.invoiceId);
+  const entries = (data.reportTableRows || []).filter(function (r) { return ids.indexOf(r.id) >= 0 && !r.invoiceId; });
   if (!entries.length) {
-    alert('Selected reports are already invoiced or missing.');
+    alert('No unbilled custom rows selected.');
     return;
   }
-  // All must be same client
-  const clientIds = [...new Set(entries.map(e => e.clientId))];
+  const clientIds = [...new Set(entries.map(function (e) { return e.clientId; }).filter(Boolean))];
   if (clientIds.length > 1) {
-    alert('Select reports for one client only so they can share a single invoice.');
+    alert('Select rows for one client only.');
+    return;
+  }
+  if (!clientIds.length) {
+    alert('Custom rows need a client before creating an invoice.');
     return;
   }
   const clientId = clientIds[0];
   const client = getClient(clientId);
-  const items = entries.map(e => ({
-    productId: '',
-    name: e.name,
-    qty: Number(e.qty) || 1,
-    unitNgn: Number(e.unitPrice) || 0,
-    lineNgn: Number(e.lineNgn) || ((Number(e.qty) || 1) * (Number(e.unitPrice) || 0)),
-    customReportId: e.id
-  }));
-  const sub = items.reduce((s, it) => s + (Number(it.lineNgn) || 0), 0);
+  const items = entries.map(function (e) {
+    return {
+      productId: '',
+      name: e.title || e.detail || e.typeLabel || 'Report line',
+      qty: 1,
+      unitNgn: Number(e.amount) || 0,
+      lineNgn: Number(e.amount) || 0,
+      reportRowId: e.id
+    };
+  });
+  const sub = items.reduce(function (s, it) { return s + (Number(it.lineNgn) || 0); }, 0);
   const inv = {
     id: uid(),
     invoiceNumber: nextInvoiceNumber(),
-    clientId,
-    title: 'Custom reports — ' + (client ? client.name : 'Client'),
+    clientId: clientId,
+    title: 'From report table — ' + (client ? client.name : 'Client'),
     status: 'unpaid',
     date: new Date().toISOString().slice(0, 10),
     dueDate: '',
-    quoteRef: '',
-    notes: 'Generated from custom reports on Reports page.',
+    notes: 'Created from custom rows on Reports.',
     showFooter: true,
     discount: 0,
-    items,
+    items: items,
     subtotalNgn: sub,
     totalNgn: sub,
     payments: [],
@@ -5496,75 +5402,96 @@ function addSelectedCustomReportsToInvoice() {
   };
   if (!data.invoices) data.invoices = [];
   data.invoices.unshift(inv);
-  entries.forEach(e => {
-    e.invoiceId = inv.id;
-    e.invoiceNumber = inv.invoiceNumber;
-  });
+  entries.forEach(function (e) { e.invoiceId = inv.id; e.ref = inv.invoiceNumber; });
   saveData();
-  logAudit('invoice_from_reports', inv.invoiceNumber + ' · ' + entries.length + ' report(s)');
-  renderCustomReportsSection();
-  alert('Invoice ' + inv.invoiceNumber + ' created with ' + entries.length + ' line item(s).');
+  renderTransactionReport();
+  alert('Invoice ' + inv.invoiceNumber + ' created.');
   if (typeof editInvoice === 'function') editInvoice(inv.id);
-  else {
-    navigate('invoices');
-    renderInvoices();
-  }
+  else navigate('invoices');
 }
-
 
 function collectLedgerRows({ from, to, clientIds, method, type } = {}) {
   const rows = [];
   const clientSet = (clientIds && clientIds.length) ? new Set(clientIds) : null;
-  const wantPay = !type || type === 'payments' || type === 'both';
-  const wantInv = type === 'invoices' || type === 'both';
+  const t = type || 'payments';
+  const wantPay = t === 'payments' || t === 'both' || t === 'all';
+  const wantInv = t === 'invoices' || t === 'both' || t === 'all';
+  const wantCustom = t === 'custom' || t === 'all' || t === 'both';
 
-  (data.invoices || []).forEach(inv => {
-    if (clientSet && !clientSet.has(inv.clientId)) return;
-    const client = getClient(inv.clientId);
-    const clientName = client ? client.name : (inv.clientName || '—');
+  if (wantPay || wantInv) {
+    (data.invoices || []).forEach(inv => {
+      if (clientSet && !clientSet.has(inv.clientId)) return;
+      const client = getClient(inv.clientId);
+      const clientName = client ? client.name : (inv.clientName || '—');
 
-    if (wantInv) {
-      const d = (inv.date || (inv.createdAt || '').slice(0, 10) || '');
-      if (from && d && d < from) { /* skip */ }
-      else if (to && d && d > to) { /* skip */ }
-      else {
-        rows.push({
-          kind: 'invoice',
-          date: d || '—',
-          clientId: inv.clientId || '',
-          clientName,
-          ref: inv.invoiceNumber || '—',
-          title: inv.title || '',
-          method: (inv.status || '').toString(),
-          note: 'Invoice issued',
-          amount: Number(inv.totalNGN) || 0,
-          signedAmount: Number(inv.totalNGN) || 0
+      if (wantInv) {
+        const d = (inv.date || (inv.createdAt || '').slice(0, 10) || '');
+        if (!(from && d && d < from) && !(to && d && d > to)) {
+          rows.push({
+            kind: 'invoice',
+            id: inv.id,
+            date: d || '—',
+            clientId: inv.clientId || '',
+            clientName,
+            ref: inv.invoiceNumber || '—',
+            title: inv.title || '',
+            method: (inv.status || '').toString(),
+            note: 'Invoice issued',
+            amount: Number(inv.totalNGN != null ? inv.totalNGN : inv.totalNgn) || 0,
+            editable: false
+          });
+        }
+      }
+
+      if (wantPay) {
+        (inv.payments || []).forEach(p => {
+          const d = (p.date || (p.createdAt || '').slice(0, 10) || '');
+          if (from && d && d < from) return;
+          if (to && d && d > to) return;
+          const mth = (p.method || '').toLowerCase();
+          if (method && mth !== method) return;
+          rows.push({
+            kind: 'payment',
+            id: p.id || (inv.id + '-pay'),
+            date: d || '—',
+            clientId: inv.clientId || '',
+            clientName,
+            ref: inv.invoiceNumber || '—',
+            title: inv.title || '',
+            method: p.method || '—',
+            note: p.note || '',
+            amount: Number(p.amount) || 0,
+            editable: false
+          });
         });
       }
-    }
+    });
+  }
 
-    if (wantPay) {
-      (inv.payments || []).forEach(p => {
-        const d = (p.date || (p.createdAt || '').slice(0, 10) || '');
-        if (from && d && d < from) return;
-        if (to && d && d > to) return;
-        const m = (p.method || '').toLowerCase();
-        if (method && m !== method) return;
-        rows.push({
-          kind: 'payment',
-          date: d || '—',
-          clientId: inv.clientId || '',
-          clientName,
-          ref: inv.invoiceNumber || '—',
-          title: inv.title || '',
-          method: p.method || '—',
-          note: p.note || '',
-          amount: Number(p.amount) || 0,
-          signedAmount: Number(p.amount) || 0
-        });
+  if (wantCustom) {
+    ensureReportRows();
+    (data.reportTableRows || []).forEach(r => {
+      if (clientSet && r.clientId && !clientSet.has(r.clientId)) return;
+      const d = (r.date || '').slice(0, 10);
+      if (from && d && d < from) return;
+      if (to && d && d > to) return;
+      const client = r.clientId ? getClient(r.clientId) : null;
+      rows.push({
+        kind: 'custom',
+        id: r.id,
+        date: d || '—',
+        clientId: r.clientId || '',
+        clientName: client ? client.name : (r.clientName || '—'),
+        ref: r.ref || '—',
+        title: r.title || '',
+        method: r.typeLabel || 'Custom',
+        note: r.detail || '',
+        amount: Number(r.amount) || 0,
+        editable: true,
+        invoiceId: r.invoiceId || null
       });
-    }
-  });
+    });
+  }
 
   rows.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.ref).localeCompare(String(a.ref)));
   return rows;
@@ -5651,13 +5578,11 @@ function initReportsPage() {
   if (type && saved.type) type.value = saved.type;
 
   renderTransactionReport();
-  renderCustomReportsSection();
 }
 
 function renderTransactionReport() {
   const filters = getReportFilterState();
   saveReportFilters();
-  if (typeof renderCustomReportsSection === 'function') renderCustomReportsSection();
   const rows = collectLedgerRows(filters);
   const summary = document.getElementById('report-summary');
   const preview = document.getElementById('report-preview');
@@ -5695,29 +5620,33 @@ function renderTransactionReport() {
           <table class="report-table data-table">
             <thead>
               <tr>
+                <th></th>
                 <th>Date</th>
                 <th>Type</th>
                 <th>Client</th>
                 <th>Reference</th>
                 <th>Detail</th>
                 <th class="num">Amount</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               ${rows.map(r => `
                 <tr>
+                  <td>${r.editable ? `<input type="checkbox" class="rr-row-check" value="${r.id}" />` : ''}</td>
                   <td>${escHtml(r.date)}</td>
-                  <td><span class="report-type-pill ${r.kind === 'payment' ? 'pay' : 'inv'}">${r.kind === 'payment' ? 'Payment' : 'Invoice'}</span></td>
+                  <td><span class="report-type-pill ${r.kind === 'payment' ? 'pay' : (r.kind === 'custom' ? 'custom' : 'inv')}">${r.kind === 'payment' ? 'Payment' : (r.kind === 'custom' ? escHtml(r.method || 'Custom') : 'Invoice')}</span></td>
                   <td>${escHtml(r.clientName)}</td>
                   <td>${escHtml(r.ref)}${r.title ? `<div class="text-xs text-slate-400">${escHtml(r.title)}</div>` : ''}</td>
                   <td>${escHtml(detailOf(r))}</td>
                   <td class="num">${formatNGN(r.amount)}</td>
+                  <td>${r.editable ? `<button type="button" class="text-xs font-semibold text-brand-700" onclick="openReportRowEditor('${r.id}')">Edit</button>` : ''}</td>
                 </tr>
               `).join('')}
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="5" class="num" style="font-weight:700">Total collected (payments)</td>
+                <td colspan="6" class="num" style="font-weight:700">Total collected (payments)</td>
                 <td class="num" style="font-weight:800">${formatNGN(collected)}</td>
               </tr>
             </tfoot>
@@ -5735,7 +5664,7 @@ function renderTransactionReport() {
               <span class="entity-card-price">${formatNGN(r.amount)}</span>
             </div>
             <div class="entity-card-body is-open" style="display:block">
-              <div class="entity-detail"><span class="entity-detail-label">Type</span><span class="entity-detail-value"><span class="report-type-pill ${r.kind === 'payment' ? 'pay' : 'inv'}">${r.kind === 'payment' ? 'Payment' : 'Invoice'}</span></span></div>
+              <div class="entity-detail"><span class="entity-detail-label">Type</span><span class="entity-detail-value"><span class="report-type-pill ${r.kind === 'payment' ? 'pay' : (r.kind === 'custom' ? 'custom' : 'inv')}">${r.kind === 'payment' ? 'Payment' : (r.kind === 'custom' ? (r.method || 'Custom') : 'Invoice')}</span></span></div>
               <div class="entity-detail"><span class="entity-detail-label">Detail</span><span class="entity-detail-value">${escHtml(detailOf(r) || '—')}</span></div>
               ${r.title ? `<div class="entity-detail"><span class="entity-detail-label">Title</span><span class="entity-detail-value">${escHtml(r.title)}</span></div>` : ''}
               <div class="entity-detail"><span class="entity-detail-label">Amount</span><span class="entity-detail-value">${formatNGN(r.amount)}</span></div>
@@ -5821,7 +5750,7 @@ function printTransactionReport() {
           ${rows.length ? rows.map(r => `
             <tr>
               <td>${escHtml(r.date)}</td>
-              <td>${r.kind === 'payment' ? 'Payment' : 'Invoice'}</td>
+              <td>${r.kind === 'payment' ? 'Payment' : (r.kind === 'custom' ? (r.method || 'Custom') : 'Invoice')}</td>
               <td>${escHtml(r.clientName)}</td>
               <td>${escHtml(r.ref)}</td>
               <td>${escHtml(r.kind === 'payment' ? ((r.method || '') + (r.note ? ' · ' + r.note : '')) : (r.method || ''))}</td>

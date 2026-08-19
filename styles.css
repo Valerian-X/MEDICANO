@@ -4977,3 +4977,6 @@ html.dark .custom-report-templates {
   background: rgba(255,255,255,0.04);
   border-color: rgba(255,255,255,0.08);
 }
+
+.report-type-pill.custom { background: #fef3c7; color: #92400e; }
+html.dark .report-type-pill.custom { background: #78350f; color: #fde68a; }
