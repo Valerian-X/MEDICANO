@@ -3002,6 +3002,68 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               <p class="text-xs text-slate-500 mt-3 mb-0">Leave all cleared to include every client. Filters update live.</p>
             </div>
 
+            
+            <!-- Custom reports → can bill to invoice -->
+            <div class="panel-soft custom-reports-panel">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h4 class="font-semibold text-sm m-0">Custom reports</h4>
+                <div class="flex flex-wrap gap-2">
+                  <button type="button" class="pres-tool-btn pres-tool-select" onclick="toggleCustomReportForm(true)">+ Log report</button>
+                  <button type="button" class="pres-tool-btn pres-tool-clear" onclick="toggleReportTemplatesEditor()">Templates</button>
+                </div>
+              </div>
+              <p class="text-xs text-slate-500 mt-0 mb-3">Log billable services or reports for a client, then add selected rows to a new invoice.</p>
+
+              <div id="custom-report-templates-editor" class="custom-report-templates hidden mb-3"></div>
+
+              <div id="custom-report-form" class="custom-report-form hidden mb-3">
+                <div class="settings-form-grid">
+                  <div>
+                    <label class="settings-label">Client</label>
+                    <select id="cr-client" class="settings-input w-full"></select>
+                  </div>
+                  <div>
+                    <label class="settings-label">Template</label>
+                    <select id="cr-template" class="settings-input w-full" onchange="onCustomReportTemplateChange()"></select>
+                  </div>
+                  <div>
+                    <label class="settings-label">Date</label>
+                    <input id="cr-date" type="date" class="settings-input w-full" />
+                  </div>
+                  <div>
+                    <label class="settings-label">Qty</label>
+                    <input id="cr-qty" type="number" min="1" step="1" value="1" class="settings-input w-full" oninput="recalcCustomReportLine()" />
+                  </div>
+                  <div>
+                    <label class="settings-label">Unit price (₦)</label>
+                    <input id="cr-price" type="number" min="0" step="0.01" class="settings-input w-full" oninput="recalcCustomReportLine()" />
+                  </div>
+                  <div>
+                    <label class="settings-label">Line total</label>
+                    <input id="cr-total" type="text" class="settings-input w-full" readonly />
+                  </div>
+                  <div class="settings-span-2">
+                    <label class="settings-label">Description</label>
+                    <input id="cr-name" type="text" class="settings-input w-full" placeholder="e.g. Site survey report" />
+                  </div>
+                  <div class="settings-span-2">
+                    <label class="settings-label">Notes (optional)</label>
+                    <input id="cr-notes" type="text" class="settings-input w-full" placeholder="Optional note" />
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2 mt-3">
+                  <button type="button" class="px-4 py-2 rounded-full text-sm font-semibold bg-brand-600 text-white" onclick="saveCustomReportEntry()">Save report</button>
+                  <button type="button" class="px-4 py-2 rounded-full text-sm font-semibold bg-slate-100 text-slate-800" onclick="toggleCustomReportForm(false)">Cancel</button>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Logged reports</span>
+                <button type="button" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-900 text-white" onclick="addSelectedCustomReportsToInvoice()">Add selected to invoice</button>
+              </div>
+              <div id="custom-reports-list" class="custom-reports-list"></div>
+            </div>
+
             <div id="report-summary" class="dash-stats-row"></div>
             <div id="report-preview" class="report-preview-wrap"></div>
           </div>

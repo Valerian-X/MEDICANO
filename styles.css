@@ -4949,3 +4949,31 @@ html.dark .cal-day:hover:not(.empty) .cal-day-core,
 html.dark .dash-mini-cal .d:hover:not(.muted) .cal-day-core {
   background: rgba(255,255,255,0.08) !important;
 }
+
+/* Custom reports on Reports page */
+.custom-reports-panel { margin-top: 0.25rem; }
+.custom-reports-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.custom-report-row { width: 100%; margin: 0; }
+.custom-report-row.is-billed { opacity: 0.72; }
+.custom-report-amt {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-left: 0.5rem;
+}
+.custom-report-form,
+.custom-report-templates {
+  padding: 0.85rem;
+  border-radius: 0.85rem;
+  background: rgba(15, 23, 42, 0.03);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+html.dark .custom-report-form,
+html.dark .custom-report-templates {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.08);
+}
