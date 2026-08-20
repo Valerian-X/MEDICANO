@@ -1,6 +1,9 @@
-# Medicano Resources Limited — Medical Equipment Quoting App
+# Medicano Resources Limited — Catalog, Quotes & Invoices
 
-Offline-first web application for managing medical equipment catalog, hospitals/clients, and professional multi-currency quotes (USD / EUR → NGN).
+> **Design & engineering rules (required reading before UI changes):** see [`DESIGN_RULES.md`](./DESIGN_RULES.md)
+
+
+Offline-first web application for managing medical items catalog, hospitals/clients, and professional multi-currency quotes (USD / EUR → NGN).
 
 ## Company
 - **Medicano Resources Limited**
@@ -9,7 +12,7 @@ Offline-first web application for managing medical equipment catalog, hospitals/
 - enquiries@medicanoresources.com
 
 ## Features
-- Equipment catalog (scalable) with SKU, description, category, brand, stock, multi-currency prices
+- Items catalog (Inventory) (scalable) with SKU, description, category, brand, stock, multi-currency prices
 - Manual exchange rates (USD→NGN, EUR→NGN) — ready for API later
 - Hospital / client management
 - Quote / Project builder with live NGN totals, discounts, status workflow
@@ -44,7 +47,7 @@ All data is stored in the browser’s localStorage under the key `medicano_data_
 
 - Use **Settings → Export All Data** to create a JSON backup.
 - Use **Import Data** on another computer/browser to restore.
-- Reset returns to the built-in sample medical equipment catalog.
+- Reset returns to the built-in sample medical items catalog.
 
 ## Sample Data
 12 realistic medical equipment items (MRI, CT, Ultrasound, Ventilators, Monitors, Lab analyzers, etc.) are pre-loaded so you can start quoting immediately. Add, edit or delete freely.

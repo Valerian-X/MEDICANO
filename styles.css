@@ -5162,3 +5162,79 @@ html.dark .report-add-row-btn {
   color: #1a1a1a;
   box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
+
+
+/* Report mobile cards — no overlap */
+#page-reports .report-mobile-cards,
+#page-reports .entity-cards.report-mobile-cards {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1rem !important;
+  padding: 0.25rem 0 0.5rem;
+}
+#page-reports .report-result-card,
+#page-reports .report-mobile-cards > .entity-card {
+  position: relative !important;
+  margin: 0 0 0.15rem 0 !important;
+  float: none !important;
+  clear: both !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  transform: none !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  z-index: auto !important;
+  overflow: visible !important;
+}
+#page-reports .report-result-card .entity-card-body {
+  position: relative !important;
+  display: block !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+#page-reports .report-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+
+/* ===== Reports: forced card gaps + date inputs ===== */
+#page-reports .report-mobile-cards {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1.15rem !important;
+  row-gap: 1.15rem !important;
+}
+#page-reports .report-result-card,
+#page-reports .report-card-spaced {
+  display: block !important;
+  width: 100% !important;
+  margin: 0 0 1.15rem 0 !important;
+  margin-bottom: 1.15rem !important;
+  float: none !important;
+  position: relative !important;
+  transform: none !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 1 !important;
+  box-sizing: border-box !important;
+}
+#page-reports .report-result-card:last-child {
+  margin-bottom: 0.35rem !important;
+}
+#page-reports .report-result-card .entity-card-body {
+  display: block !important;
+  position: static !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+#page-reports #report-date-to,
+#page-reports #report-date-from {
+  color: inherit;
+}
