@@ -3341,6 +3341,48 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               </div>
             </div>
 
+
+            <!-- Team & approvals -->
+            <div class="settings-card settings-panel collapsed" data-panel="team">
+              <button type="button" class="settings-panel-toggle" onclick="toggleSettingsPanel('team')">
+                <span class="settings-card-title">Team &amp; approvals</span>
+                <span class="settings-chevron">▼</span>
+              </button>
+              <div class="settings-panel-body">
+                <p class="settings-help">Shared company data. <strong>Admin</strong> changes go live for everyone. <strong>Staff</strong> changes wait for admin approval.</p>
+                <p id="team-role-label" class="text-sm font-semibold mb-2"></p>
+                <p id="team-org-label" class="text-xs text-slate-500 mb-3"></p>
+
+                <div class="settings-form-grid mb-3">
+                  <div class="settings-span-2">
+                    <label class="settings-label">Invite staff (admin)</label>
+                    <div class="settings-inline-row">
+                      <input id="team-invite-email" type="email" class="settings-input" placeholder="colleague@email.com" />
+                      <select id="team-invite-role" class="settings-input" style="max-width:7rem">
+                        <option value="staff">Staff</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                      <button type="button" class="settings-primary-btn settings-btn-compact" onclick="teamCreateInvite()">Invite</button>
+                    </div>
+                    <p id="team-invite-result" class="text-xs mt-2 mb-0"></p>
+                  </div>
+                  <div class="settings-span-2">
+                    <label class="settings-label">Join a team (paste invite code)</label>
+                    <div class="settings-inline-row">
+                      <input id="team-join-code" type="text" class="settings-input" placeholder="e.g. AB12CD" maxlength="12" />
+                      <button type="button" class="settings-secondary-btn" onclick="teamJoinCode()">Join</button>
+                    </div>
+                  </div>
+                </div>
+
+                <h4 class="text-sm font-semibold mb-2">Members</h4>
+                <div id="team-members-list" class="team-members-list mb-4"></div>
+
+                <h4 class="text-sm font-semibold mb-2">Pending approvals <span id="pending-count-badge" class="pending-badge hidden">0</span></h4>
+                <div id="team-pending-list" class="team-pending-list"></div>
+              </div>
+            </div>
+
             <!-- Categories -->
             <div class="settings-card settings-panel collapsed" data-panel="categories">
               <button type="button" class="settings-panel-toggle" onclick="toggleSettingsPanel('categories')">

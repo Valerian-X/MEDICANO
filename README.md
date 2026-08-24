@@ -88,3 +88,80 @@ service cloud.firestore {
 
 Data path: `users/{uid}/workspace/main`. Local `localStorage` remains the working copy; cloud updates when you are signed in and online.
 
+
+
+## Team workspace & approvals (Firestore)
+
+Shared company data with admin publish + staff pending approval.
+
+### Collections
+- `orgs/{orgId}/workspace/main` — live data everyone reads
+- `orgs/{orgId}/members/{uid}` — `{ role: "admin"|"staff", email }`
+- `orgs/{orgId}/pending/{id}` — staff proposals `{ status, payload, byEmail, summary }`
+- `orgs/{orgId}/invites/{code}` — invites
+- `joinCodes/{code}` — global invite lookup `{ orgId, role, email, used }`
+- `users/{uid}/meta/profile` — `{ orgId, role }`
+
+### Suggested rules
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function memberDoc(orgId) {
+      return get(/databases/$(database)/documents/orgs/$(orgId)/members/$(uid())).data;
+    }
+    function isMember(orgId) {
+      return signedIn() && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(uid()));
+    }
+    function isAdmin(orgId) {
+      return isMember(orgId) && memberDoc(orgId).role == 'admin';
+    }
+
+    match /users/{userId}/meta/{doc} {
+      allow read, write: if signedIn() && uid() == userId;
+    }
+    match /users/{userId}/workspace/{doc} {
+      allow read, write: if signedIn() && uid() == userId;
+    }
+
+    match /joinCodes/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn();
+    }
+
+    match /orgs/{orgId} {
+      allow read: if isMember(orgId);
+      allow create: if signedIn();
+      allow update: if isAdmin(orgId);
+
+      match /members/{memberId} {
+        allow read: if isMember(orgId);
+        allow write: if isAdmin(orgId) || (signedIn() && memberId == uid());
+      }
+      match /workspace/{doc} {
+        allow read: if isMember(orgId);
+        allow write: if isAdmin(orgId);
+      }
+      match /pending/{pid} {
+        allow read: if isMember(orgId);
+        allow create: if isMember(orgId);
+        allow update: if isAdmin(orgId) || (isMember(orgId) && resource.data.byUid == uid());
+      }
+      match /invites/{code} {
+        allow read: if isMember(orgId);
+        allow write: if isAdmin(orgId);
+      }
+    }
+  }
+}
+```
+
+### How to use
+1. **Admin** signs up / signs in first → org is created automatically (role Admin).
+2. Settings → **Team & approvals** → enter staff email → **Invite** → share the **code**.
+3. **Staff** creates their own account, signs in → pastes code → **Join**.
+4. Staff edits (invoice, client, etc.) → save → status **Submitted · waiting for admin**.
+5. Admin opens **Team & approvals** → **Approve** (publishes for everyone) or **Reject**.

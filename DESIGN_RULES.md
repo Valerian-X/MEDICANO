@@ -3,7 +3,40 @@
 **Follow these for every new page, card, form, table, filter, and PDF.**  
 Do not reintroduce patterns that were already fixed. When in doubt, copy an existing screen (Quotes list, Invoice editor, Reports filters) rather than inventing a new layout.
 
-Last updated: 2026-08-20 · App cache: `medicano-v51+`
+Last updated: 2026-08-20 · App cache: `medicano-v53+`
+
+---
+
+## 0. Design tokens (CSS)
+
+Canonical variables live in `styles.css` under `:root` and `html.dark`.
+
+| Token | Use for |
+|-------|---------|
+| `--gap-card` | Space between list/entity cards |
+| `--gap-section` | Space between page sections |
+| `--gap-filter` | Filter control grids |
+| `--cream` / `--cream-2` | Page / soft surfaces |
+| `--ink` | Primary text & dark pills |
+| `--muted` | Secondary labels |
+| `--card` | Card surface |
+| `--pink` `--yellow` `--green` `--blue` | Pastel accents |
+| `--radius` `--radius-pill` `--radius-card` | Corners |
+| `--cal-core-size` | Calendar day highlight circle |
+| `--table-bg` `--table-head` `--table-border` | Tables (light + dark) |
+| `--caution-*` | Low-stock alert |
+
+**New UI must prefer tokens**, e.g.:
+
+```css
+.my-list { display: flex; flex-direction: column; gap: var(--gap-card); }
+.my-btn  { border-radius: var(--radius-pill); background: var(--cream-2); color: var(--ink); }
+```
+
+Helpers already defined: `.stack-cards`, `.gap-card`, `.pill-btn`, `.pill-btn-soft`, `.surface-card`.
+
+Dark mode: override tokens on `html.dark` only when needed; components should read `var(--…)` so they flip automatically.
+
 
 ---
 
@@ -172,17 +205,144 @@ Last updated: 2026-08-20 · App cache: `medicano-v51+`
 
 ---
 
-## 18. Anti-patterns (do not reintroduce)
+## 18. Anti-patterns — concrete examples
 
-- White table body in dark mode  
-- Square full-cell calendar selection  
-- UTC “today” in date filters  
-- Zero-gap overlapping entity cards  
-- “Apply filters” buttons for simple lists  
-- Modal-only inventory editor when a full page pattern exists  
-- Sync writing `window.data` without updating `let data`  
-- PDF title “INVOICE” when status is paid  
-- Sidebar renaming Inventory → Items  
+### Dates
+
+```js
+// ❌ BAD — UTC, wrong day in WAT evenings/mornings
+const today = new Date().toISOString().slice(0, 10);
+
+// ✅ GOOD — local calendar day
+const today = localYMD(new Date());
+```
+
+### Card stacks
+
+```html
+<!-- ❌ BAD — no gap, cards can visually merge/overlap -->
+<div>
+  <div class="entity-card">…</div>
+  <div class="entity-card">…</div>
+</div>
+
+<!-- ✅ GOOD -->
+<div class="entity-cards stack-cards">
+  <div class="entity-card">…</div>
+  <div class="entity-card">…</div>
+</div>
+```
+
+```css
+/* ❌ BAD */
+.entity-card + .entity-card { margin-top: 0; }
+
+/* ✅ GOOD */
+.entity-cards { display: flex; flex-direction: column; gap: var(--gap-card); }
+```
+
+### Calendar highlight
+
+```css
+/* ❌ BAD — paints the whole grid cell as a square */
+.cal-day.selected { background: #c4a4b0; border-radius: 0; }
+
+/* ✅ GOOD — circle only around the number */
+.cal-day.selected { background: transparent; }
+.cal-day.selected .cal-day-core {
+  background: var(--cal-selected);
+  border-radius: 50%;
+  width: var(--cal-core-size);
+  height: var(--cal-core-size);
+}
+```
+
+### Reports defaults
+
+```js
+// ❌ BAD — leave type on "payments" so custom rows vanish
+typeEl.value = saved.type || 'payments';
+
+// ✅ GOOD — always All + local today when opening Reports
+typeEl.value = 'all';
+toEl.value = localYMD(new Date());
+```
+
+### Dark mode tables
+
+```css
+/* ❌ BAD — white body rows in dark mode */
+html.dark .report-table tbody tr { background: #fff; color: #111; }
+
+/* ✅ GOOD */
+html.dark .report-table,
+html.dark .report-table tbody tr {
+  background: var(--table-bg);
+  color: var(--table-text);
+}
+html.dark .report-table th { background: var(--table-head); }
+```
+
+### Cloud sync data binding
+
+```js
+// ❌ BAD — UI still reads script-scoped `data`
+window.data = remotePayload;
+
+// ✅ GOOD
+applyCloudData(remotePayload); // sets `data` + localStorage + refresh
+```
+
+### Invoice PDF title
+
+```js
+// ❌ BAD
+const label = 'INVOICE';
+
+// ✅ GOOD
+const label = status === 'paid' ? 'RECEIPT'
+  : docType === 'proforma' ? 'PROFORMA INVOICE'
+  : 'INVOICE';
+```
+
+### Sidebar / product wording
+
+```html
+<!-- ❌ BAD -->
+<a data-page="products">Items</a>
+
+<!-- ✅ GOOD -->
+<a data-page="products">Inventory</a>
+```
+
+```html
+<!-- ❌ BAD in new UI -->
+<label>Equipment name</label>
+
+<!-- ✅ GOOD -->
+<label>Item name</label>
+```
+
+### Filters
+
+```html
+<!-- ❌ BAD -->
+<button onclick="applyFilters()">Apply filters</button>
+
+<!-- ✅ GOOD — live -->
+<select onchange="renderTransactionReport()">…</select>
+```
+
+### Hard-coded spacing/colour in new CSS
+
+```css
+/* ❌ BAD */
+.my-card-list { gap: 6px; background: #fafafa; }
+
+/* ✅ GOOD */
+.my-card-list { gap: var(--gap-card); background: var(--surface); }
+```
+
 
 ---
 

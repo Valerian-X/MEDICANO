@@ -1086,7 +1086,10 @@ function navigate(page) {
   if (page === 'inventory') renderInventory();
   if (page === 'presentation') renderPresPicker();
   if (page === 'rates') renderRates();
-  if (page === 'settings') renderSettings();
+  if (page === 'settings') {
+    if (typeof renderTeamPanel === 'function') renderTeamPanel();
+    if (typeof renderSettings === 'function') renderSettings();
+  }
 }
 
 // -------------------- Dashboard --------------------
@@ -6491,3 +6494,134 @@ window.addEventListener('load', () => {
     }
   }, 1500);
 });
+
+
+
+// ---- Team / approvals UI ----
+async function renderTeamPanel() {
+  const cloud = window.MedicanoCloud;
+  const orgLabel = document.getElementById('team-org-label');
+  const roleLabel = document.getElementById('team-role-label');
+  const list = document.getElementById('team-members-list');
+  if (!cloud || !cloud.isSignedIn || !cloud.isSignedIn()) {
+    if (list) list.innerHTML = '<p class="text-sm text-slate-400">Sign in to manage team sync.</p>';
+    if (orgLabel) orgLabel.textContent = '';
+    return;
+  }
+  if (orgLabel) orgLabel.textContent = cloud.getOrgId ? ('Org: ' + (cloud.getOrgId() || '—')) : '';
+  if (roleLabel && cloud.getRole) {
+    const r = cloud.getRole();
+    roleLabel.textContent = r === 'admin' ? 'Role: Admin — your saves publish to everyone' : 'Role: Staff — your saves need admin approval';
+  }
+  if (list && cloud.listMembers) {
+    try {
+      const members = await cloud.listMembers();
+      list.innerHTML = members.map(function (m) {
+        return '<div class="select-row" style="cursor:default"><span class="select-row-text"><span class="select-row-title">' +
+          escHtml(m.email || m.uid) + '</span><span class="select-row-sub">' + escHtml(m.role || '') + '</span></span></div>';
+      }).join('') || '<p class="text-sm text-slate-400">No members yet</p>';
+    } catch (e) {
+      list.innerHTML = '<p class="text-sm text-slate-400">Could not load members (check rules).</p>';
+    }
+  }
+  renderApprovalsPanel();
+}
+
+function renderApprovalsPanel() {
+  const cloud = window.MedicanoCloud;
+  const list = document.getElementById('team-pending-list');
+  const badge = document.getElementById('pending-count-badge');
+  if (!list) return;
+  if (!cloud || !cloud.getPending) {
+    list.innerHTML = '';
+    return;
+  }
+  const pending = cloud.getPending() || [];
+  if (badge) {
+    if (pending.length) {
+      badge.textContent = String(pending.length);
+      badge.classList.remove('hidden');
+    } else badge.classList.add('hidden');
+  }
+  const isAdmin = cloud.isAdmin && cloud.isAdmin();
+  if (!pending.length) {
+    list.innerHTML = '<p class="text-sm text-slate-400">No pending staff changes.</p>';
+    return;
+  }
+  list.innerHTML = pending.map(function (p) {
+    const actions = isAdmin
+      ? ('<div class="team-pending-actions">' +
+         '<button type="button" class="settings-primary-btn settings-btn-compact" onclick="teamApprovePending(\'' + p.id + '\')">Approve</button> ' +
+         '<button type="button" class="settings-secondary-btn" onclick="teamRejectPending(\'' + p.id + '\')">Reject</button></div>')
+      : '<span class="text-xs text-slate-500">Waiting for admin</span>';
+    return '<div class="team-pending-card">' +
+      '<div class="select-row-title">' + escHtml(p.byEmail || p.byUid || 'Staff') + '</div>' +
+      '<div class="select-row-sub">' + escHtml(p.summary || '') + ' · ' + escHtml((p.createdAt || '').slice(0, 16).replace('T', ' ')) + '</div>' +
+      actions + '</div>';
+  }).join('');
+}
+
+async function teamCreateInvite() {
+  const cloud = window.MedicanoCloud;
+  if (!cloud || !cloud.createInvite) return;
+  const email = document.getElementById('team-invite-email')?.value || '';
+  const role = document.getElementById('team-invite-role')?.value || 'staff';
+  const out = document.getElementById('team-invite-result');
+  try {
+    const code = await cloud.createInvite(email, role);
+    if (out) out.innerHTML = 'Invite code: <strong style="letter-spacing:0.08em">' + escHtml(code) + '</strong> — share with your colleague after they create an account and sign in.';
+  } catch (e) {
+    if (out) out.textContent = (e && e.message) ? e.message : String(e);
+  }
+}
+
+async function teamJoinCode() {
+  const cloud = window.MedicanoCloud;
+  if (!cloud || !cloud.joinWithCode) return;
+  const code = document.getElementById('team-join-code')?.value || '';
+  try {
+    await cloud.joinWithCode(code);
+    alert('Joined team. Shared workspace will load.');
+    renderTeamPanel();
+  } catch (e) {
+    alert((e && e.message) ? e.message : String(e));
+  }
+}
+
+async function teamApprovePending(id) {
+  const cloud = window.MedicanoCloud;
+  if (!cloud || !cloud.approvePending) return;
+  if (!confirm('Approve this change and publish it for everyone?')) return;
+  try {
+    await cloud.approvePending(id);
+    alert('Approved and published to the team.');
+    renderApprovalsPanel();
+  } catch (e) {
+    alert((e && e.message) ? e.message : String(e));
+  }
+}
+
+async function teamRejectPending(id) {
+  const cloud = window.MedicanoCloud;
+  if (!cloud || !cloud.rejectPending) return;
+  if (!confirm('Reject this staff change?')) return;
+  try {
+    await cloud.rejectPending(id);
+    renderApprovalsPanel();
+  } catch (e) {
+    alert((e && e.message) ? e.message : String(e));
+  }
+}
+
+window.renderTeamPanel = renderTeamPanel;
+window.renderApprovalsPanel = renderApprovalsPanel;
+
+function onMedicanoAuthChanged(user) {
+  if (typeof renderTeamPanel === 'function') {
+    try { renderTeamPanel(); } catch (e) {}
+  }
+  if (typeof updateConnectionBadge === 'function') {
+    try { updateConnectionBadge(); } catch (e) {}
+  }
+}
+window.onMedicanoAuthChanged = onMedicanoAuthChanged;

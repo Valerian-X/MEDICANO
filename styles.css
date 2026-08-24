@@ -437,15 +437,27 @@ html.dark .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
 /* =========================================================
    Medicano UI — Intelly-inspired soft medical dashboard
    ========================================================= */
+/* =========================================================
+   DESIGN SYSTEM TOKENS — use these instead of hard-coded values
+   See DESIGN_RULES.md § Tokens
+   ========================================================= */
 :root {
+  /* Surfaces */
   --cream: #f6f1ea;
   --cream-2: #efe8de;
   --ink: #1a1a1a;
   --muted: #6b7280;
+  --card: #ffffff;
+  --surface: var(--cream);
+  --surface-2: var(--cream-2);
+  --border-subtle: rgba(26, 26, 26, 0.08);
+
+  /* Sidebar */
   --sidebar: #0c0c0c;
   --sidebar-hover: #1a1a1a;
   --sidebar-active: #222;
-  --card: #ffffff;
+
+  /* Accents (pastel cards / calendar dots) */
   --yellow: #f5e6a8;
   --pink: #f5cfe0;
   --green: #c8e8c0;
@@ -453,12 +465,123 @@ html.dark .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
   --lavender: #e0d4f7;
   --peach: #f8d5c2;
   --mint: #c5ebe3;
+  --caution-bg: #fffbeb;
+  --caution-border: #fcd34d;
+  --caution-text: #92400e;
+
+  /* Brand / interactive */
+  --brand: var(--ink);
+  --brand-contrast: #ffffff;
+  --focus-ring: rgba(26, 26, 26, 0.35);
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --gap-card: 1.1rem;       /* minimum between entity cards */
+  --gap-section: 1.25rem;   /* between page sections */
+  --gap-filter: 0.85rem;    /* filter grids */
+
+  /* Radii */
   --radius: 1.25rem;
   --radius-sm: 0.85rem;
+  --radius-md: 1rem;
   --radius-pill: 999px;
+  --radius-card: var(--radius);
+
+  /* Type */
+  --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --text-xs: 0.72rem;
+  --text-sm: 0.85rem;
+  --text-md: 0.95rem;
+  --text-lg: 1.15rem;
+  --text-title: 1.35rem;
+  --font-weight-title: 700;
+
+  /* Elevation */
   --shadow: 0 8px 28px rgba(26, 26, 26, 0.06);
   --shadow-sm: 0 2px 10px rgba(26, 26, 26, 0.04);
+  --shadow-md: 0 6px 20px rgba(26, 26, 26, 0.08);
+
+  /* Calendar day core */
+  --cal-core-size: 2rem;
+  --cal-core-size-sm: 1.75rem;
+  --cal-selected: #c4a4b0;
+  --cal-today-ring: #a8a29e;
+
+  /* Tables */
+  --table-bg: #ffffff;
+  --table-head: #f8fafc;
+  --table-border: #e2e8f0;
+  --table-text: #1e293b;
+
+  /* Controls */
+  --control-min-height: 2.5rem;
+  --input-min-height: 2.6rem;
 }
+
+html.dark {
+  --cream: #141414;
+  --cream-2: #1c1c1c;
+  --ink: #f3f0ea;
+  --muted: #94a3b8;
+  --card: #1c1c1c;
+  --surface: #141414;
+  --surface-2: #1c1c1c;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --sidebar: #0a0a0a;
+  --sidebar-hover: #1a1a1a;
+  --sidebar-active: #222;
+  --brand: #f3f0ea;
+  --brand-contrast: #0a0a0a;
+  --caution-bg: #2a2410;
+  --caution-border: rgba(252, 211, 77, 0.35);
+  --caution-text: #fde68a;
+  --cal-selected: #6b4a56;
+  --cal-today-ring: rgba(255, 255, 255, 0.4);
+  --table-bg: #1c1c1c;
+  --table-head: #252525;
+  --table-border: rgba(255, 255, 255, 0.08);
+  --table-text: #e2e8f0;
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* Token utility helpers — prefer these in new UI */
+.gap-card { gap: var(--gap-card) !important; }
+.gap-section { gap: var(--gap-section) !important; }
+.stack-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-card) !important;
+}
+.surface-card {
+  background: var(--card);
+  color: var(--ink);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+}
+.pill-btn {
+  border-radius: var(--radius-pill);
+  min-height: var(--control-min-height);
+  padding: 0.65rem 1.15rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+}
+.pill-btn-soft {
+  background: var(--cream-2);
+  color: var(--ink);
+}
+.pill-btn-dark {
+  background: var(--ink);
+  color: var(--brand-contrast);
+}
+
 
 html, body {
   background: var(--cream) !important;
@@ -4332,7 +4455,7 @@ html.dark .data-table td, html.dark .report-table td {
 .client-history-cards {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem !important;
+  gap: var(--gap-card) !important;
 }
 .entity-card,
 .report-result-card,
@@ -5205,8 +5328,8 @@ html.dark .report-add-row-btn {
 #page-reports .report-mobile-cards {
   display: flex !important;
   flex-direction: column !important;
-  gap: 1.15rem !important;
-  row-gap: 1.15rem !important;
+  gap: var(--gap-card) !important;
+  row-gap: var(--gap-card) !important;
 }
 #page-reports .report-result-card,
 #page-reports .report-card-spaced {
@@ -5237,4 +5360,40 @@ html.dark .report-add-row-btn {
 #page-reports #report-date-to,
 #page-reports #report-date-from {
   color: inherit;
+}
+
+/* Team & approvals */
+.team-pending-list, .team-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-card, 0.85rem);
+}
+.team-pending-card {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm, 0.85rem);
+  background: var(--cream-2, #efe8de);
+  color: var(--ink, #1a1a1a);
+}
+html.dark .team-pending-card {
+  background: #252525;
+  color: #f3f0ea;
+}
+.team-pending-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: #b45309;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  margin-left: 0.35rem;
 }
