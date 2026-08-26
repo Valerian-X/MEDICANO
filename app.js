@@ -2170,7 +2170,7 @@ function renderClientDetailPage() {
       <button type="button" onclick="navigate('clients')" class="client-back-link">← Back to Clients</button>
       <div class="client-page-actions">
         <button type="button" onclick="editClient('${c.id}')" class="client-edit-btn">Edit</button>
-        <button type="button" onclick="showNewQuote(); setTimeout(()=>{ const s=document.getElementById('quote-client'); if(s){ s.value='${c.id}'; onQuoteClientSelect(); } }, 50)" class="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-medium">New quote</button>
+        <button type="button" onclick="showNewQuote(); setTimeout(()=>{ const s=document.getElementById('quote-client'); if(s){ s.value='${c.id}'; onQuoteClientSelect(); } }, 50)" class="btn-primary btn-compact">New quote</button>
         <button type="button" onclick="showNewInvoice(); populateInvoiceClientSelect('${c.id}')" class="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm font-medium">New invoice</button>
       </div>
     </div>
@@ -6186,7 +6186,7 @@ function renderNoteTemplatesEditor() {
     <div class="settings-term-row" data-id="${t.id}">
       <input class="settings-input nt-name" value="${escHtml(t.name)}" placeholder="Template name" />
       <textarea class="settings-input nt-body" rows="2" placeholder="Body">${escHtml(t.body)}</textarea>
-      <button type="button" class="settings-secondary-btn" onclick="this.closest('[data-id]').remove()">Remove</button>
+      <button type="button" class="btn-soft" onclick="this.closest('[data-id]').remove()">Remove</button>
     </div>`).join('') || '<p class="settings-help">No templates yet.</p>';
 }
 
@@ -6585,8 +6585,8 @@ function renderApprovalsPanel() {
   list.innerHTML = pending.map(function (p) {
     const actions = isAdmin
       ? ('<div class="team-pending-actions">' +
-         '<button type="button" class="settings-primary-btn settings-btn-compact" onclick="teamApprovePending(\'' + p.id + '\')">Approve</button> ' +
-         '<button type="button" class="settings-secondary-btn" onclick="teamRejectPending(\'' + p.id + '\')">Reject</button></div>')
+         '<button type="button" class="btn-primary btn-compact" onclick="teamApprovePending(\'' + p.id + '\')">Approve</button> ' +
+         '<button type="button" class="btn-soft" onclick="teamRejectPending(\'' + p.id + '\')">Reject</button></div>')
       : '<span class="text-xs text-slate-500">Waiting for admin</span>';
     return '<div class="team-pending-card">' +
       '<div class="select-row-title">' + escHtml(p.byEmail || p.byUid || 'Staff') + '</div>' +

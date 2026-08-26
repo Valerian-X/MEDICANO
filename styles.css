@@ -835,8 +835,8 @@ span[class*="rounded"] {
 }
 
 /* ----- Brand color remaps to soft black / pastel ----- */
-.bg-brand-600 { background: var(--ink) !important; }
-.bg-brand-700 { background: #333 !important; }
+.bg-brand-600 { background: #1a1a1a !important; color: #fff !important; }
+.bg-brand-700 { background: #333 !important; color: #fff !important; }
 .bg-brand-800 { background: var(--sidebar) !important; }
 .bg-brand-50 { background: var(--mint) !important; }
 .bg-brand-100 { background: var(--mint) !important; }
@@ -5529,4 +5529,542 @@ html.dark .cal-today-btn.action-chip.soft {
 html.dark button[style*="f5cfe0"],
 html.dark button[style*="--pink"] {
   color: #1a1a1a !important;
+}
+
+
+
+/* Tailwind text-white on light primary in dark mode */
+html.dark button.bg-brand-600.text-white,
+html.dark button[class*="bg-brand-600"] {
+  color: #1a1a1a !important;
+}
+/* Soft slate pills */
+html.dark button.bg-slate-100,
+html.dark .bg-slate-100 {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+/* action-chip.dark stays inverted properly in dark: use cream + dark text OR solid black+white */
+html.dark .action-chip.dark,
+html.dark button.action-chip.dark {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+html.dark .action-chip.pink,
+html.dark button.action-chip.pink {
+  background: #f5cfe0 !important;
+  color: #1a1a1a !important;
+}
+html.dark .action-chip.soft,
+html.dark button.action-chip.soft {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+html.dark .action-chip.blue,
+html.dark button.action-chip.blue {
+  background: #c9daf8 !important;
+  color: #1a1a1a !important;
+}
+html.dark .dash-add-event-btn {
+  background: #f5cfe0 !important;
+  color: #1a1a1a !important;
+}
+html.dark .qa-pink,
+html.dark .qa-soft,
+html.dark .qa-blue {
+  color: #1a1a1a !important;
+}
+html.dark .qa-pink { background: #f5cfe0 !important; }
+html.dark .qa-soft { background: #efe8de !important; }
+html.dark .qa-blue { background: #c9daf8 !important; }
+html.dark .settings-primary-btn,
+html.dark .settings-secondary-btn {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+/* Save movement — not full width */
+.btn-save-movement {
+  width: auto !important;
+  min-width: 9rem;
+  max-width: 14rem;
+}
+
+/* =========================================================
+   BUTTON SYSTEM (single source of truth)
+   Use: btn-primary | btn-soft | btn-pink | btn-blue | btn-dark
+   ========================================================= */
+.btn-primary,
+.btn-soft,
+.btn-pink,
+.btn-blue,
+.btn-dark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1.25;
+  border-radius: var(--radius-pill, 999px);
+  padding: 0.65rem 1.15rem;
+  min-height: 2.5rem;
+  box-sizing: border-box;
+  text-decoration: none;
+  transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-primary:hover,
+.btn-soft:hover,
+.btn-pink:hover,
+.btn-blue:hover,
+.btn-dark:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+.btn-primary:active,
+.btn-soft:active,
+.btn-pink:active,
+.btn-blue:active,
+.btn-dark:active {
+  transform: translateY(0);
+  opacity: 0.88;
+}
+
+/* Light mode */
+.btn-primary {
+  background: #1a1a1a !important;
+  color: #ffffff !important;
+}
+.btn-soft {
+  background: var(--cream-2, #efe8de) !important;
+  color: #1a1a1a !important;
+}
+.btn-pink {
+  background: var(--pink, #f5cfe0) !important;
+  color: #1a1a1a !important;
+}
+.btn-blue {
+  background: var(--blue, #c9daf8) !important;
+  color: #1a1a1a !important;
+}
+.btn-dark {
+  background: #1a1a1a !important;
+  color: #ffffff !important;
+}
+
+/* Dark mode — light surfaces always get dark text */
+html.dark .btn-primary,
+html.dark .btn-soft,
+html.dark .btn-pink,
+html.dark .btn-blue {
+  color: #1a1a1a !important;
+}
+html.dark .btn-primary {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+html.dark .btn-soft {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+html.dark .btn-pink {
+  background: #f5cfe0 !important;
+  color: #1a1a1a !important;
+}
+html.dark .btn-blue {
+  background: #c9daf8 !important;
+  color: #1a1a1a !important;
+}
+html.dark .btn-dark {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+
+.btn-block { width: 100%; }
+.btn-compact {
+  min-height: 2.25rem;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+}
+.btn-save-movement {
+  width: auto !important;
+  min-width: 9rem;
+  max-width: 14rem;
+}
+
+/* ---- Aliases: old classes map to the system (no light-on-light) ---- */
+button.bg-brand-600,
+.bg-brand-600,
+a.bg-brand-600,
+button.bg-brand-700,
+.btn-brand,
+.settings-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border-radius: var(--radius-pill, 999px);
+  padding: 0.65rem 1.15rem;
+  min-height: 2.5rem;
+  background: #1a1a1a !important;
+  color: #ffffff !important;
+  box-sizing: border-box;
+}
+html.dark button.bg-brand-600,
+html.dark .bg-brand-600,
+html.dark a.bg-brand-600,
+html.dark button.bg-brand-700,
+html.dark .btn-brand,
+html.dark .settings-primary-btn,
+html.dark button.bg-brand-600.text-white,
+html.dark .bg-brand-600.text-white,
+html.dark button[class*="bg-brand-600"] {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+
+.settings-secondary-btn,
+button.bg-slate-100,
+.bg-slate-100.text-slate-800,
+button.bg-slate-100.text-slate-800 {
+  background: var(--cream-2, #efe8de) !important;
+  color: #1a1a1a !important;
+  border: none;
+  border-radius: var(--radius-pill, 999px);
+  font-weight: 700;
+  cursor: pointer;
+}
+html.dark .settings-secondary-btn,
+html.dark button.bg-slate-100,
+html.dark .bg-slate-100,
+html.dark button.bg-slate-100.text-slate-800 {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+
+.action-chip.pink,
+button.action-chip.pink,
+.dash-add-event-btn,
+.qa-pink {
+  background: var(--pink, #f5cfe0) !important;
+  color: #1a1a1a !important;
+}
+html.dark .action-chip.pink,
+html.dark button.action-chip.pink,
+html.dark .dash-add-event-btn,
+html.dark .qa-pink {
+  background: #f5cfe0 !important;
+  color: #1a1a1a !important;
+}
+
+.action-chip.soft,
+button.action-chip.soft,
+.qa-soft,
+.pres-tool-btn,
+.pres-tool-select,
+.pres-tool-clear,
+.report-add-row-btn {
+  background: var(--cream-2, #efe8de) !important;
+  color: #1a1a1a !important;
+}
+html.dark .action-chip.soft,
+html.dark button.action-chip.soft,
+html.dark .qa-soft,
+html.dark .pres-tool-btn,
+html.dark .pres-tool-select,
+html.dark .pres-tool-clear,
+html.dark .report-add-row-btn {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+
+.action-chip.blue,
+.qa-blue {
+  background: var(--blue, #c9daf8) !important;
+  color: #1a1a1a !important;
+}
+html.dark .action-chip.blue,
+html.dark .qa-blue {
+  background: #c9daf8 !important;
+  color: #1a1a1a !important;
+}
+
+.action-chip.dark,
+button.action-chip.dark,
+.qa-dark {
+  background: #1a1a1a !important;
+  color: #ffffff !important;
+}
+html.dark .action-chip.dark,
+html.dark button.action-chip.dark,
+html.dark .qa-dark {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+
+/* =========================================================
+   FULL CONSISTENCY LAYER — cards, forms, filters, type, tables
+   Apply on top of legacy utilities. Prefer these patterns.
+   ========================================================= */
+
+/* --- Page surface --- */
+body {
+  font-family: var(--font-sans) !important;
+  background: var(--cream, #f6f1ea) !important;
+  color: var(--ink, #1a1a1a) !important;
+}
+html.dark body {
+  background: var(--cream, #141414) !important;
+  color: var(--ink, #f3f0ea) !important;
+}
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-section, 1.25rem);
+}
+
+/* --- Page title (header) --- */
+#page-title {
+  font-size: var(--text-title, 1.35rem) !important;
+  font-weight: var(--font-weight-title, 700) !important;
+  letter-spacing: -0.02em;
+  text-align: center !important;
+  width: 100%;
+  color: var(--ink, #1a1a1a) !important;
+}
+html.dark #page-title {
+  color: #f3f0ea !important;
+}
+
+/* --- Panels / white cards --- */
+.panel-soft,
+.settings-card,
+.bg-white.rounded-xl,
+.bg-white.rounded-2xl,
+.responsive-table-shell.panel-soft {
+  background: var(--card, #fff) !important;
+  color: var(--ink, #1a1a1a) !important;
+  border-radius: var(--radius-card, 1.25rem) !important;
+  box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--border-subtle) !important;
+  box-sizing: border-box;
+}
+html.dark .panel-soft,
+html.dark .settings-card,
+html.dark .bg-white.rounded-xl,
+html.dark .bg-white.rounded-2xl,
+html.dark .responsive-table-shell.panel-soft {
+  background: var(--card, #1c1c1c) !important;
+  color: var(--ink, #f3f0ea) !important;
+  border-color: var(--border-subtle) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* --- Card stacks: never overlap --- */
+.entity-cards,
+.line-cards,
+.stack-cards,
+.report-mobile-cards,
+.client-history-cards,
+.pres-picker-stack,
+.select-stack,
+.team-pending-list,
+.team-members-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--gap-card, 1.1rem) !important;
+  width: 100%;
+}
+.entity-card,
+.line-card,
+.report-result-card,
+.report-card-spaced {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  position: relative !important;
+  float: none !important;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-radius: var(--radius-card, 1.25rem);
+}
+
+/* --- Form controls (app-wide) --- */
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="tel"],
+input[type="url"],
+select,
+textarea,
+.settings-input,
+.filter-control {
+  font-family: inherit;
+  font-size: var(--text-sm, 0.85rem) !important;
+  min-height: var(--input-min-height, 2.6rem) !important;
+  padding: 0.55rem 0.85rem !important;
+  border-radius: var(--radius-sm, 0.85rem) !important;
+  border: 1.5px solid rgba(26, 26, 26, 0.12) !important;
+  background: #fff !important;
+  color: #1a1a1a !important;
+  box-sizing: border-box !important;
+  max-width: 100%;
+}
+textarea {
+  min-height: 4.5rem !important;
+  line-height: 1.45 !important;
+}
+html.dark input[type="text"],
+html.dark input[type="search"],
+html.dark input[type="email"],
+html.dark input[type="password"],
+html.dark input[type="number"],
+html.dark input[type="date"],
+html.dark input[type="time"],
+html.dark input[type="tel"],
+html.dark input[type="url"],
+html.dark select,
+html.dark textarea,
+html.dark .settings-input,
+html.dark .filter-control {
+  background: #252525 !important;
+  color: #f3f0ea !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1;
+}
+label.settings-label,
+.filter-date-label,
+.block.text-slate-500,
+.block.text-sm.font-medium {
+  font-size: var(--text-xs, 0.72rem) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em;
+  color: var(--muted, #6b7280) !important;
+  margin-bottom: 0.35rem;
+  display: block;
+}
+html.dark label.settings-label,
+html.dark .filter-date-label,
+html.dark .block.text-slate-500,
+html.dark .block.text-sm.font-medium {
+  color: #94a3b8 !important;
+}
+
+/* --- Filter toolbars --- */
+.list-toolbar-filters,
+.report-filter-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-filter, 0.85rem);
+  align-items: end;
+}
+.report-filter-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+.filter-date-field,
+.filter-status-field {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.35rem !important;
+  min-width: 0;
+}
+
+/* --- Tables --- */
+.data-table,
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--table-bg) !important;
+  color: var(--table-text) !important;
+}
+.data-table th,
+.report-table th {
+  background: var(--table-head) !important;
+  color: var(--muted) !important;
+  border-bottom: 1px solid var(--table-border) !important;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.data-table td,
+.report-table td {
+  border-bottom: 1px solid var(--table-border) !important;
+  color: var(--table-text) !important;
+}
+html.dark .data-table,
+html.dark .report-table,
+html.dark .data-table tbody tr,
+html.dark .report-table tbody tr {
+  background: var(--table-bg) !important;
+  color: var(--table-text) !important;
+}
+html.dark .data-table th,
+html.dark .report-table th {
+  background: var(--table-head) !important;
+  color: #94a3b8 !important;
+}
+
+/* --- Select rows (payment-style) --- */
+.select-row {
+  border-radius: var(--radius-pill, 999px) !important;
+  background: #eef1f5 !important;
+  color: #1a1a1a !important;
+}
+html.dark .select-row {
+  background: #2a2a2a !important;
+  color: #f3f0ea !important;
+  border-color: transparent !important;
+}
+html.dark .select-row-title { color: #f3f0ea !important; }
+html.dark .select-row-sub { color: #94a3b8 !important; }
+
+/* --- Muted helper text --- */
+.text-slate-500,
+.text-slate-400,
+.settings-help {
+  color: var(--muted) !important;
+}
+html.dark .text-slate-500,
+html.dark .text-slate-400,
+html.dark .settings-help {
+  color: #94a3b8 !important;
+}
+
+/* --- Section headings inside pages --- */
+.dash-panel-title,
+.settings-card-title,
+h3.font-semibold {
+  font-size: var(--text-md, 0.95rem) !important;
+  font-weight: 700 !important;
+  color: var(--ink) !important;
+}
+html.dark .dash-panel-title,
+html.dark .settings-card-title,
+html.dark h3.font-semibold {
+  color: #f3f0ea !important;
+}
+
+/* --- Checkboxes stay compact --- */
+input[type="checkbox"],
+input[type="radio"] {
+  min-height: 1rem !important;
+  width: 1rem !important;
+  height: 1rem !important;
+  padding: 0 !important;
+  accent-color: #1a1a1a;
 }

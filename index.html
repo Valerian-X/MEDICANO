@@ -2256,8 +2256,8 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 <button type="button" class="cal-nav-btn" onclick="calNextMonth()" aria-label="Next month">›</button>
               </div>
               <div class="cal-month-actions">
-                <button type="button" class="action-chip soft cal-action-btn cal-today-btn" onclick="calGoToday()">Today</button>
-                <button type="button" class="action-chip dark cal-action-btn" onclick="openCalEventForm()">+ Add event</button>
+                <button type="button" class="btn-soft cal-action-btn cal-today-btn" onclick="calGoToday()">Today</button>
+                <button type="button" class="btn-primary cal-action-btn" onclick="openCalEventForm()">+ Add event</button>
               </div>
               <div id="cal-grid" class="cal-grid"></div>
             </div>
@@ -2269,7 +2269,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                   <p class="cal-day-kicker">Today's timeline</p>
                   <h3 id="cal-day-label" class="cal-day-title">Day</h3>
                 </div>
-                <button type="button" class="action-chip pink cal-action-btn" onclick="openCalEventForm()">Add event</button>
+                <button type="button" class="btn-pink cal-action-btn" onclick="openCalEventForm()">Add event</button>
               </div>
               <div id="cal-timeline" class="cal-timeline"></div>
             </div>
@@ -2326,8 +2326,8 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 <textarea id="cal-event-notes" rows="2" class="w-full" placeholder="Location, contact person, equipment..."></textarea>
               </div>
               <div class="sm:col-span-2 lg:col-span-3 flex gap-2">
-                <button type="button" onclick="saveCalEvent()" class="action-chip dark">Save event</button>
-                <button type="button" onclick="closeCalEventForm()" class="action-chip soft">Cancel</button>
+                <button type="button" onclick="saveCalEvent()" class="btn-primary">Save event</button>
+                <button type="button" onclick="closeCalEventForm()" class="btn-soft">Cancel</button>
               </div>
             </div>
           </div>
@@ -2430,7 +2430,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 <button type="button" class="cal-nav-btn" onclick="dashCalNext()" aria-label="Next">›</button>
               </div>
               <div id="dash-mini-cal" class="dash-side-grid"></div>
-              <button type="button" class="dash-add-event-btn" onclick="navigate('calendar'); openCalEventForm()">Add event</button>
+              <button type="button" class="btn-pink dash-add-event-btn btn-block" onclick="navigate('calendar'); openCalEventForm()">Add event</button>
 
               <div class="dash-timeline-block">
                 <div class="dash-timeline-head">
@@ -2438,7 +2438,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                     <p class="dash-timeline-kicker">Day timeline</p>
                     <h4 id="dash-day-label" class="dash-timeline-title">Day</h4>
                   </div>
-                  <button type="button" class="action-chip soft" style="padding:0.35rem 0.75rem;font-size:0.72rem" onclick="navigate('calendar')">View all</button>
+                  <button type="button" class="btn-soft" style="padding:0.35rem 0.75rem;font-size:0.72rem" onclick="navigate('calendar')">View all</button>
                 </div>
                 <div id="dash-upcoming-events" class="dash-timeline-list"></div>
               </div>
@@ -2541,8 +2541,8 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
             </div>
 
             <div class="flex flex-wrap gap-2 justify-end">
-              <button type="button" onclick="navigate('products')" class="px-4 py-2.5 rounded-full text-sm font-semibold bg-slate-100 text-slate-800">Cancel</button>
-              <button type="submit" class="px-4 py-2.5 rounded-full text-sm font-semibold bg-brand-600 text-white">Save item</button>
+              <button type="button" onclick="navigate('products')" class="btn-soft">Cancel</button>
+              <button type="submit" class="btn-primary">Save item</button>
             </div>
           </form>
         </section>
@@ -2555,7 +2555,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               <select id="product-category-filter" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
                 <option value="">All Categories</option>
               </select>
-              <button onclick="showProductForm()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium whitespace-nowrap">+ Add Item</button>
+              <button onclick="showProductForm()" class="btn-primary">+ Add Item</button>
             </div>
             <div class="select-stack" style="max-width:100%">
               <label class="select-row" style="border-radius:1.1rem;cursor:pointer">
@@ -2589,7 +2589,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         <!-- CLIENTS -->
         <section id="page-clients" class="page hidden">
           <div class="flex flex-col sm:flex-row sm:items-center justify-end gap-3 mb-5">
-            <button onclick="showClientForm()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium shrink-0">+ Add Client</button>
+            <button onclick="showClientForm()" class="btn-primary">+ Add Client</button>
           </div>
           <div id="clients-list" class="entity-cards"></div>
         </section>
@@ -2623,7 +2623,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               </label>
             </div>
             <button onclick="exportQuotesExcel()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium">Export Excel</button>
-            <button onclick="showNewQuote()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">+ New Quote / Project</button>
+            <button onclick="showNewQuote()" class="btn-primary">+ New Quote / Project</button>
           </div>
           <div id="quotes-list" class="entity-cards"></div>
         </section>
@@ -2767,7 +2767,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                   </div>
                 </div>
                 <div class="mt-5 space-y-2">
-                  <button onclick="saveQuote()" class="w-full py-2.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium text-sm">Save Quote</button>
+                  <button onclick="saveQuote()" class="btn-primary btn-block">Save Quote</button>
                   <button onclick="printQuote()" class="w-full py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-medium text-sm">Print / PDF</button>
                   <button onclick="emailQuote()" class="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium text-sm" style="background:#2563eb">Email Quote</button>
                   <button onclick="if(confirm('Delete this quote?')) deleteCurrentQuote()" id="btn-delete-quote" class="w-full py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm hidden">Delete</button>
@@ -2804,7 +2804,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 </select>
               </label>
             </div>
-            <button onclick="showNewInvoice()" class="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium">+ New Invoice</button>
+            <button onclick="showNewInvoice()" class="btn-primary">+ New Invoice</button>
           </div>
           <div id="invoices-list" class="entity-cards"></div>
         </section>
@@ -2951,7 +2951,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 <p class="text-sm text-slate-500 mt-3">Total (NGN)</p>
                 <p id="inv-total" class="text-2xl font-bold text-brand-700">₦0</p>
                 <div class="mt-4 space-y-2">
-                  <button onclick="saveInvoice()" class="w-full py-2.5 bg-brand-600 text-white rounded-lg font-medium text-sm">Save Invoice</button>
+                  <button onclick="saveInvoice()" class="btn-primary btn-block">Save Invoice</button>
                   <button onclick="printInvoice()" class="w-full py-2.5 bg-slate-700 text-white rounded-lg font-medium text-sm">Download PDF</button>
                   <button onclick="if(confirm('Delete this invoice?')) deleteCurrentInvoice()" id="btn-delete-invoice" class="w-full py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm hidden">Delete</button>
                 </div>
@@ -3086,8 +3086,8 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                   <label class="block text-slate-500 mb-1">Note (optional)</label>
                   <input id="inv-note" type="text" placeholder="e.g. Received from supplier / Issued to LUTH" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
                 </div>
-                <div class="sm:col-span-2 lg:col-span-2 flex items-end">
-                  <button type="button" onclick="saveStockMovement()" class="w-full px-4 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-medium">Save movement</button>
+                <div class="sm:col-span-2 lg:col-span-2 flex items-end justify-start">
+                  <button type="button" onclick="saveStockMovement()" class="btn-primary btn-save-movement">Save movement</button>
                 </div>
               </div>
             </div>
@@ -3234,8 +3234,8 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               <div id="pres-picker" class="pres-picker-stack max-h-80 overflow-y-auto mb-4">
                 <!-- filled by JS — payment-style select rows -->
               </div>
-              <button onclick="generatePresentation()" class="w-full sm:w-auto px-6 py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium text-sm">
-                Generate High-Quality PDF Presentation
+              <button onclick="generatePresentation()" class="btn-primary">
+                Generate PDF
               </button>
             </div>
           </div>
@@ -3277,7 +3277,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 <input id="rate-eur" type="number" step="0.01" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
               </div>
               <div class="flex flex-wrap gap-2">
-                <button onclick="saveRates()" id="btn-save-rates" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium">Save Rates</button>
+                <button onclick="saveRates()" id="btn-save-rates" class="btn-primary">Save Rates</button>
                 <button onclick="fetchAutoRates()" id="btn-fetch-rates" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hidden">Fetch latest rates</button>
               </div>
               <p id="rates-updated" class="text-xs text-slate-500 mt-2"></p>
@@ -3337,7 +3337,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                     <input id="set-bank-code" type="text" class="settings-input" placeholder="Optional" />
                   </div>
                 </div>
-                <button onclick="saveSettings()" class="settings-primary-btn">Save Settings</button>
+                <button onclick="saveSettings()" class="btn-primary">Save Settings</button>
               </div>
             </div>
 
@@ -3362,7 +3362,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                         <option value="staff">Staff</option>
                         <option value="admin">Admin</option>
                       </select>
-                      <button type="button" class="settings-primary-btn settings-btn-compact" onclick="teamCreateInvite()">Invite</button>
+                      <button type="button" class="btn-primary btn-compact" onclick="teamCreateInvite()">Invite</button>
                     </div>
                     <p id="team-invite-result" class="text-xs mt-2 mb-0"></p>
                   </div>
@@ -3370,7 +3370,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                     <label class="settings-label">Join a team (paste invite code)</label>
                     <div class="settings-inline-row">
                       <input id="team-join-code" type="text" class="settings-input" placeholder="e.g. AB12CD" maxlength="12" />
-                      <button type="button" class="settings-secondary-btn" onclick="teamJoinCode()">Join</button>
+                      <button type="button" class="btn-soft" onclick="teamJoinCode()">Join</button>
                     </div>
                   </div>
                 </div>
@@ -3393,7 +3393,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 <p class="settings-help">Manage categories used in the equipment dropdown when adding machines.</p>
                 <div class="settings-inline-row">
                   <input id="new-category" type="text" placeholder="New category name..." class="settings-input" />
-                  <button onclick="addCategory()" class="settings-primary-btn settings-btn-compact">Add</button>
+                  <button onclick="addCategory()" class="btn-primary btn-compact">Add</button>
                 </div>
                 <ul id="categories-list" class="settings-list">
                   <!-- filled by JS -->
@@ -3413,9 +3413,9 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                   <!-- filled by JS -->
                 </div>
                 <div class="settings-inline-row settings-inline-wrap">
-                  <button type="button" onclick="addTermRow()" class="settings-secondary-btn">+ Add clause</button>
-                  <button type="button" onclick="saveTerms()" class="settings-primary-btn settings-btn-compact">Save Terms</button>
-                  <button type="button" onclick="if(confirm('Reset terms to default text?')) resetTerms()" class="settings-secondary-btn">Reset defaults</button>
+                  <button type="button" onclick="addTermRow()" class="btn-soft">+ Add clause</button>
+                  <button type="button" onclick="saveTerms()" class="btn-primary btn-compact">Save Terms</button>
+                  <button type="button" onclick="if(confirm('Reset terms to default text?')) resetTerms()" class="btn-soft">Reset defaults</button>
                 </div>
               </div>
             </div>
@@ -3436,7 +3436,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                     <input id="set-username" type="text" class="settings-input" placeholder="e.g. Valerian" maxlength="40" />
                   </div>
                 </div>
-                <button type="button" onclick="saveUserSettings()" class="settings-primary-btn">Save user settings</button>
+                <button type="button" onclick="saveUserSettings()" class="btn-primary">Save user settings</button>
               </div>
             </div>
 
@@ -3476,7 +3476,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                     </label>
                   </div>
                 </div>
-                <button type="button" onclick="saveNumberingSettings()" class="settings-primary-btn">Save numbering &amp; workflow</button>
+                <button type="button" onclick="saveNumberingSettings()" class="btn-primary">Save numbering &amp; workflow</button>
               </div>
             </div>
 
@@ -3490,8 +3490,8 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 <p class="settings-help">Reusable clauses for quote and invoice notes.</p>
                 <div id="note-templates-editor" class="settings-terms-editor"></div>
                 <div class="settings-inline-row settings-inline-wrap">
-                  <button type="button" onclick="addNoteTemplateRow()" class="settings-secondary-btn">+ Add template</button>
-                  <button type="button" onclick="saveNoteTemplates()" class="settings-primary-btn settings-btn-compact">Save templates</button>
+                  <button type="button" onclick="addNoteTemplateRow()" class="btn-soft">+ Add template</button>
+                  <button type="button" onclick="saveNoteTemplates()" class="btn-primary btn-compact">Save templates</button>
                 </div>
               </div>
             </div>
@@ -3590,7 +3590,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         </div>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" onclick="closeModal('modal-client')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm">Save Client</button>
+          <button type="submit" class="btn-primary">Save Client</button>
         </div>
       </form>
     </div>
@@ -3636,8 +3636,8 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         <p class="rr-items-total mt-2">Row total: <strong id="rr-items-total">₦0.00</strong></p>
       </div>
       <div class="flex flex-wrap gap-2 mt-4">
-        <button type="button" class="px-4 py-2.5 rounded-full text-sm font-semibold bg-brand-600 text-white" onclick="saveReportTableRow()">Save row</button>
-        <button type="button" class="px-4 py-2.5 rounded-full text-sm font-semibold bg-slate-100 text-slate-800" onclick="closeReportRowEditor()">Cancel</button>
+        <button type="button" class="btn-primary" onclick="saveReportTableRow()">Save row</button>
+        <button type="button" class="btn-soft" onclick="closeReportRowEditor()">Cancel</button>
         <button type="button" id="rr-delete-btn" class="px-4 py-2.5 rounded-full text-sm font-semibold text-red-600 hidden" onclick="deleteReportTableRow()">Delete</button>
       </div>
     </div>
@@ -3653,7 +3653,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
       <p id="auth-modal-help" class="text-sm text-slate-500 mb-3">Sign in to sync Medicano across your devices via Firebase.</p>
       <div class="auth-tabs mb-3">
         <button type="button" id="auth-tab-signin" class="action-chip is-active" onclick="setAuthMode('signin')">Sign in</button>
-        <button type="button" id="auth-tab-signup" class="action-chip soft" onclick="setAuthMode('signup')">Create account</button>
+        <button type="button" id="auth-tab-signup" class="btn-soft" onclick="setAuthMode('signup')">Create account</button>
       </div>
       <form id="auth-form" class="space-y-3" onsubmit="submitAuthForm(event)">
         <div>
@@ -3665,7 +3665,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
           <input id="auth-password" type="password" required minlength="6" class="settings-input w-full" autocomplete="current-password" placeholder="At least 6 characters" />
         </div>
         <p id="auth-error" class="text-sm text-red-500 hidden"></p>
-        <button type="submit" id="auth-submit" class="settings-primary-btn w-full">Sign in</button>
+        <button type="submit" id="auth-submit" class="btn-primary btn-block">Sign in</button>
       </form>
       <p id="auth-config-hint" class="text-xs text-slate-500 mt-3 hidden">
         Firebase is not configured yet. Add your project keys to <code>firebase-config.js</code> (see README).

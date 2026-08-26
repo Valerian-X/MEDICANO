@@ -143,6 +143,18 @@ Dark mode: override tokens on `html.dark` only when needed; components should re
 
 ## 11. Buttons
 
+**Use the shared button system only:**
+- `btn-primary` — main actions (Save, Add, New…)
+- `btn-soft` — cancel / secondary
+- `btn-pink` — accent (Add event, etc.)
+- `btn-blue` — alternate soft accent
+- `btn-dark` — rare emphasis
+- Modifiers: `btn-block`, `btn-compact`
+
+Do **not** invent new `bg-brand-600 text-white` one-offs. Dark mode is handled by the system (light surface + dark text).
+
+## 11b. Buttons (legacy note)
+
 - Prefer pill / `action-chip` / `select-row` / `pres-tool-btn` patterns already in the app.
 - “Select all” text: **black** (including presentation & reports).
 - Reports **+ Add table row**: light cream pill, **below** the table/list, **right-aligned** (dark mode stays light on dark).
@@ -345,5 +357,27 @@ const label = status === 'paid' ? 'RECEIPT'
 
 
 ---
+
+## 19. FULL UI COMPONENT MAP
+
+| UI need | Use this |
+|---------|----------|
+| Primary action | `btn-primary` |
+| Secondary / cancel | `btn-soft` |
+| Pink accent | `btn-pink` |
+| Blue accent | `btn-blue` |
+| Card list stack | `entity-cards` or `stack-cards` + `entity-card` |
+| Soft panel | `panel-soft` or `settings-card` |
+| Text field | native input / `settings-input` / `filter-control` (shared styles) |
+| Filter row | `list-toolbar-filters` or `report-filter-grid` |
+| Label above field | `settings-label` or `filter-date-label` |
+| Payment-style choice | `select-row` inside `select-stack` |
+| Desktop table | `data-table` / `report-table` |
+| Mobile table rows | `entity-cards` / `report-mobile-cards` |
+| Spacing between cards | `gap: var(--gap-card)` — never zero |
+
+**Dark mode:** tokens flip on `html.dark`. Do not invent new light text on light surfaces.
+
+**CSS:** prefer `styles.css` consistency layer + button system over new one-off rules.
 
 When adding something new: **read this file first**, then mirror the closest existing feature in `index.html` / `styles.css` / `app.js`.
