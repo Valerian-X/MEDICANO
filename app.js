@@ -1116,6 +1116,7 @@ function updateDashboardGreeting() {
 function saveUserSettings() {
   if (!data.userProfile) data.userProfile = {};
   data.userProfile.username = (document.getElementById('set-username')?.value || '').trim();
+  try { localStorage.setItem('medicano_username_local', data.userProfile.username || ''); } catch (e) {}
   saveData();
   updateDashboardGreeting();
   if (typeof logAudit === 'function') logAudit('user_settings', data.userProfile.username || '(cleared)');
@@ -1406,6 +1407,7 @@ function renderDashUpcomingEvents() {
           <span class="dash-tl-time">${escHtml(e.time || dateLabel || '—')}</span>
         </div>
         <div class="dash-tl-meta">${escHtml(e.type || 'Event')}${client ? ' · ' + escHtml(client.name) : ''}${mode === 'upcoming' && dateLabel ? ' · ' + dateLabel : ''}</div>
+        ${eventCreatorLabel(e) ? `<div class="cal-event-by dash-tl-by">By ${escHtml(eventCreatorLabel(e))}</div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1761,6 +1763,7 @@ function renderCalTimeline() {
   timeline.innerHTML = events.map(e => {
     const client = e.clientId ? getClient(e.clientId) : null;
     const color = e.color || 'pink';
+    const by = eventCreatorLabel(e);
     return `<div class="cal-event-card ${color}">
       <div class="cal-event-time">${escHtml(e.time || '—')}</div>
       <div class="cal-event-body">
@@ -1769,6 +1772,7 @@ function renderCalTimeline() {
           ${e.type ? `<span class="cal-pill">${escHtml(e.type)}</span>` : ''}
           ${client ? `<span class="cal-pill soft">${escHtml(client.name)}</span>` : ''}
         </div>
+        ${by ? `<div class="cal-event-by">By ${escHtml(by)}</div>` : ''}
         ${e.notes ? `<p class="cal-event-notes">${escHtml(e.notes)}</p>` : ''}
       </div>
       <button type="button" class="cal-event-del" onclick="deleteCalEvent('${e.id}')" title="Delete">✕</button>
@@ -1793,6 +1797,29 @@ function closeCalEventForm() {
   document.getElementById('cal-event-form')?.classList.add('hidden');
 }
 
+
+function getLocalUsername() {
+  try {
+    if (data && data.userProfile && data.userProfile.username) {
+      const n = String(data.userProfile.username).trim();
+      if (n) return n;
+    }
+    const ls = localStorage.getItem('medicano_username_local');
+    if (ls && ls.trim()) return ls.trim();
+  } catch (e) {}
+  const cloud = window.MedicanoCloud;
+  if (cloud && cloud.currentUser) {
+    const u = cloud.currentUser();
+    if (u && u.email) return String(u.email).split('@')[0];
+  }
+  return '';
+}
+
+function eventCreatorLabel(e) {
+  if (!e) return '';
+  return (e.createdByName || e.createdBy || '').trim();
+}
+
 function saveCalEvent() {
   const title = document.getElementById('cal-event-title')?.value.trim();
   const date = document.getElementById('cal-event-date')?.value;
@@ -1806,9 +1833,16 @@ function saveCalEvent() {
     return;
   }
   if (!data.calendarEvents) data.calendarEvents = [];
+  const createdByName = getLocalUsername();
+  const cloud = window.MedicanoCloud;
+  const createdByUid = (cloud && cloud.currentUser && cloud.currentUser()) ? (cloud.currentUser().uid || '') : '';
+  const createdByEmail = (cloud && cloud.currentUser && cloud.currentUser()) ? (cloud.currentUser().email || '') : '';
   data.calendarEvents.push({
     id: 'ev' + Date.now() + Math.random().toString(36).slice(2, 5),
     title, date, time, type, color, clientId, notes,
+    createdByName: createdByName || createdByEmail || 'Team',
+    createdByUid,
+    createdByEmail,
     createdAt: new Date().toISOString()
   });
   saveData();

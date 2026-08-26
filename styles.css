@@ -883,7 +883,7 @@ header .rounded-full.bg-green-100 {
 .action-chip:hover { transform: translateY(-1px); opacity: 0.92; }
 .action-chip.dark { background: var(--ink); color: #fff; }
 .action-chip.soft { background: var(--cream-2); color: var(--ink); }
-.action-chip.pink { background: var(--pink); color: var(--ink); }
+.action-chip.pink { background: var(--pink, #f5cfe0); color: #1a1a1a !important; }
 .action-chip.blue { background: var(--blue); color: var(--ink); }
 
 /* Settings panels */
@@ -3160,8 +3160,8 @@ html.dark .qa-soft {
   color: #f8fafc !important;
 }
 html.dark .qa-pink {
-  background: #5c3a4a !important;
-  color: #fce7f3 !important;
+  background: #f5cfe0 !important;
+  color: #1a1a1a !important;
 }
 html.dark .qa-blue {
   background: #2a3a55 !important;
@@ -3331,8 +3331,8 @@ html.dark .qa-soft {
   color: #ffffff !important;
 }
 html.dark .qa-pink {
-  background: #5a3d4a !important;
-  color: #f5e6ec !important;
+  background: #f5cfe0 !important;
+  color: #1a1a1a !important;
 }
 html.dark .qa-blue {
   background: #2c3d55 !important;
@@ -5396,4 +5396,137 @@ html.dark .team-pending-card {
   font-size: 0.7rem;
   font-weight: 800;
   margin-left: 0.35rem;
+}
+
+
+/* Dark mode: light-coloured buttons → dark text (Settings + PDF export) */
+html.dark .settings-primary-btn,
+html.dark .settings-btn-compact.settings-primary-btn,
+html.dark #page-settings .settings-primary-btn {
+  background: #e8ddd0 !important;
+  color: #1a1a1a !important;
+}
+html.dark .settings-secondary-btn,
+html.dark #page-settings .settings-secondary-btn {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+html.dark #page-settings button.settings-primary-btn,
+html.dark #page-settings button.settings-secondary-btn,
+html.dark #page-settings .settings-panel-body button[class*="settings-"] {
+  color: #1a1a1a !important;
+}
+/* Soft/light action chips & slate buttons used for export PDF etc. */
+html.dark .action-chip.soft,
+html.dark button.action-chip.soft {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+html.dark .bg-slate-100,
+html.dark button.bg-slate-100,
+html.dark a.bg-slate-100 {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+html.dark .text-slate-800.bg-slate-100,
+html.dark button.bg-slate-100.text-slate-800 {
+  color: #1a1a1a !important;
+}
+/* Presentation / PDF export tool buttons */
+html.dark .pres-tool-btn,
+html.dark button.pres-tool-btn,
+html.dark .export-pdf-btn,
+html.dark [data-export-pdf],
+html.dark .pdf-export-options button,
+html.dark .pres-export-row button {
+  color: #1a1a1a !important;
+}
+html.dark .pres-tool-btn.soft,
+html.dark .pres-tool-btn:not(.dark):not(.primary) {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+/* Generic light pills in dark mode across app */
+html.dark .pill-btn-soft {
+  background: var(--cream-2, #efe8de) !important;
+  color: #1a1a1a !important;
+}
+html.dark .report-add-row-btn {
+  background: #e8ddd0 !important;
+  color: #1a1a1a !important;
+}
+
+/* Event creator label */
+.cal-event-by,
+.dash-tl-by {
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(26, 26, 26, 0.65);
+  letter-spacing: 0.01em;
+}
+html.dark .cal-event-by,
+html.dark .dash-tl-by {
+  color: rgba(243, 240, 234, 0.75);
+}
+
+
+/* =========================================================
+   Dark mode: light pastel buttons → dark text (app-wide)
+   Matches "Add event" pink pill with black text
+   ========================================================= */
+html.dark .action-chip.pink,
+html.dark button.action-chip.pink,
+html.dark .action-chip.soft,
+html.dark button.action-chip.soft,
+html.dark .action-chip.blue,
+html.dark button.action-chip.blue {
+  color: #1a1a1a !important;
+}
+html.dark .action-chip.pink,
+html.dark button.action-chip.pink {
+  background: #f5cfe0 !important;
+  color: #1a1a1a !important;
+}
+html.dark .action-chip.soft,
+html.dark button.action-chip.soft {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+html.dark .action-chip.blue,
+html.dark button.action-chip.blue {
+  background: #c9daf8 !important;
+  color: #1a1a1a !important;
+}
+html.dark .dash-add-event-btn,
+html.dark button.dash-add-event-btn {
+  background: #f5cfe0 !important;
+  color: #1a1a1a !important;
+}
+html.dark .qa-pink,
+html.dark button.qa-pink,
+html.dark .qa-btn.qa-pink {
+  background: #f5cfe0 !important;
+  color: #1a1a1a !important;
+}
+html.dark .qa-soft,
+html.dark button.qa-soft,
+html.dark .qa-btn.qa-soft {
+  background: #efe8de !important;
+  color: #1a1a1a !important;
+}
+html.dark .qa-blue,
+html.dark button.qa-blue,
+html.dark .qa-btn.qa-blue {
+  background: #c9daf8 !important;
+  color: #1a1a1a !important;
+}
+html.dark .cal-action-btn.action-chip.pink,
+html.dark .cal-today-btn.action-chip.soft {
+  color: #1a1a1a !important;
+}
+/* Any button explicitly using pastel pink fill */
+html.dark button[style*="f5cfe0"],
+html.dark button[style*="--pink"] {
+  color: #1a1a1a !important;
 }

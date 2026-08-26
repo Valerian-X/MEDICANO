@@ -74,6 +74,11 @@
         return copy;
       });
     }
+    // Usernames stay per-device — never publish into shared workspace
+    if (data.userProfile) {
+      data.userProfile = Object.assign({}, data.userProfile);
+      delete data.userProfile.username;
+    }
     return data;
   }
 
@@ -115,12 +120,15 @@
         }
 
         var localSrc2 = (typeof window.getAppData === 'function' ? window.getAppData() : window.data);
-        if (localSrc2 && localSrc2.userProfile && localSrc2.userProfile.username) {
-          if (!payload.userProfile) payload.userProfile = {};
-          if (!payload.userProfile.username) {
-            payload.userProfile.username = localSrc2.userProfile.username;
-          }
-        }
+        // Always keep this device's username — never take username from cloud
+        var localName = '';
+        try {
+          localName = (localSrc2 && localSrc2.userProfile && localSrc2.userProfile.username) || '';
+          if (!localName) localName = localStorage.getItem('medicano_username_local') || '';
+        } catch (eN) {}
+        if (!payload.userProfile) payload.userProfile = {};
+        payload.userProfile.username = localName || '';
+
         if (localSrc2 && Array.isArray(localSrc2.products) && Array.isArray(payload.products)) {
           var localById = {};
           localSrc2.products.forEach(function (p) { localById[p.id] = p; });
