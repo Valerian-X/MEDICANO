@@ -358,26 +358,4 @@ const label = status === 'paid' ? 'RECEIPT'
 
 ---
 
-## 19. FULL UI COMPONENT MAP
-
-| UI need | Use this |
-|---------|----------|
-| Primary action | `btn-primary` |
-| Secondary / cancel | `btn-soft` |
-| Pink accent | `btn-pink` |
-| Blue accent | `btn-blue` |
-| Card list stack | `entity-cards` or `stack-cards` + `entity-card` |
-| Soft panel | `panel-soft` or `settings-card` |
-| Text field | native input / `settings-input` / `filter-control` (shared styles) |
-| Filter row | `list-toolbar-filters` or `report-filter-grid` |
-| Label above field | `settings-label` or `filter-date-label` |
-| Payment-style choice | `select-row` inside `select-stack` |
-| Desktop table | `data-table` / `report-table` |
-| Mobile table rows | `entity-cards` / `report-mobile-cards` |
-| Spacing between cards | `gap: var(--gap-card)` — never zero |
-
-**Dark mode:** tokens flip on `html.dark`. Do not invent new light text on light surfaces.
-
-**CSS:** prefer `styles.css` consistency layer + button system over new one-off rules.
-
 When adding something new: **read this file first**, then mirror the closest existing feature in `index.html` / `styles.css` / `app.js`.
