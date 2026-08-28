@@ -3632,7 +3632,7 @@ function generateInvoicePdf(inv) {
       .slice(0, max || 50);
     const clientName = sanitize(client ? client.name : 'Client', 50) || 'Client';
     const docTitle = sanitize(invNum, 30) || 'Invoice';
-    doc.save(clientName + ' - ' + docTitle + '.pdf');
+    savePdfFile(doc, clientName + ' - ' + docTitle + '.pdf');
   }).catch(err => {
     console.error(err);
     alert(err.message || 'Could not generate invoice PDF. Check your connection and try again.');
@@ -4472,12 +4472,35 @@ function loadJsPdf() {
   return new Promise((resolve, reject) => {
     if (window.jspdf && window.jspdf.jsPDF) return resolve(window.jspdf.jsPDF);
     if (window.jsPDF) return resolve(window.jsPDF);
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    s.onload = () => resolve((window.jspdf && window.jspdf.jsPDF) || window.jsPDF);
-    s.onerror = () => reject(new Error('Could not load PDF engine. Please connect to the internet once to generate presentations.'));
-    document.head.appendChild(s);
+    function trySrc(src, next) {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => {
+        const C = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+        if (C) resolve(C);
+        else if (next) next();
+        else reject(new Error('PDF engine loaded but jsPDF is missing.'));
+      };
+      s.onerror = () => { if (next) next(); else reject(new Error('Could not load PDF engine. Offline APK needs jspdf.umd.min.js in the app folder.')); };
+      document.head.appendChild(s);
+    }
+    // Local file first (works in APK / offline), CDN fallback for web
+    trySrc('jspdf.umd.min.js', () => trySrc('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', null));
   });
+}
+
+/** Save PDF — uses native bridge on Android APK when available */
+function savePdfFile(doc, filename) {
+  try {
+    if (window.MedicanoNative && typeof window.MedicanoNative.savePdf === 'function') {
+      const dataUri = doc.output('datauristring');
+      window.MedicanoNative.savePdf(dataUri, filename || 'medicano.pdf');
+      return;
+    }
+  } catch (e) {
+    console.warn('Native PDF save failed, falling back', e);
+  }
+  doc.save(filename || 'medicano.pdf');
 }
 
 function generatePresentation() {
@@ -4520,7 +4543,7 @@ function generatePresentation() {
   }).catch(err => {
     alert(err.message || 'PDF generation failed.');
   }).finally(() => {
-    if (btn) { btn.disabled = false; btn.textContent = 'Generate High-Quality PDF Presentation'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
   });
 }
 
@@ -5225,7 +5248,7 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
     .slice(0, max || 50);
   const clientName = sanitize(forClient, 50) || 'Client';
   const docTitle = sanitize(title, 40) || 'Presentation';
-  doc.save(clientName + ' - ' + docTitle + '.pdf');
+  savePdfFile(doc, clientName + ' - ' + docTitle + '.pdf');
 }
 
 function escHtml(s) {
@@ -6381,7 +6404,7 @@ function generateQuotePdf(q) {
     doc.text('Client acknowledgement', W - M - 180, y + 52);
 
     const safe = (s) => String(s || 'Quote').replace(/[\\/:*?"<>|]/g, ' ').trim().slice(0, 40);
-    doc.save(safe(client && client.name) + ' - ' + safe(q.quoteNumber) + '.pdf');
+    savePdfFile(doc, safe(client && client.name) + ' - ' + safe(q.quoteNumber) + '.pdf');
   }).catch(err => alert(err.message || 'Could not generate quote PDF'));
 }
 
@@ -6659,3 +6682,16 @@ function onMedicanoAuthChanged(user) {
   }
 }
 window.onMedicanoAuthChanged = onMedicanoAuthChanged;
+
+function toggleAuthPassword() {
+  const input = document.getElementById('auth-password');
+  const btn = document.getElementById('auth-password-toggle');
+  if (!input) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  if (btn) {
+    btn.textContent = show ? 'Hide' : 'Show';
+    btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+  }
+}
+window.toggleAuthPassword = toggleAuthPassword;

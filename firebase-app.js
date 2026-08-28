@@ -96,6 +96,39 @@
     return countRecords(d) + ' records · updated ' + ((d && d.updatedAt) || '').slice(0, 19).replace('T', ' ');
   }
 
+  /** Human-readable breakdown for admin approval UI */
+  function buildPendingDetails(d) {
+    d = d || {};
+    function names(arr, key) {
+      key = key || 'name';
+      return (arr || []).slice()
+        .sort(function (a, b) {
+          return String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''));
+        })
+        .slice(0, 8)
+        .map(function (x) {
+          if (key === 'invoice') return x.invoiceNumber || x.title || x.id || 'Invoice';
+          if (key === 'quote') return x.quoteNumber || x.title || x.id || 'Quote';
+          if (key === 'event') return (x.title || 'Event') + (x.date ? ' (' + x.date + ')' : '');
+          return x[key] || x.title || x.sku || x.id || '—';
+        });
+    }
+    return {
+      clients: (d.clients || []).length,
+      products: (d.products || []).length,
+      quotes: (d.quotes || []).length,
+      invoices: (d.invoices || []).length,
+      events: (d.calendarEvents || []).length,
+      reportRows: (d.reportTableRows || []).length,
+      clientNames: names(d.clients, 'name'),
+      productNames: names(d.products, 'name'),
+      quoteNames: names(d.quotes, 'quote'),
+      invoiceNames: names(d.invoices, 'invoice'),
+      eventNames: names(d.calendarEvents, 'event')
+    };
+  }
+
+
   function applyRemotePayload(remote, opts) {
     opts = opts || {};
     const force = !!opts.force;
@@ -249,6 +282,7 @@
         createdAt: new Date().toISOString(),
         summary: summarizePayload(payload),
         recordCount: countRecords(payload),
+        details: buildPendingDetails(payload),
         payload: payload
       });
       status('Submitted · waiting for admin · ' + (auth.currentUser.email || ''), 'online');

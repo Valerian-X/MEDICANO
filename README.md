@@ -22,7 +22,11 @@ Offline-first web application for managing medical items catalog, hospitals/clie
 - Export / Import JSON backups (move data between devices)
 - Responsive design (desktop + mobile)
 
-## How to Use
+## Native apps (Windows / Android / iOS)
+
+See **[NATIVE.md](./NATIVE.md)** — install as an app from the browser now, or use Electron / Capacitor wrappers for store builds.
+
+
 
 ### Option 1 — Open directly (simplest for offline)
 1. Open the folder `medicano`

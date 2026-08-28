@@ -1,14 +1,17 @@
 {
-  "name": "Medicano Resources - Equipment Quoting",
+  "id": "/",
+  "name": "Medicano Resources",
   "short_name": "Medicano",
-  "description": "Medical equipment catalog, quoting and client presentations for Medicano Resources Limited",
+  "description": "Catalog, quotes, invoices and stock for Medicano Resources Limited",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0f766e",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "background_color": "#f6f1ea",
   "theme_color": "#0f766e",
   "orientation": "any",
   "lang": "en",
+  "dir": "ltr",
   "icons": [
     {
       "src": "icon-192.png",
@@ -29,5 +32,17 @@
       "purpose": "maskable"
     }
   ],
-  "categories": ["business", "productivity"]
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "New invoice",
+      "short_name": "Invoice",
+      "url": "./index.html#invoices"
+    },
+    {
+      "name": "New quote",
+      "short_name": "Quote",
+      "url": "./index.html#quotes"
+    }
+  ]
 }

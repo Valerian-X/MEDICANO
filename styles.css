@@ -5806,3 +5806,70 @@ html.dark .qa-dark {
   background: #efe8de !important;
   color: #1a1a1a !important;
 }
+
+/* Password show/hide */
+.password-field-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.password-field-wrap .settings-input {
+  padding-right: 4.25rem !important;
+}
+.password-toggle-btn {
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.35rem 0.55rem;
+  border-radius: 0.5rem;
+}
+.password-toggle-btn:hover { color: #1a1a1a; background: rgba(0,0,0,0.05); }
+html.dark .password-toggle-btn { color: #94a3b8; }
+html.dark .password-toggle-btn:hover { color: #f3f0ea; background: rgba(255,255,255,0.08); }
+
+/* Pending approval details */
+.pending-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.75rem;
+  margin: 0.55rem 0 0.35rem;
+  font-size: 0.75rem;
+  color: inherit;
+  opacity: 0.9;
+}
+.pending-details-expand {
+  margin: 0.35rem 0 0.5rem;
+  font-size: 0.8rem;
+}
+.pending-details-expand summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: inherit;
+  opacity: 0.85;
+}
+.pending-details-body {
+  margin-top: 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.pending-detail-block { font-size: 0.78rem; }
+.pending-detail-label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+  opacity: 0.8;
+}
+.pending-detail-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  opacity: 0.9;
+}
+.pending-detail-list li { margin: 0.15rem 0; }

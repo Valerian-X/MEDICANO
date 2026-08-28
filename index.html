@@ -12,6 +12,9 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Medicano" />
+  <meta name="application-name" content="Medicano" />
+  <meta name="msapplication-TileColor" content="#0f766e" />
   <style>
 /* Medicano Resources - Offline styles (no CDN required) */
 
@@ -3662,7 +3665,10 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         </div>
         <div>
           <label class="settings-label">Password</label>
-          <input id="auth-password" type="password" required minlength="6" class="settings-input w-full" autocomplete="current-password" placeholder="At least 6 characters" />
+          <div class="password-field-wrap">
+            <input id="auth-password" type="password" required minlength="6" class="settings-input w-full" autocomplete="current-password" placeholder="At least 6 characters" />
+            <button type="button" id="auth-password-toggle" class="password-toggle-btn" onclick="toggleAuthPassword()" aria-pressed="false">Show</button>
+          </div>
         </div>
         <p id="auth-error" class="text-sm text-red-500 hidden"></p>
         <button type="submit" id="auth-submit" class="btn-primary btn-block">Sign in</button>
@@ -3683,6 +3689,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="firebase-app.js"></script>
+  <script src="jspdf.umd.min.js"></script>
   <script src="app.js"></script>
 
   <div id="lowstock-toast" class="lowstock-toast hidden" role="status">
