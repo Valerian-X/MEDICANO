@@ -58,6 +58,8 @@ const DEFAULT_DATA = {
   ],
   stockMovements: [],
   calendarEvents: [],
+  services: [],
+  officeExpenses: [],
   products: [
     {
       id: 'p1',
@@ -265,6 +267,8 @@ function applyCloudData(payload) {
   if (!data.invoices) data.invoices = [];
   if (!data.categories) data.categories = [];
   if (!data.calendarEvents) data.calendarEvents = [];
+  if (!data.services) data.services = [];
+  if (!data.officeExpenses) data.officeExpenses = [];
   if (!data.stockMovements) data.stockMovements = [];
   if (!data.userProfile) data.userProfile = { username: '' };
       if (!Array.isArray(data.reportTableRows)) data.reportTableRows = [];
@@ -890,10 +894,86 @@ function refreshAllViews() {
 // ---- Auth UI (Firebase bridge) ----
 let authMode = 'signin';
 
+
+function showForgotPassword() {
+  const form = document.getElementById('auth-form');
+  const forgot = document.getElementById('auth-forgot-panel');
+  const tabs = document.querySelector('.auth-tabs');
+  const help = document.getElementById('auth-modal-help');
+  const title = document.getElementById('auth-modal-title');
+  if (form) form.classList.add('hidden');
+  if (tabs) tabs.classList.add('hidden');
+  if (forgot) forgot.classList.remove('hidden');
+  if (title) title.textContent = 'Reset password';
+  if (help) help.textContent = 'Enter your account email. Firebase will send a reset link if the account exists.';
+  const err = document.getElementById('auth-error');
+  if (err) { err.textContent = ''; err.classList.add('hidden'); }
+  const email = document.getElementById('auth-email')?.value || '';
+  const fe = document.getElementById('auth-forgot-email');
+  if (fe && email) fe.value = email;
+}
+
+function hideForgotPassword() {
+  const form = document.getElementById('auth-form');
+  const forgot = document.getElementById('auth-forgot-panel');
+  const tabs = document.querySelector('.auth-tabs');
+  const help = document.getElementById('auth-modal-help');
+  if (form) form.classList.remove('hidden');
+  if (tabs) tabs.classList.remove('hidden');
+  if (forgot) forgot.classList.add('hidden');
+  setAuthMode(authMode || 'signin');
+  if (help) help.textContent = 'Sign in to sync Medicano across your devices via Firebase.';
+}
+
+async function sendForgotPassword(ev) {
+  if (ev) ev.preventDefault();
+  const email = (document.getElementById('auth-forgot-email')?.value || '').trim();
+  const err = document.getElementById('auth-forgot-error');
+  const ok = document.getElementById('auth-forgot-success');
+  if (err) { err.textContent = ''; err.classList.add('hidden'); }
+  if (ok) { ok.textContent = ''; ok.classList.add('hidden'); }
+  if (!email) {
+    if (err) { err.textContent = 'Enter your email address.'; err.classList.remove('hidden'); }
+    return;
+  }
+  const cloud = window.MedicanoCloud;
+  if (!cloud || !cloud.resetPassword) {
+    if (err) { err.textContent = 'Cloud auth is not available.'; err.classList.remove('hidden'); }
+    return;
+  }
+  try {
+    await cloud.resetPassword(email);
+    if (ok) {
+      ok.textContent = 'If an account exists for this email, a password reset link has been sent. Check your inbox (and spam).';
+      ok.classList.remove('hidden');
+    }
+  } catch (e) {
+    let msg = (e && e.message) ? e.message : String(e);
+    if (/user-not-found/i.test(msg)) msg = 'If an account exists for this email, a reset link has been sent.';
+    if (/invalid-email/i.test(msg)) msg = 'That email address is not valid.';
+    if (/network/i.test(msg)) msg = 'Network error. Check your connection and try again.';
+    // Always show generic success-style for enumeration safety when user-not-found
+    if (/user-not-found/i.test(String(e && e.code))) {
+      if (ok) {
+        ok.textContent = 'If an account exists for this email, a password reset link has been sent. Check your inbox (and spam).';
+        ok.classList.remove('hidden');
+      }
+      return;
+    }
+    if (err) { err.textContent = msg; err.classList.remove('hidden'); }
+  }
+}
+
 function openAuthModal() {
   const m = document.getElementById('auth-modal');
   if (!m) return;
   m.classList.remove('hidden');
+  const forgot = document.getElementById('auth-forgot-panel');
+  if (forgot) forgot.classList.add('hidden');
+  const form = document.getElementById('auth-form');
+  if (form) form.classList.remove('hidden');
+  const tabs = document.querySelector('.auth-tabs');
+  if (tabs) tabs.classList.remove('hidden');
   const cloud = window.MedicanoCloud;
   const hint = document.getElementById('auth-config-hint');
   if (hint) {
@@ -1061,6 +1141,7 @@ function navigate(page) {
     inventory: 'In Stock',
     presentation: 'Client Presentation',
     rates: 'Exchange Rates',
+    'services-expenses': 'Services & Expenses',
     settings: 'Settings'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
@@ -1086,6 +1167,7 @@ function navigate(page) {
   if (page === 'inventory') renderInventory();
   if (page === 'presentation') renderPresPicker();
   if (page === 'rates') renderRates();
+  if (page === 'services-expenses') renderServicesExpenses();
   if (page === 'settings') {
     if (typeof renderTeamPanel === 'function') renderTeamPanel();
     if (typeof renderSettings === 'function') renderSettings();
@@ -1833,6 +1915,8 @@ function saveCalEvent() {
     return;
   }
   if (!data.calendarEvents) data.calendarEvents = [];
+  if (!data.services) data.services = [];
+  if (!data.officeExpenses) data.officeExpenses = [];
   const createdByName = getLocalUsername();
   const cloud = window.MedicanoCloud;
   const createdByUid = (cloud && cloud.currentUser && cloud.currentUser()) ? (cloud.currentUser().uid || '') : '';
@@ -3485,7 +3569,6 @@ function generateInvoicePdf(inv) {
     y += 4; // small gap after header rule before first row
 
     items.forEach((it) => {
-      if (y > H - 160) { doc.addPage(); y = 48; }
       const prod = it.productId ? getProduct(it.productId) : null;
       const name = it.name || (prod ? prod.name : 'Item');
       const desc = (it.description || (prod && prod.description) || '').trim();
@@ -3493,16 +3576,34 @@ function generateInvoicePdf(inv) {
       const unit = Number(it.unitNgn) || 0;
       const line = it.lineNgn != null ? it.lineNgn : qty * unit;
 
-      // Content starts with padding under the previous rule
+      // Wrap description column only — never spill into Unit / Qty / Amount
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10.5);
+      const nameLines = doc.splitTextToSize(String(name || 'Item'), descMaxW);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      const dLines = desc ? doc.splitTextToSize(desc, descMaxW).slice(0, 5) : [];
+      const nameLineH = 13;
+      const descLineH = 11;
+      const blockH = Math.max(1, nameLines.length) * nameLineH
+        + (dLines.length ? dLines.length * descLineH + 2 : 0);
+
+      if (y + 14 + blockH + 20 > H - 80) {
+        doc.addPage();
+        y = 48;
+      }
+
       y += 14;
       const textY = y;
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10.5);
       doc.setTextColor(...INK);
-      const nameLines = doc.splitTextToSize(String(name), descMaxW);
-      doc.text(nameLines[0] || '', colDesc, textY);
+      nameLines.forEach((ln, i) => {
+        doc.text(ln, colDesc, textY + i * nameLineH);
+      });
 
+      // Numbers stay on the first line of the row, right-aligned in their columns
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
       doc.setTextColor(...INK);
@@ -3511,26 +3612,18 @@ function generateInvoicePdf(inv) {
       doc.setFont('helvetica', 'bold');
       doc.text(formatNairaPlain(line), colAmount, textY, { align: 'right' });
 
-      let extra = 0;
-      if (desc) {
+      let cursorY = textY + nameLines.length * nameLineH;
+      if (dLines.length) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.5);
         doc.setTextColor(...GRAY);
-        const dLines = doc.splitTextToSize(desc, descMaxW).slice(0, 2);
         dLines.forEach((ln, i) => {
-          doc.text(ln, colDesc, textY + 13 + i * 11);
+          doc.text(ln, colDesc, cursorY + i * descLineH);
         });
-        extra = dLines.length * 11 + 2;
-      } else if (nameLines.length > 1) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10.5);
-        doc.setTextColor(...INK);
-        doc.text(nameLines[1], colDesc, textY + 13);
-        extra = 13;
+        cursorY += dLines.length * descLineH + 2;
       }
 
-      // Keep text clearly above the rule (not sitting on it)
-      y = textY + extra + 16;
+      y = Math.max(cursorY, textY + 13) + 10;
       doc.setDrawColor(...LINE);
       doc.setLineWidth(0.5);
       doc.line(M, y, W - M, y);
@@ -4071,6 +4164,302 @@ function downloadCsv(filename, rows) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+
+function exportClientsExcel() {
+  const rows = [
+    ['Name', 'Contact', 'Phone', 'Email', 'Address']
+  ];
+  (data.clients || []).forEach(c => {
+    rows.push([
+      c.name || '',
+      c.contact || '',
+      c.phone || '',
+      c.email || '',
+      c.address || ''
+    ]);
+  });
+  downloadCsv('medicano-clients-' + new Date().toISOString().slice(0, 10) + '.csv', rows);
+  alert('Client list exported. Open the CSV in Excel or Google Sheets.');
+}
+
+function downloadClientsTemplate() {
+  const rows = [
+    ['Name', 'Contact', 'Phone', 'Email', 'Address'],
+    ['Lagos University Teaching Hospital', 'Dr. Adebayo', '08031234567', 'procurement@luth.gov.ng', 'Idi-Araba, Lagos'],
+    ['Reddington Hospital', 'Procurement', '07012345678', 'orders@reddingtonhospital.com', 'Victoria Island, Lagos']
+  ];
+  downloadCsv('medicano-clients-template.csv', rows);
+  alert('Template downloaded. Fill rows in Excel, save as CSV (UTF-8), then Import spreadsheet.');
+}
+
+function importClientsFromCsv(file) {
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const rows = parseCsv(ev.target.result);
+      if (rows.length < 2) {
+        alert('Spreadsheet is empty or has no data rows.');
+        return;
+      }
+      const headers = rows[0].map(normalizeHeader);
+      function col(aliases) {
+        for (const a of aliases) {
+          const i = headers.indexOf(a);
+          if (i >= 0) return i;
+        }
+        return -1;
+      }
+      const iName = col(['name', 'hospital', 'hospital name', 'clinic', 'client', 'client name']);
+      const iContact = col(['contact', 'contact person', 'contact name', 'person']);
+      const iPhone = col(['phone', 'telephone', 'mobile', 'tel']);
+      const iEmail = col(['email', 'e-mail', 'mail']);
+      const iAddress = col(['address', 'location', 'city']);
+      if (iName < 0) {
+        alert('Could not find a Name column. Use headers: Name, Contact, Phone, Email, Address');
+        return;
+      }
+      if (!data.clients) data.clients = [];
+      let added = 0, updated = 0;
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r];
+        const name = String(row[iName] || '').trim();
+        if (!name) continue;
+        const contact = iContact >= 0 ? String(row[iContact] || '').trim() : '';
+        const phone = iPhone >= 0 ? String(row[iPhone] || '').trim() : '';
+        const email = iEmail >= 0 ? String(row[iEmail] || '').trim() : '';
+        const address = iAddress >= 0 ? String(row[iAddress] || '').trim() : '';
+        const existing = data.clients.find(c => (c.name || '').toLowerCase() === name.toLowerCase());
+        if (existing) {
+          if (contact) existing.contact = contact;
+          if (phone) existing.phone = phone;
+          if (email) existing.email = email;
+          if (address) existing.address = address;
+          updated++;
+        } else {
+          data.clients.push({
+            id: 'c' + Date.now() + Math.random().toString(36).slice(2, 6),
+            name, contact, phone, email, address,
+            createdAt: new Date().toISOString()
+          });
+          added++;
+        }
+      }
+      saveData();
+      renderClients();
+      alert('Clients import complete.\\nAdded: ' + added + '\\nUpdated: ' + updated);
+    } catch (e) {
+      console.error(e);
+      alert('Could not import clients. Save as CSV (UTF-8) and try again.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function onClientsCsvSelected(input) {
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  const name = (file.name || '').toLowerCase();
+  if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    alert('Please save the file as CSV (UTF-8) from Excel, then import again.');
+    input.value = '';
+    return;
+  }
+  importClientsFromCsv(file);
+  input.value = '';
+}
+
+
+const EXPENSE_CATEGORIES = [
+  'Rent', 'Utilities', 'Salaries', 'Transport', 'Office supplies',
+  'Maintenance', 'Marketing', 'Professional fees', 'Other'
+];
+
+function renderServicesExpenses() {
+  renderServicesList();
+  renderExpensesList();
+  fillServiceClientSelect();
+  const ed = document.getElementById('svc-date');
+  const xd = document.getElementById('exp-date');
+  const today = (typeof localYMD === 'function') ? localYMD() : new Date().toISOString().slice(0, 10);
+  if (ed && !ed.value) ed.value = today;
+  if (xd && !xd.value) xd.value = today;
+  const expCat = document.getElementById('exp-category');
+  if (expCat && expCat.options.length <= 1) {
+    expCat.innerHTML = EXPENSE_CATEGORIES.map(c => '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>').join('');
+  }
+}
+
+function fillServiceClientSelect() {
+  const sel = document.getElementById('svc-client');
+  if (!sel) return;
+  const cur = sel.value;
+  const clients = (data.clients || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  sel.innerHTML = '<option value="">— Select client —</option>' +
+    clients.map(c => '<option value="' + c.id + '">' + escHtml(c.name) + '</option>').join('');
+  if (cur) sel.value = cur;
+}
+
+function renderServicesList() {
+  const el = document.getElementById('services-list');
+  if (!el) return;
+  const list = (data.services || []).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  if (!list.length) {
+    el.innerHTML = '<div class="entity-empty">No services recorded yet</div>';
+    return;
+  }
+  el.innerHTML = list.map(s => {
+    const client = s.clientId ? getClient(s.clientId) : null;
+    const cname = client ? client.name : (s.clientName || '—');
+    const amt = (Number(s.amountNgn) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `<div class="entity-card" id="svc-card-${s.id}">
+      <button type="button" class="entity-card-header" onclick="onEntityCardClick(event, 'svc-card-${s.id}')">
+        <span class="entity-card-chevron">▾</span>
+        <span class="entity-card-main">
+          <span class="entity-card-title">${escHtml(s.description || 'Service')}</span>
+          <span class="entity-card-sub">${escHtml(cname)} · ${escHtml(s.date || '')}</span>
+        </span>
+        <span class="entity-card-price">₦${amt}</span>
+      </button>
+      <div class="entity-card-body">
+        <div class="entity-detail"><span class="entity-detail-label">Client</span><span class="entity-detail-value">${escHtml(cname)}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Date</span><span class="entity-detail-value">${escHtml(s.date || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Amount</span><span class="entity-detail-value">₦${amt}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Notes</span><span class="entity-detail-value">${escHtml(s.notes || '—')}</span></div>
+        <div class="entity-card-actions">
+          <button type="button" class="danger" onclick="event.stopPropagation(); if(confirm('Delete this service record?')) deleteService('${s.id}')">Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderExpensesList() {
+  const el = document.getElementById('expenses-list');
+  if (!el) return;
+  const list = (data.officeExpenses || []).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  if (!list.length) {
+    el.innerHTML = '<div class="entity-empty">No office expenses recorded yet</div>';
+    return;
+  }
+  el.innerHTML = list.map(x => {
+    const amt = (Number(x.amountNgn) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `<div class="entity-card" id="exp-card-${x.id}">
+      <button type="button" class="entity-card-header" onclick="onEntityCardClick(event, 'exp-card-${x.id}')">
+        <span class="entity-card-chevron">▾</span>
+        <span class="entity-card-main">
+          <span class="entity-card-title">${escHtml(x.description || x.category || 'Expense')}</span>
+          <span class="entity-card-sub">${escHtml(x.category || 'Other')} · ${escHtml(x.date || '')}</span>
+        </span>
+        <span class="entity-card-price">₦${amt}</span>
+      </button>
+      <div class="entity-card-body">
+        <div class="entity-detail"><span class="entity-detail-label">Category</span><span class="entity-detail-value">${escHtml(x.category || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Date</span><span class="entity-detail-value">${escHtml(x.date || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Paid to</span><span class="entity-detail-value">${escHtml(x.paidTo || '—')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Amount</span><span class="entity-detail-value">₦${amt}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Notes</span><span class="entity-detail-value">${escHtml(x.notes || '—')}</span></div>
+        <div class="entity-card-actions">
+          <button type="button" class="danger" onclick="event.stopPropagation(); if(confirm('Delete this expense?')) deleteExpense('${x.id}')">Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function saveServiceRecord(ev) {
+  if (ev) ev.preventDefault();
+  const clientId = document.getElementById('svc-client')?.value || '';
+  const description = (document.getElementById('svc-description')?.value || '').trim();
+  const amountNgn = parseFloat(document.getElementById('svc-amount')?.value) || 0;
+  const date = document.getElementById('svc-date')?.value || '';
+  const notes = (document.getElementById('svc-notes')?.value || '').trim();
+  if (!description) { alert('Enter a service description.'); return; }
+  if (!date) { alert('Enter a date.'); return; }
+  if (!data.services) data.services = [];
+  const client = clientId ? getClient(clientId) : null;
+  data.services.push({
+    id: 'svc' + Date.now() + Math.random().toString(36).slice(2, 5),
+    clientId: clientId || null,
+    clientName: client ? client.name : '',
+    description,
+    amountNgn,
+    date,
+    notes,
+    createdAt: new Date().toISOString()
+  });
+  saveData();
+  document.getElementById('svc-description').value = '';
+  document.getElementById('svc-amount').value = '';
+  document.getElementById('svc-notes').value = '';
+  renderServicesList();
+}
+
+function saveExpenseRecord(ev) {
+  if (ev) ev.preventDefault();
+  const category = document.getElementById('exp-category')?.value || 'Other';
+  const description = (document.getElementById('exp-description')?.value || '').trim();
+  const amountNgn = parseFloat(document.getElementById('exp-amount')?.value) || 0;
+  const date = document.getElementById('exp-date')?.value || '';
+  const paidTo = (document.getElementById('exp-paidto')?.value || '').trim();
+  const notes = (document.getElementById('exp-notes')?.value || '').trim();
+  if (!description) { alert('Enter an expense description.'); return; }
+  if (!date) { alert('Enter a date.'); return; }
+  if (!data.officeExpenses) data.officeExpenses = [];
+  data.officeExpenses.push({
+    id: 'exp' + Date.now() + Math.random().toString(36).slice(2, 5),
+    category, description, amountNgn, date, paidTo, notes,
+    createdAt: new Date().toISOString()
+  });
+  saveData();
+  document.getElementById('exp-description').value = '';
+  document.getElementById('exp-amount').value = '';
+  document.getElementById('exp-paidto').value = '';
+  document.getElementById('exp-notes').value = '';
+  renderExpensesList();
+}
+
+function deleteService(id) {
+  data.services = (data.services || []).filter(s => s.id !== id);
+  saveData();
+  renderServicesList();
+}
+
+function deleteExpense(id) {
+  data.officeExpenses = (data.officeExpenses || []).filter(x => x.id !== id);
+  saveData();
+  renderExpensesList();
+}
+
+function exportServicesCsv() {
+  const rows = [['Date', 'Client', 'Description', 'Amount NGN', 'Notes']];
+  (data.services || []).forEach(s => {
+    const client = s.clientId ? getClient(s.clientId) : null;
+    rows.push([
+      s.date || '',
+      client ? client.name : (s.clientName || ''),
+      s.description || '',
+      s.amountNgn || 0,
+      s.notes || ''
+    ]);
+  });
+  downloadCsv('medicano-services-' + new Date().toISOString().slice(0, 10) + '.csv', rows);
+}
+
+function exportExpensesCsv() {
+  const rows = [['Date', 'Category', 'Description', 'Amount NGN', 'Paid to', 'Notes']];
+  (data.officeExpenses || []).forEach(x => {
+    rows.push([
+      x.date || '',
+      x.category || '',
+      x.description || '',
+      x.amountNgn || 0,
+      x.paidTo || '',
+      x.notes || ''
+    ]);
+  });
+  downloadCsv('medicano-expenses-' + new Date().toISOString().slice(0, 10) + '.csv', rows);
 }
 
 function exportProductsExcel() {
@@ -6338,22 +6727,28 @@ function generateQuotePdf(q) {
     y += 6; doc.setDrawColor(...LINE); doc.line(M, y, W - M, y); y += 14;
 
     items.forEach(it => {
-      if (y > H - 100) { doc.addPage(); y = 50; }
       const name = it.name || 'Item';
       const qty = Number(it.qty) || 0;
       const unit = Number(it.unitNGN != null ? it.unitNGN : it.unitNgn) || 0;
       const line = Number(it.lineNGN != null ? it.lineNGN : it.lineNgn) || (qty * unit);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
-      doc.setTextColor(...INK);
       const nl = doc.splitTextToSize(String(name), descMaxW);
-      doc.text(nl[0] || '', colDesc, y);
+      const lineH = 12;
+      const blockH = Math.max(1, nl.length) * lineH;
+      if (y + blockH + 16 > H - 90) { doc.addPage(); y = 50; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...INK);
+      nl.forEach((ln, i) => {
+        doc.text(ln, colDesc, y + i * lineH);
+      });
       doc.setFont('helvetica', 'normal');
       doc.text(formatNairaPlain(unit), colUnit, y, { align: 'right' });
       doc.text(String(qty), colQty, y, { align: 'right' });
       doc.setFont('helvetica', 'bold');
       doc.text(formatNairaPlain(line), colAmount, y, { align: 'right' });
-      y += 16;
+      y += blockH + 6;
       doc.setDrawColor(...LINE);
       doc.setLineWidth(0.4);
       doc.line(M, y - 4, W - M, y - 4);

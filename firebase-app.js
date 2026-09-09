@@ -89,7 +89,9 @@
       + (d.invoices || []).length
       + (d.products || []).length
       + (d.calendarEvents || []).length
-      + (d.reportTableRows || []).length;
+      + (d.reportTableRows || []).length
+      + (d.services || []).length
+      + (d.officeExpenses || []).length;
   }
 
   function summarizePayload(d) {
@@ -586,6 +588,11 @@
       if (!ready) return Promise.reject(new Error('Firebase is not configured.'));
       if (!auth) return Promise.reject(new Error('Firebase Auth is not ready.'));
       return auth.createUserWithEmailAndPassword(email, password);
+    },
+    resetPassword: function (email) {
+      if (!ready) return Promise.reject(new Error('Firebase is not configured.'));
+      if (!auth) return Promise.reject(new Error('Firebase Auth is not ready.'));
+      return auth.sendPasswordResetEmail(email);
     },
     signOut: function () {
       if (unsubSnap) { unsubSnap(); unsubSnap = null; }

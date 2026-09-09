@@ -2202,6 +2202,9 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         <a href="#rates" data-page="rates" class="sidebar-link flex items-center gap-3">
           <span>💱</span> Exchange Rates
         </a>
+        <a href="#" class="sidebar-link" data-page="services-expenses" onclick="navigate('services-expenses'); return false;">
+          <span>💼</span> Services &amp; Expenses
+        </a>
         <a href="#settings" data-page="settings" class="sidebar-link flex items-center gap-3">
           <span>⚙️</span> Settings
         </a>
@@ -2592,7 +2595,15 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         <!-- CLIENTS -->
         <section id="page-clients" class="page hidden">
           <div class="flex flex-col sm:flex-row sm:items-center justify-end gap-3 mb-5">
-            <button onclick="showClientForm()" class="btn-primary">+ Add Client</button>
+            <div class="flex flex-wrap gap-2 items-center">
+              <button type="button" class="btn-soft btn-compact" onclick="downloadClientsTemplate()">Template</button>
+              <button type="button" class="btn-soft btn-compact" onclick="exportClientsExcel()">Export CSV</button>
+              <label class="btn-soft btn-compact" style="cursor:pointer;margin:0">
+                Import CSV
+                <input type="file" accept=".csv,text/csv" class="hidden" onchange="onClientsCsvSelected(this)" />
+              </label>
+              <button onclick="showClientForm()" class="btn-primary">+ Add Client</button>
+            </div>
           </div>
           <div id="clients-list" class="entity-cards"></div>
         </section>
@@ -3290,6 +3301,82 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         </section>
 
         <!-- SETTINGS -->
+        
+        <!-- SERVICES & OFFICE EXPENSES -->
+        <section id="page-services-expenses" class="page hidden">
+          <div class="flex flex-col gap-5">
+            <div class="panel-soft p-4">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h3 class="font-semibold m-0">Services rendered to clients</h3>
+                <button type="button" class="btn-soft btn-compact" onclick="exportServicesCsv()">Export services CSV</button>
+              </div>
+              <form class="settings-form-grid mb-4" onsubmit="saveServiceRecord(event)">
+                <div>
+                  <label class="settings-label">Client</label>
+                  <select id="svc-client" class="settings-input w-full"></select>
+                </div>
+                <div>
+                  <label class="settings-label">Date</label>
+                  <input id="svc-date" type="date" class="settings-input w-full" required />
+                </div>
+                <div class="settings-span-2">
+                  <label class="settings-label">Service description *</label>
+                  <input id="svc-description" type="text" class="settings-input w-full" placeholder="e.g. Installation, training, maintenance visit" required />
+                </div>
+                <div>
+                  <label class="settings-label">Amount (₦)</label>
+                  <input id="svc-amount" type="number" min="0" step="0.01" class="settings-input w-full" placeholder="0.00" />
+                </div>
+                <div>
+                  <label class="settings-label">Notes</label>
+                  <input id="svc-notes" type="text" class="settings-input w-full" placeholder="Optional" />
+                </div>
+                <div class="settings-span-2">
+                  <button type="submit" class="btn-primary">Save service</button>
+                </div>
+              </form>
+              <div id="services-list" class="entity-cards stack-cards"></div>
+            </div>
+
+            <div class="panel-soft p-4">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h3 class="font-semibold m-0">Office expenditure</h3>
+                <button type="button" class="btn-soft btn-compact" onclick="exportExpensesCsv()">Export expenses CSV</button>
+              </div>
+              <form class="settings-form-grid mb-4" onsubmit="saveExpenseRecord(event)">
+                <div>
+                  <label class="settings-label">Category</label>
+                  <select id="exp-category" class="settings-input w-full"></select>
+                </div>
+                <div>
+                  <label class="settings-label">Date</label>
+                  <input id="exp-date" type="date" class="settings-input w-full" required />
+                </div>
+                <div class="settings-span-2">
+                  <label class="settings-label">Description *</label>
+                  <input id="exp-description" type="text" class="settings-input w-full" placeholder="e.g. Office rent, diesel, stationery" required />
+                </div>
+                <div>
+                  <label class="settings-label">Amount (₦)</label>
+                  <input id="exp-amount" type="number" min="0" step="0.01" class="settings-input w-full" placeholder="0.00" />
+                </div>
+                <div>
+                  <label class="settings-label">Paid to</label>
+                  <input id="exp-paidto" type="text" class="settings-input w-full" placeholder="Vendor or person" />
+                </div>
+                <div class="settings-span-2">
+                  <label class="settings-label">Notes</label>
+                  <input id="exp-notes" type="text" class="settings-input w-full" placeholder="Optional" />
+                </div>
+                <div class="settings-span-2">
+                  <button type="submit" class="btn-primary">Save expense</button>
+                </div>
+              </form>
+              <div id="expenses-list" class="entity-cards stack-cards"></div>
+            </div>
+          </div>
+        </section>
+
         <section id="page-settings" class="page hidden">
           <div class="settings-page">
             <!-- Company -->
@@ -3672,7 +3759,20 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         </div>
         <p id="auth-error" class="text-sm text-red-500 hidden"></p>
         <button type="submit" id="auth-submit" class="btn-primary btn-block">Sign in</button>
+        <p class="text-sm mt-2 mb-0 text-center">
+          <button type="button" class="auth-forgot-link" onclick="showForgotPassword()">Forgot password?</button>
+        </p>
       </form>
+      <div id="auth-forgot-panel" class="hidden space-y-3">
+        <div>
+          <label class="settings-label">Account email</label>
+          <input id="auth-forgot-email" type="email" class="settings-input w-full" placeholder="you@company.com" autocomplete="email" />
+        </div>
+        <p id="auth-forgot-error" class="text-sm text-red-500 hidden"></p>
+        <p id="auth-forgot-success" class="text-sm text-emerald-600 hidden"></p>
+        <button type="button" class="btn-primary btn-block" onclick="sendForgotPassword(event)">Send reset link</button>
+        <button type="button" class="btn-soft btn-block" onclick="hideForgotPassword()">Back to sign in</button>
+      </div>
       <p id="auth-config-hint" class="text-xs text-slate-500 mt-3 hidden">
         Firebase is not configured yet. Add your project keys to <code>firebase-config.js</code> (see README).
       </p>
