@@ -2499,7 +2499,16 @@ function openQuote(id) {
   document.getElementById('quote-status').value = q.status;
   document.getElementById('quote-notes').value = q.notes || '';
   document.getElementById('quote-discount').value = q.discount || 0;
-  if (document.getElementById('quote-discount-amt')) document.getElementById('quote-discount-amt').value = '0';
+  {
+    const amtEl = document.getElementById('quote-discount-amt');
+    const sub = Number(q.subtotalNGN) || 0;
+    let savedAmt = (q.discountAmount != null && q.discountAmount !== '')
+      ? Number(q.discountAmount)
+      : (sub * (Number(q.discount) || 0) / 100);
+    if (amtEl) amtEl.value = String(Math.round((savedAmt || 0) * 100) / 100);
+    window._discountMode = window._discountMode || {};
+    window._discountMode.quote = (q.discountMode === 'amt') ? 'amt' : 'pct';
+  }
 
   document.getElementById('quote-items-list').innerHTML = '';
   quoteItemCounter = 0;
@@ -2752,6 +2761,8 @@ function saveQuote() {
     status: document.getElementById('quote-status').value,
     notes: document.getElementById('quote-notes').value.trim(),
     discount,
+    discountAmount: disc.amt,
+    discountMode: (window._discountMode && window._discountMode.quote) || 'pct',
     items,
     subtotalNGN: subtotal,
     totalNGN,
@@ -3113,7 +3124,16 @@ function editInvoice(id) {
   document.getElementById('inv-due').value = (inv.dueDate || '').slice(0, 10);
   document.getElementById('inv-quote-ref').value = inv.quoteRef || '';
   document.getElementById('inv-discount').value = inv.discount || 0;
-  if (document.getElementById('inv-discount-amt')) document.getElementById('inv-discount-amt').value = '0';
+  {
+    const amtEl = document.getElementById('inv-discount-amt');
+    const sub = Number(inv.subtotalNgn) || 0;
+    let savedAmt = (inv.discountAmount != null && inv.discountAmount !== '')
+      ? Number(inv.discountAmount)
+      : (sub * (Number(inv.discount) || 0) / 100);
+    if (amtEl) amtEl.value = String(Math.round((savedAmt || 0) * 100) / 100);
+    window._discountMode = window._discountMode || {};
+    window._discountMode.invoice = (inv.discountMode === 'amt') ? 'amt' : 'pct';
+  }
   document.getElementById('inv-notes').value = inv.notes || '';
   const sf = document.getElementById('inv-show-footer');
   if (sf) sf.checked = inv.showFooter !== false;
@@ -3212,6 +3232,27 @@ function collectInvoiceItems() {
   return items;
 }
 
+
+/** Compact % for display only — does not change money figures */
+function formatDiscountPctLabel(pct) {
+  const n = Number(pct) || 0;
+  if (!n) return '0';
+  if (Math.abs(n - Math.round(n)) < 0.05) return String(Math.round(n));
+  return (Math.round(n * 10) / 10).toFixed(1).replace(/\.0$/, '');
+}
+
+function getSavedDiscountAmount(doc, subtotal) {
+  subtotal = Number(subtotal) || 0;
+  if (!doc) return 0;
+  if (doc.discountAmount != null && doc.discountAmount !== '') {
+    return Math.round(Number(doc.discountAmount) * 100) / 100;
+  }
+  if (doc.discountAmt != null && doc.discountAmt !== '') {
+    return Math.round(Number(doc.discountAmt) * 100) / 100;
+  }
+  const pct = Number(doc.discount) || 0;
+  return Math.round(subtotal * pct / 100 * 100) / 100;
+}
 
 /** Discount can be entered as % or ₦ amount.
  *  Mode 'amt' → total = subtotal − amount (exact remaining balance).
@@ -3343,7 +3384,7 @@ function saveInvoice() {
   });
   const items = collectInvoiceItems();
   if (!items.length) { alert('Add at least one line item.'); return; }
-  const { sub, total, discount } = recalcInvoiceTotal();
+  const { sub, total, discount, discountAmt } = recalcInvoiceTotal();
   const payload = {
     clientId,
     title: document.getElementById('inv-title')?.value.trim() || 'Invoice',
@@ -3354,6 +3395,8 @@ function saveInvoice() {
     notes: document.getElementById('inv-notes')?.value.trim() || '',
     showFooter: document.getElementById('inv-show-footer')?.checked !== false,
     discount,
+    discountAmount: discountAmt != null ? discountAmt : 0,
+    discountMode: (window._discountMode && window._discountMode.invoice) || 'pct',
     items,
     subtotalNgn: sub,
     totalNgn: total,
@@ -3421,6 +3464,14 @@ function createInvoiceFromQuote(quoteId) {
   document.getElementById('inv-title').value = q.title || 'Invoice';
   document.getElementById('inv-quote-ref').value = q.quoteNumber || '';
   document.getElementById('inv-discount').value = q.discount || 0;
+  {
+    const amtEl = document.getElementById('inv-discount-amt');
+    const sub = Number(q.subtotalNGN) || 0;
+    const savedAmt = (q.discountAmount != null) ? Number(q.discountAmount) : (sub * (Number(q.discount) || 0) / 100);
+    if (amtEl) amtEl.value = Math.round((savedAmt || 0) * 100) / 100;
+    window._discountMode = window._discountMode || {};
+    window._discountMode.invoice = q.discountMode === 'amt' ? 'amt' : 'pct';
+  }
   document.getElementById('inv-notes').value = q.notes || '';
   document.getElementById('inv-status').value = 'sent';
   const list = document.getElementById('invoice-items-list');
@@ -3761,9 +3812,13 @@ function generateInvoicePdf(inv) {
       return totalsRight - amountW - gap - doc.getTextWidth(label);
     };
     const leftEdge = drawTotalLine('Subtotal', subtotal, y, false);
-    if (discount > 0) {
+    const discountAmtPdf = (typeof getSavedDiscountAmount === 'function')
+      ? getSavedDiscountAmount(inv, subtotal)
+      : Math.round(subtotal * (Number(discount) || 0) / 100 * 100) / 100;
+    if (discountAmtPdf > 0.009 || (Number(discount) || 0) > 0) {
       y += 16;
-      drawTotalLine('Discount (' + discount + '% · ' + formatNairaPlain(subtotal * discount / 100) + ')', -(subtotal * discount / 100), y, false);
+      const pctLbl = formatDiscountPctLabel(discount);
+      drawTotalLine('Discount (' + pctLbl + '%)', -discountAmtPdf, y, false);
     }
     y += 10;
     doc.setDrawColor(...TEAL);
@@ -3946,7 +4001,7 @@ function printQuote() {
           <div style="display:flex;justify-content:space-between;padding:4px 0;">
             <span>Subtotal</span><span>${formatNGN(subtotal)}</span>
           </div>
-          ${discount > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Discount (${discount}%)</span><span>-${formatNGN(subtotal * discount / 100)}</span></div>` : ''}
+          ${(function(){ const a = (typeof getSavedDiscountAmount==='function') ? getSavedDiscountAmount({discount:discount, discountAmount: (document.getElementById('quote-discount-amt')&&document.getElementById('quote-discount-amt').value)}, subtotal) : subtotal*discount/100; return a>0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Discount (${formatDiscountPctLabel(discount)}%)</span><span>-${formatNGN(a)}</span></div>` : ''; })()}
           <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid #0f766e;font-weight:700;font-size:16px;color:#0f766e;">
             <span>TOTAL (NGN)</span><span>${formatNGN(total)}</span>
           </div>
@@ -6946,9 +7001,13 @@ function generateQuotePdf(q) {
       return totalsRight - amountW - 14 - doc.getTextWidth(label);
     };
     const qLeft = drawQTotal('Subtotal', subtotal, y, false);
-    if (discount > 0) {
+    const discountAmtPdf = (typeof getSavedDiscountAmount === 'function')
+      ? getSavedDiscountAmount(q, subtotal)
+      : Math.round(subtotal * (Number(discount) || 0) / 100 * 100) / 100;
+    if (discountAmtPdf > 0.009 || (Number(discount) || 0) > 0) {
       y += 14;
-      drawQTotal('Discount (' + discount + '% · ' + formatNairaPlain(subtotal * discount / 100) + ')', -(subtotal * discount / 100), y, false);
+      const pctLbl = formatDiscountPctLabel(discount);
+      drawQTotal('Discount (' + pctLbl + '%)', -discountAmtPdf, y, false);
     }
     y += 8;
     doc.setDrawColor(...TEAL);
