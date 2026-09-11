@@ -7529,7 +7529,8 @@ function buildApprovalDiff(payload, live) {
     { key: 'invoices', kind: 'invoice', label: 'Invoices' },
     { key: 'calendarEvents', kind: 'event', label: 'Events' },
     { key: 'services', kind: 'service', label: 'Services' },
-    { key: 'officeExpenses', kind: 'expense', label: 'Expenses' }
+    { key: 'officeExpenses', kind: 'expense', label: 'Expenses' },
+    { key: 'reportTableRows', kind: 'reportRow', label: 'Report rows' }
   ];
   const result = [];
   groups.forEach(function (g) {
@@ -7539,107 +7540,83 @@ function buildApprovalDiff(payload, live) {
     liveArr.forEach(function (x) { if (x && x.id) liveMap[x.id] = x; });
     const remoteMap = {};
     remoteArr.forEach(function (x) { if (x && x.id) remoteMap[x.id] = x; });
-    const added = [];
-    const updated = [];
-    const removed = [];
+    const items = [];
     Object.keys(remoteMap).forEach(function (id) {
-      if (!liveMap[id]) added.push(labelEntity(g.kind, remoteMap[id]));
-      else if (fingerprintEntity(g.kind, remoteMap[id]) !== fingerprintEntity(g.kind, liveMap[id])) {
-        updated.push(labelEntity(g.kind, remoteMap[id]));
+      if (!liveMap[id]) {
+        items.push({ key: g.key, id: id, action: 'add', label: labelEntity(g.kind, remoteMap[id]) });
+      } else if (fingerprintEntity(g.kind, remoteMap[id]) !== fingerprintEntity(g.kind, liveMap[id])) {
+        items.push({ key: g.key, id: id, action: 'update', label: labelEntity(g.kind, remoteMap[id]) });
       }
     });
     Object.keys(liveMap).forEach(function (id) {
-      if (!remoteMap[id]) removed.push(labelEntity(g.kind, liveMap[id]));
+      if (!remoteMap[id]) {
+        items.push({ key: g.key, id: id, action: 'remove', label: labelEntity(g.kind, liveMap[id]) });
+      }
     });
-    if (added.length || updated.length || removed.length) {
+    if (items.length) {
       result.push({
+        key: g.key,
         label: g.label,
         remoteCount: remoteArr.length,
         liveCount: liveArr.length,
-        added: added.slice(0, 30),
-        updated: updated.slice(0, 30),
-        removed: removed.slice(0, 30),
-        addedMore: Math.max(0, added.length - 30),
-        updatedMore: Math.max(0, updated.length - 30),
-        removedMore: Math.max(0, removed.length - 30)
+        items: items
       });
     }
   });
   return result;
 }
 
-function formatDiffSectionHtml(title, items, more, tone) {
-  if (!items || !items.length) return '';
-  const cls = tone === 'add' ? 'pending-diff-add' : (tone === 'remove' ? 'pending-diff-remove' : 'pending-diff-update');
-  return '<div class="pending-diff-block ' + cls + '">' +
-    '<div class="pending-diff-label">' + escHtml(title) + ' (' + (items.length + (more || 0)) + ')</div>' +
-    '<ul class="pending-diff-list">' +
-    items.map(function (n) { return '<li>' + escHtml(n) + '</li>'; }).join('') +
-    ((more > 0) ? '<li class="pending-diff-more">…and ' + more + ' more</li>' : '') +
-    '</ul></div>';
-}
-
 function formatPendingReviewHtml(p) {
   const payload = p.payload || {};
-  const d = p.details || {};
   const live = (typeof data !== 'undefined' && data) ? data : {};
   const diffs = buildApprovalDiff(payload, live);
+  const pid = p.id || '';
 
-  const counts = [
-    ['Clients', d.clients != null ? d.clients : (payload.clients || []).length],
-    ['Items', d.products != null ? d.products : (payload.products || []).length],
-    ['Quotes', d.quotes != null ? d.quotes : (payload.quotes || []).length],
-    ['Invoices', d.invoices != null ? d.invoices : (payload.invoices || []).length],
-    ['Events', d.events != null ? d.events : (payload.calendarEvents || []).length],
-    ['Services', d.services != null ? d.services : (payload.services || []).length],
-    ['Expenses', d.expenses != null ? d.expenses : (payload.officeExpenses || []).length]
-  ];
-
-  let countsHtml = '<div class="pending-counts">' + counts.map(function (c) {
-    return '<span>' + escHtml(c[0]) + ': <strong>' + c[1] + '</strong></span>';
-  }).join('') + '</div>';
-
-  let diffHtml = '';
-  if (diffs.length) {
-    diffHtml = '<div class="pending-diff-wrap">' +
-      '<div class="pending-diff-title">Changes vs current live data</div>' +
-      diffs.map(function (g) {
-        return '<div class="pending-diff-group">' +
-          '<div class="pending-diff-group-title">' + escHtml(g.label) +
-          ' <span class="pending-diff-meta">live ' + g.liveCount + ' → proposed ' + g.remoteCount + '</span></div>' +
-          formatDiffSectionHtml('Added', g.added, g.addedMore, 'add') +
-          formatDiffSectionHtml('Updated', g.updated, g.updatedMore, 'update') +
-          formatDiffSectionHtml('Removed', g.removed, g.removedMore, 'remove') +
-          '</div>';
-      }).join('') +
-      '</div>';
-  } else {
-    diffHtml = '<p class="pending-diff-empty text-sm">No field-level differences detected vs your current data (counts may still differ if only order/timestamps changed).</p>';
+  if (!diffs.length) {
+    return '<p class="pending-diff-empty text-sm">No field-level differences vs your current live data. You can still approve the full submission or reject it.</p>';
   }
 
-  function listBlock(title, arr) {
-    arr = arr || [];
-    if (!arr.length) return '';
-    return '<div class="pending-detail-block"><span class="pending-detail-label">' + escHtml(title) + '</span>' +
-      '<ul class="pending-detail-list">' + arr.map(function (n) {
-        return '<li>' + escHtml(n) + '</li>';
-      }).join('') + '</ul></div>';
-  }
+  let html = '<div class="pending-diff-wrap">' +
+    '<div class="pending-diff-title">Select changes to approve</div>' +
+    '<div class="pending-select-actions">' +
+    '<button type="button" class="btn-soft btn-compact" onclick="approvalSelectAll(\'' + pid + '\', true)">Select all</button> ' +
+    '<button type="button" class="btn-soft btn-compact" onclick="approvalSelectAll(\'' + pid + '\', false)">Clear</button>' +
+    '</div>';
 
-  const snapshot =
-    listBlock('Clients in proposal', d.clientNames) +
-    listBlock('Inventory in proposal', d.productNames) +
-    listBlock('Quotes in proposal', d.quoteNames) +
-    listBlock('Invoices in proposal', d.invoiceNames) +
-    listBlock('Events in proposal', d.eventNames) +
-    listBlock('Services in proposal', d.serviceNames) +
-    listBlock('Expenses in proposal', d.expenseNames);
+  diffs.forEach(function (g) {
+    html += '<div class="pending-diff-group">' +
+      '<div class="pending-diff-group-title">' + escHtml(g.label) +
+      ' <span class="pending-diff-meta">live ' + g.liveCount + ' → proposed ' + g.remoteCount + '</span></div>';
+    g.items.forEach(function (it) {
+      const tone = it.action === 'add' ? 'add' : (it.action === 'remove' ? 'remove' : 'update');
+      const actionLbl = it.action === 'add' ? 'Add' : (it.action === 'remove' ? 'Remove' : 'Update');
+      const val = encodeURIComponent(JSON.stringify({ key: it.key, id: it.id, action: it.action }));
+      html += '<label class="pending-check-row pending-diff-' + tone + '">' +
+        '<input type="checkbox" class="pending-item-check" data-pending="' + escHtml(pid) + '" value="' + val + '" checked />' +
+        '<span class="pending-check-action">' + actionLbl + '</span>' +
+        '<span class="pending-check-label">' + escHtml(it.label) + '</span>' +
+        '</label>';
+    });
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
 
-  return countsHtml + diffHtml +
-    '<details class="pending-details-expand">' +
-    '<summary>View full content snapshot in this submission</summary>' +
-    '<div class="pending-details-body">' + (snapshot || '<p class="text-sm">No named items listed.</p>') + '</div>' +
-    '</details>';
+function approvalSelectAll(pendingId, on) {
+  document.querySelectorAll('.pending-item-check[data-pending="' + pendingId + '"]').forEach(function (cb) {
+    cb.checked = !!on;
+  });
+}
+
+function getSelectedApprovalItems(pendingId) {
+  const out = [];
+  document.querySelectorAll('.pending-item-check[data-pending="' + pendingId + '"]:checked').forEach(function (cb) {
+    try {
+      out.push(JSON.parse(decodeURIComponent(cb.value)));
+    } catch (e) {}
+  });
+  return out;
 }
 
 function renderApprovalsPanel() {
@@ -7666,8 +7643,9 @@ function renderApprovalsPanel() {
   list.innerHTML = pending.map(function (p) {
     const actions = isAdmin
       ? ('<div class="team-pending-actions">' +
-         '<button type="button" class="btn-primary btn-compact" onclick="teamApprovePending(\'' + p.id + '\')">Approve &amp; publish</button> ' +
-         '<button type="button" class="btn-soft" onclick="teamRejectPending(\'' + p.id + '\')">Reject</button></div>')
+         '<button type="button" class="btn-primary btn-compact" onclick="teamApprovePending(\'' + p.id + '\')">Approve selected</button> ' +
+         '<button type="button" class="btn-soft btn-compact" onclick="teamApprovePending(\'' + p.id + '\', true)">Approve all</button> ' +
+         '<button type="button" class="btn-soft" onclick="teamRejectPending(\'' + p.id + '\')">Reject all</button></div>')
       : '<span class="text-xs text-slate-500">Waiting for admin review</span>';
     return '<div class="team-pending-card">' +
       '<div class="select-row-title">' + escHtml(p.byEmail || p.byUid || 'Staff') + '</div>' +
@@ -7678,40 +7656,24 @@ function renderApprovalsPanel() {
   }).join('');
 }
 
-async function teamCreateInvite() {
-  const cloud = window.MedicanoCloud;
-  if (!cloud || !cloud.createInvite) return;
-  const email = document.getElementById('team-invite-email')?.value || '';
-  const role = document.getElementById('team-invite-role')?.value || 'staff';
-  const out = document.getElementById('team-invite-result');
-  try {
-    const code = await cloud.createInvite(email, role);
-    if (out) out.innerHTML = 'Invite code: <strong style="letter-spacing:0.08em">' + escHtml(code) + '</strong> — share with your colleague after they create an account and sign in.';
-  } catch (e) {
-    if (out) out.textContent = (e && e.message) ? e.message : String(e);
-  }
-}
-
-async function teamJoinCode() {
-  const cloud = window.MedicanoCloud;
-  if (!cloud || !cloud.joinWithCode) return;
-  const code = document.getElementById('team-join-code')?.value || '';
-  try {
-    await cloud.joinWithCode(code);
-    alert('Joined team. Shared workspace will load.');
-    renderTeamPanel();
-  } catch (e) {
-    alert((e && e.message) ? e.message : String(e));
-  }
-}
-
-async function teamApprovePending(id) {
+async function teamApprovePending(id, approveAll) {
   const cloud = window.MedicanoCloud;
   if (!cloud || !cloud.approvePending) return;
-  if (!confirm('Approve this change and publish it for everyone?')) return;
+  let selection = null;
+  if (!approveAll) {
+    selection = getSelectedApprovalItems(id);
+    if (!selection.length) {
+      alert('Select at least one change to approve, or use “Approve all”.');
+      return;
+    }
+  }
+  const msg = approveAll
+    ? 'Approve the entire submission and publish for everyone?'
+    : ('Approve ' + selection.length + ' selected change(s) and publish?');
+  if (!confirm(msg)) return;
   try {
-    await cloud.approvePending(id);
-    alert('Approved and published to the team.');
+    await cloud.approvePending(id, selection);
+    alert(approveAll ? 'Full submission approved and published.' : (selection.length + ' change(s) approved and published.'));
     renderApprovalsPanel();
   } catch (e) {
     alert((e && e.message) ? e.message : String(e));

@@ -665,30 +665,146 @@
     return code;
   }
 
-  async function approvePending(id) {
+  /** Apply only selected staff changes onto live workspace.
+   *  selection: null/undefined = full payload; else [{ key, id, action: 'add'|'update'|'remove' }]
+   */
+  function buildPartialApprovalPayload(live, proposed, selection) {
+    live = live || {};
+    proposed = proposed || {};
+    if (!selection || !selection.length) {
+      // Full approve: merge proposed into live (keeps admin-only records not in proposal)
+      return typeof mergeWorkspacePayloads === 'function'
+        ? mergeWorkspacePayloads(live, proposed)
+        : proposed;
+    }
+    var out = JSON.parse(JSON.stringify(live));
+    if (!out.deletedRecords || typeof out.deletedRecords !== 'object') out.deletedRecords = {};
+    selection.forEach(function (sel) {
+      if (!sel || !sel.key || !sel.id) return;
+      var key = sel.key;
+      var id = String(sel.id);
+      var action = sel.action || 'update';
+      if (!Array.isArray(out[key])) out[key] = [];
+      if (action === 'remove') {
+        out[key] = out[key].filter(function (x) { return !x || String(x.id) !== id; });
+        out.deletedRecords[id] = { at: new Date().toISOString(), kind: key };
+      } else {
+        var item = null;
+        (proposed[key] || []).forEach(function (x) {
+          if (x && String(x.id) === id) item = x;
+        });
+        if (!item) return;
+        var idx = -1;
+        out[key].forEach(function (x, i) {
+          if (x && String(x.id) === id) idx = i;
+        });
+        if (idx >= 0) out[key][idx] = item;
+        else out[key].push(item);
+        // If it was previously deleted, clear tombstone so it can live again
+        if (out.deletedRecords[id]) delete out.deletedRecords[id];
+      }
+    });
+    return out;
+  }
+
+  async function approvePending(id, selection) {
     if (memberRole !== 'admin' || !orgId) throw new Error('Admin only.');
     const ref = pendingCol(orgId).doc(id);
     const snap = await ref.get();
     if (!snap.exists) throw new Error('Request not found.');
     const d = snap.data();
     if (d.status !== 'pending') throw new Error('Already handled.');
-    const payload = d.payload;
-    if (!payload) throw new Error('Empty proposal.');
+    const proposed = d.payload;
+    if (!proposed) throw new Error('Empty proposal.');
+
+    // Live workspace
+    var live = {};
+    try {
+      const liveSnap = await orgWorkspaceRef(orgId).get();
+      if (liveSnap.exists && liveSnap.data() && liveSnap.data().payload) {
+        live = liveSnap.data().payload;
+        if (typeof live === 'string') live = JSON.parse(live);
+      }
+    } catch (eL) {
+      console.warn(eL);
+    }
+    // Prefer in-memory admin data as live base when available
+    var localSrc = (typeof window.getAppData === 'function' ? window.getAppData() : window.data) || {};
+    if (localSrc && (localSrc.clients || localSrc.products || localSrc.invoices)) {
+      live = typeof mergeWorkspacePayloads === 'function'
+        ? mergeWorkspacePayloads(live, localSrc)
+        : localSrc;
+    }
+
+    var payload = buildPartialApprovalPayload(live, proposed, selection);
     const updatedAt = new Date().toISOString();
     payload.updatedAt = updatedAt;
+    lastPushUpdatedAt = updatedAt;
+
     await orgWorkspaceRef(orgId).set({
       updatedAt: updatedAt,
       email: auth.currentUser.email || '',
       recordCount: countRecords(payload),
       payload: payload,
       lastApprovedFrom: id,
-      lastApprovedBy: auth.currentUser.uid
+      lastApprovedBy: auth.currentUser.uid,
+      lastApprovalMode: (selection && selection.length) ? 'partial' : 'full'
     }, { merge: false });
-    await ref.set({
-      status: 'approved',
-      resolvedAt: updatedAt,
-      resolvedBy: auth.currentUser.uid
-    }, { merge: true });
+
+    // Partial approve: keep pending so admin can continue with remaining items
+    if (selection && selection.length) {
+      // Update proposed payload: remove approved items from pending proposal
+      var remaining = JSON.parse(JSON.stringify(proposed));
+      var approvedIds = {};
+      selection.forEach(function (s) {
+        if (s && s.id) approvedIds[String(s.id)] = s;
+      });
+      ['clients','products','quotes','invoices','calendarEvents','services','officeExpenses','reportTableRows'].forEach(function (k) {
+        if (!Array.isArray(remaining[k])) return;
+        remaining[k] = remaining[k].filter(function (x) {
+          if (!x || !x.id) return true;
+          var sel = approvedIds[String(x.id)];
+          if (!sel) return true;
+          // approved add/update → drop from pending
+          if (sel.action === 'add' || sel.action === 'update') return false;
+          return true;
+        });
+      });
+      // For removals approved, the live data already dropped them; nothing to keep in pending
+      var stillHas = countRecords(remaining) > 0;
+      // Also check if any remove actions remain unselected
+      var stillDiff = false;
+      try {
+        // simple check: if remaining lists differ from live for any id
+        stillDiff = stillHas;
+      } catch (e) {}
+
+      if (stillDiff) {
+        await ref.set({
+          payload: remaining,
+          summary: summarizePayload(remaining),
+          recordCount: countRecords(remaining),
+          details: buildPendingDetails(remaining),
+          lastPartialAt: updatedAt,
+          status: 'pending'
+        }, { merge: true });
+      } else {
+        await ref.set({
+          status: 'approved',
+          resolvedAt: updatedAt,
+          resolvedBy: auth.currentUser.uid,
+          approvalMode: 'partial-complete'
+        }, { merge: true });
+      }
+    } else {
+      await ref.set({
+        status: 'approved',
+        resolvedAt: updatedAt,
+        resolvedBy: auth.currentUser.uid,
+        approvalMode: 'full'
+      }, { merge: true });
+    }
+
     await applyRemotePayload({ updatedAt: updatedAt, payload: payload }, { force: true });
     status('Approved & published', 'online');
     return true;
