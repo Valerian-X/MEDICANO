@@ -2566,18 +2566,16 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               <select id="product-category-filter" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
                 <option value="">All Categories</option>
               </select>
+              <select id="product-sort" class="btn-soft btn-compact list-sort-select" onchange="renderProducts()" title="Sort items" aria-label="Sort items">
+                <option value="name-asc">Name A–Z</option>
+                <option value="name-desc">Name Z–A</option>
+                <option value="modified-desc">Recently modified</option>
+                <option value="stock-asc">Stock (low → high)</option>
+                <option value="stock-desc">Stock (high → low)</option>
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
               <button onclick="showProductForm()" class="btn-primary">+ Add Item</button>
-              <label class="filter-date-field" style="min-width:9rem">
-                <span class="filter-date-label">Sort</span>
-                <select id="product-sort" class="filter-control" onchange="renderProducts()">
-                  <option value="name-asc">Name A–Z</option>
-                  <option value="name-desc">Name Z–A</option>
-                  <option value="modified-desc">Recently modified</option>
-                  <option value="stock-asc">Stock (low → high)</option>
-                  <option value="stock-desc">Stock (high → low)</option>
-                  <option value="newest">Newest first</option>
-                </select>
-              </label>
             </div>
             <div class="select-stack" style="max-width:100%">
               <label class="select-row" style="border-radius:1.1rem;cursor:pointer">
@@ -2618,16 +2616,13 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 Import CSV
                 <input type="file" accept=".csv,text/csv" class="hidden" onchange="onClientsCsvSelected(this)" />
               </label>
-              <label class="filter-date-field" style="min-width:9rem">
-                <span class="filter-date-label">Sort</span>
-                <select id="client-sort" class="filter-control" onchange="renderClients()">
-                  <option value="name-asc">Name A–Z</option>
-                  <option value="name-desc">Name Z–A</option>
-                  <option value="modified-desc">Recently modified</option>
-                  <option value="newest">Newest first</option>
-                  <option value="oldest">Oldest first</option>
-                </select>
-              </label>
+              <select id="client-sort" class="btn-soft btn-compact list-sort-select" onchange="renderClients()" title="Sort clients" aria-label="Sort clients">
+                <option value="name-asc">Name A–Z</option>
+                <option value="name-desc">Name Z–A</option>
+                <option value="modified-desc">Recently modified</option>
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
               <button onclick="showClientForm()" class="btn-primary">+ Add Client</button>
             </div>
           </div>
@@ -3062,9 +3057,8 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                 </select>
               </label>
               <label class="filter-date-field">
-                <span class="filter-date-label">Sort</span>
-                <select id="report-sort" class="filter-control filter-status-select"
-                  onchange="renderTransactionReport()">
+                <select id="report-sort" class="filter-control filter-status-select list-sort-select"
+                  onchange="renderTransactionReport()" title="Sort" aria-label="Sort">
                   <option value="date-desc">Date (newest)</option>
                   <option value="date-asc">Date (oldest)</option>
                   <option value="amount-desc">Amount (high → low)</option>

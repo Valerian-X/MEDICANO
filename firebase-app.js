@@ -164,6 +164,10 @@
     const localUpdated = localSrc.updatedAt || '';
     const remoteUpdated = remote.updatedAt || (remote.payload && remote.payload.updatedAt) || '';
 
+    // Ignore echo of a push this device just made
+    if (!force && remoteUpdated && lastPushUpdatedAt && remoteUpdated === lastPushUpdatedAt) {
+      return Promise.resolve(false);
+    }
     if (!force && remoteUpdated && localUpdated && remoteUpdated < localUpdated) {
       return Promise.resolve(false);
     }
@@ -178,8 +182,15 @@
           return;
         }
 
-        var localSrc2 = (typeof window.getAppData === 'function' ? window.getAppData() : window.data);
-        // Always keep this device's username — never take username from cloud
+        var localSrc2 = (typeof window.getAppData === 'function' ? window.getAppData() : window.data) || {};
+
+        // Multi-device: merge instead of replace so neither side loses records
+        if (localSrc2 && (localSrc2.clients || localSrc2.products || localSrc2.invoices || localSrc2.quotes || localSrc2.services)) {
+          if (typeof mergeWorkspacePayloads === 'function') {
+            payload = mergeWorkspacePayloads(localSrc2, payload);
+          }
+        }
+
         var localName = '';
         try {
           localName = (localSrc2 && localSrc2.userProfile && localSrc2.userProfile.username) || '';
@@ -262,64 +273,186 @@
     return { orgId: oid, role: 'admin' };
   }
 
+  var lastPushUpdatedAt = '';
+  var pushInFlight = false;
+
+  function entityTs(x) {
+    if (!x) return 0;
+    var c = x.updatedAt || x.createdAt || x.date || '';
+    if (!c) {
+      var m = String(x.id || '').match(/(\d{10,13})/);
+      if (m) {
+        var n = Number(m[1]);
+        return n > 1e12 ? n : (n > 1e9 ? n * 1000 : 0);
+      }
+      return 0;
+    }
+    if (typeof c === 'number') return c < 1e12 ? c * 1000 : c;
+    var t = new Date(c).getTime();
+    return isNaN(t) ? 0 : t;
+  }
+
+  function mergeById(localArr, remoteArr) {
+    var map = {};
+    (remoteArr || []).forEach(function (x) {
+      if (x && x.id != null) map[String(x.id)] = x;
+    });
+    (localArr || []).forEach(function (x) {
+      if (!x || x.id == null) return;
+      var id = String(x.id);
+      var prev = map[id];
+      if (!prev) map[id] = x;
+      else map[id] = entityTs(x) >= entityTs(prev) ? x : prev;
+    });
+    return Object.keys(map).map(function (k) { return map[k]; });
+  }
+
+  function maxIso(a, b) {
+    a = a || '';
+    b = b || '';
+    return a >= b ? a : b;
+  }
+
+  function mergeWorkspacePayloads(local, remote) {
+    local = local || {};
+    remote = remote || {};
+    var out = {};
+    var localNewer = (local.updatedAt || '') >= (remote.updatedAt || '');
+    var base = localNewer ? local : remote;
+    var other = localNewer ? remote : local;
+    Object.keys(other).forEach(function (k) { out[k] = other[k]; });
+    Object.keys(base).forEach(function (k) { out[k] = base[k]; });
+
+    var listKeys = [
+      'clients', 'products', 'quotes', 'invoices', 'calendarEvents',
+      'services', 'officeExpenses', 'stockMovements', 'reportTableRows',
+      'noteTemplates'
+    ];
+    listKeys.forEach(function (k) {
+      if (Array.isArray(local[k]) || Array.isArray(remote[k])) {
+        out[k] = mergeById(local[k], remote[k]);
+      }
+    });
+    // categories are strings
+    if (Array.isArray(local.categories) || Array.isArray(remote.categories)) {
+      var set = {};
+      (remote.categories || []).forEach(function (c) { if (c) set[c] = true; });
+      (local.categories || []).forEach(function (c) { if (c) set[c] = true; });
+      out.categories = Object.keys(set).sort();
+    }
+
+    if ((remote.updatedAt || '') > (local.updatedAt || '')) {
+      if (remote.company) out.company = remote.company;
+      if (remote.settings) out.settings = remote.settings;
+      if (remote.rates) out.rates = remote.rates;
+      if (remote.numbering) out.numbering = remote.numbering;
+    } else {
+      if (local.company) out.company = local.company;
+      if (local.settings) out.settings = local.settings;
+      if (local.rates) out.rates = local.rates;
+      if (local.numbering) out.numbering = local.numbering;
+    }
+
+    out.userProfile = (local.userProfile && typeof local.userProfile === 'object')
+      ? local.userProfile
+      : (remote.userProfile || { username: '' });
+    out.deviceProfile = local.deviceProfile || remote.deviceProfile || out.deviceProfile;
+    out.updatedAt = maxIso(local.updatedAt, remote.updatedAt);
+    return out;
+  }
+
   async function pushWorkspace() {
     if (!ready || !auth || !auth.currentUser || !db || !orgId) {
       return { ok: false, reason: 'not-ready' };
     }
     if (applyingRemote) return { ok: false, reason: 'applying-remote' };
+    if (pushInFlight) return { ok: false, reason: 'push-in-flight' };
+    pushInFlight = true;
+    try {
+      const src = (typeof window.getAppData === 'function' ? window.getAppData() : window.data) || window.data;
+      if (!src) return { ok: false, reason: 'no-data' };
 
-    const src = (typeof window.getAppData === 'function' ? window.getAppData() : window.data) || window.data;
-    const payload = cloudSafePayload(src);
-    if (!payload) return { ok: false, reason: 'no-data' };
-    payload.updatedAt = new Date().toISOString();
-    if (src) src.updatedAt = payload.updatedAt;
-    if (typeof window.saveDataLocalOnly === 'function') window.saveDataLocalOnly();
+      var working = src;
+      // Admin multi-device: merge with current cloud before publish
+      if (memberRole === 'admin') {
+        try {
+          const remoteSnap = await orgWorkspaceRef(orgId).get();
+          if (remoteSnap.exists) {
+            var rd = remoteSnap.data() || {};
+            var remotePayload = rd.payload;
+            if (typeof remotePayload === 'string') {
+              try { remotePayload = JSON.parse(remotePayload); } catch (eP) { remotePayload = null; }
+            }
+            if (remotePayload && typeof remotePayload === 'object') {
+              working = mergeWorkspacePayloads(src, remotePayload);
+              if (src.userProfile) working.userProfile = src.userProfile;
+              if (typeof window.applyCloudData === 'function') {
+                applyingRemote = true;
+                try { window.applyCloudData(working); }
+                finally { applyingRemote = false; }
+              }
+            }
+          }
+        } catch (eFetch) {
+          console.warn('pre-push fetch', eFetch);
+        }
+      }
 
-    const meta = {
-      updatedAt: payload.updatedAt,
-      email: auth.currentUser.email || '',
-      recordCount: countRecords(payload),
-      payload: payload
-    };
+      const payload = cloudSafePayload(working);
+      if (!payload) return { ok: false, reason: 'no-data' };
+      payload.updatedAt = new Date().toISOString();
+      if (working) working.updatedAt = payload.updatedAt;
+      if (src) src.updatedAt = payload.updatedAt;
+      if (typeof window.saveDataLocalOnly === 'function') window.saveDataLocalOnly();
 
-    // Admin → live workspace
-    if (memberRole === 'admin') {
-      status('Publishing…', 'syncing');
+      const meta = {
+        updatedAt: payload.updatedAt,
+        email: auth.currentUser.email || '',
+        recordCount: countRecords(payload),
+        payload: payload
+      };
+
+      if (memberRole === 'admin') {
+        status('Publishing…', 'syncing');
+        try {
+          lastPushUpdatedAt = payload.updatedAt;
+          await orgWorkspaceRef(orgId).set(meta, { merge: false });
+          status('Synced · Admin · ' + (auth.currentUser.email || ''), 'online');
+          return { ok: true, mode: 'published' };
+        } catch (e) {
+          console.error(e);
+          status(permissionMsg(e), 'error');
+          return { ok: false, error: e };
+        }
+      }
+
+      // Staff → pending
+      status('Submitting for approval…', 'syncing');
       try {
-        await orgWorkspaceRef(orgId).set(meta, { merge: false });
-        status('Synced · Admin · ' + (auth.currentUser.email || ''), 'online');
-        return { ok: true, mode: 'published' };
+        const id = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+        await pendingCol(orgId).doc(id).set({
+          id: id,
+          status: 'pending',
+          byUid: auth.currentUser.uid,
+          byEmail: auth.currentUser.email || '',
+          createdAt: new Date().toISOString(),
+          summary: summarizePayload(payload),
+          recordCount: countRecords(payload),
+          details: buildPendingDetails(payload),
+          payload: payload
+        });
+        status('Submitted · waiting for admin · ' + (auth.currentUser.email || ''), 'online');
+        if (typeof window.renderApprovalsPanel === 'function') {
+          try { window.renderApprovalsPanel(); } catch (e2) {}
+        }
+        return { ok: true, mode: 'pending', id: id };
       } catch (e) {
         console.error(e);
         status(permissionMsg(e), 'error');
         return { ok: false, error: e };
       }
-    }
-
-    // Staff → pending proposal (does not update live workspace)
-    status('Submitting for approval…', 'syncing');
-    try {
-      const id = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
-      await pendingCol(orgId).doc(id).set({
-        id: id,
-        status: 'pending',
-        byUid: auth.currentUser.uid,
-        byEmail: auth.currentUser.email || '',
-        createdAt: new Date().toISOString(),
-        summary: summarizePayload(payload),
-        recordCount: countRecords(payload),
-        details: buildPendingDetails(payload),
-        payload: payload
-      });
-      status('Submitted · waiting for admin · ' + (auth.currentUser.email || ''), 'online');
-      if (typeof window.renderApprovalsPanel === 'function') {
-        try { window.renderApprovalsPanel(); } catch (e2) {}
-      }
-      return { ok: true, mode: 'pending', id: id };
-    } catch (e) {
-      console.error(e);
-      status(permissionMsg(e), 'error');
-      return { ok: false, error: e };
+    } finally {
+      pushInFlight = false;
     }
   }
 
@@ -344,11 +477,16 @@
       const ref = orgWorkspaceRef(orgId);
       const snap = await ref.get();
       if (snap.exists) {
+        // force so first login always merges remote; merge keeps local-only records
         await applyRemotePayload(snap.data(), { force: true });
         status(
           (memberRole === 'admin' ? 'Synced · Admin · ' : 'Synced · Staff · ') + (user.email || ''),
           'online'
         );
+        // After login, admin republishes merge so other devices see this device's offline work
+        if (memberRole === 'admin') {
+          try { await pushWorkspace(); } catch (eP) { console.warn(eP); }
+        }
       } else if (memberRole === 'admin') {
         await pushWorkspace();
       } else {
@@ -357,8 +495,11 @@
 
       if (unsubSnap) unsubSnap();
       unsubSnap = ref.onSnapshot(function (s) {
-        if (!s.exists || applyingRemote) return;
-        applyRemotePayload(s.data(), { force: false });
+        if (!s.exists || applyingRemote || pushInFlight) return;
+        var d = s.data() || {};
+        // Skip echo of our own push
+        if (d.updatedAt && lastPushUpdatedAt && d.updatedAt === lastPushUpdatedAt) return;
+        applyRemotePayload(d, { force: false });
       }, function (err) {
         console.error(err);
         status('Sync failed', 'error');
@@ -538,10 +679,11 @@
     try {
       if (!orgId) await ensureOrgForUser(auth.currentUser);
       const snap = await orgWorkspaceRef(orgId).get();
+      // Merge cloud into local (do not wipe newer local records)
       if (snap.exists) {
         await applyRemotePayload(snap.data(), { force: true });
       }
-      // Admin can also publish current local if desired
+      // Admin publishes merged result so all devices share the combined state
       if (memberRole === 'admin') {
         await pushWorkspace();
       }

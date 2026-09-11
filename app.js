@@ -774,6 +774,14 @@ function loadData() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       data = JSON.parse(raw);
+
+      // Backfill timestamps so sort by newest/modified works
+      (data.clients || []).forEach(function (c) {
+        /* timestamps filled by ensureEntityTimestamps below */
+      });
+      (data.products || []).forEach(function (p) {
+        /* timestamps filled by ensureEntityTimestamps below */
+      });
       // Ensure structure
       if (!data.rates) data.rates = DEFAULT_DATA.rates;
       if (!data.rates.mode) data.rates.mode = 'manual';
@@ -843,6 +851,12 @@ function loadData() {
         if (q.followUpDone == null) q.followUpDone = false;
       });
       // Ensure every product has stock / lowStock numbers
+      if (typeof ensureEntityTimestamps === 'function') {
+        ensureEntityTimestamps(data.clients);
+        ensureEntityTimestamps(data.products);
+        ensureEntityTimestamps(data.quotes);
+        ensureEntityTimestamps(data.invoices);
+      }
       data.products.forEach(p => {
         if (typeof p.stock !== 'number' || isNaN(p.stock)) p.stock = 0;
         if (typeof p.lowStock !== 'number' || isNaN(p.lowStock)) p.lowStock = 1;
@@ -1534,6 +1548,59 @@ function updateRatesDisplay() {
 }
 
 // -------------------- Products --------------------
+
+/** Reliable timestamp for sorting (ISO dates, then id digits) */
+function entityTimestamp(obj, prefer) {
+  if (!obj) return 0;
+  const order = prefer === 'created'
+    ? [obj.createdAt, obj.updatedAt, obj.date, obj.created_at, obj.updated_at]
+    : [obj.updatedAt, obj.createdAt, obj.date, obj.updated_at, obj.created_at];
+  for (let i = 0; i < order.length; i++) {
+    const c = order[i];
+    if (c == null || c === '') continue;
+    // numeric epoch
+    if (typeof c === 'number' && c > 0) return c < 1e12 ? c * 1000 : c;
+    const t = new Date(c).getTime();
+    if (!isNaN(t) && t > 0) return t;
+  }
+  // Extract timestamp-like digits from id (c173… / inv173… / p173…)
+  const id = String(obj.id || '');
+  const m = id.match(/(\d{10,13})/);
+  if (m) {
+    let n = Number(m[1]);
+    if (n > 1e12) return n;
+    if (n > 1e9) return n * 1000;
+  }
+  // Last resort: stable hash from id so items aren't all "0"
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = ((h << 5) - h) + id.charCodeAt(i);
+  return Math.abs(h) % 1e9;
+}
+
+/** Backfill createdAt/updatedAt so newest / oldest / modified sorts work */
+function ensureEntityTimestamps(arr) {
+  if (!Array.isArray(arr)) return;
+  const n = arr.length;
+  arr.forEach((x, i) => {
+    if (!x || typeof x !== 'object') return;
+    const hasC = !!(x.createdAt || x.created_at);
+    const hasU = !!(x.updatedAt || x.updated_at);
+    if (!hasC && !hasU) {
+      const fromId = entityTimestamp(x, 'created');
+      // Prefer id-derived time when it looks like a real epoch; else staggered synthetic times
+      const looksReal = fromId > 1e11;
+      const iso = looksReal
+        ? new Date(fromId).toISOString()
+        : new Date(Date.now() - (n - i) * 3600000).toISOString();
+      x.createdAt = iso;
+      x.updatedAt = iso;
+    } else {
+      if (!x.createdAt) x.createdAt = x.created_at || x.updatedAt || x.updated_at;
+      if (!x.updatedAt) x.updatedAt = x.updated_at || x.createdAt || x.created_at;
+    }
+  });
+}
+
 function renderProducts() {
   const search = (document.getElementById('product-search')?.value || '').toLowerCase();
   const cat = document.getElementById('product-category-filter')?.value || '';
@@ -1548,7 +1615,8 @@ function renderProducts() {
     filterEl.value = currentVal;
   }
 
-  let list = data.products.filter(p => {
+  if (typeof ensureEntityTimestamps === 'function') ensureEntityTimestamps(data.products);
+  let list = (data.products || []).filter(p => {
     const matchSearch = !search || (p.name || '').toLowerCase().includes(search) || (p.sku || '').toLowerCase().includes(search) || (p.description || '').toLowerCase().includes(search);
     const matchCat = !cat || p.category === cat;
     return matchSearch && matchCat;
@@ -1556,10 +1624,20 @@ function renderProducts() {
   const sortKey = document.getElementById('product-sort')?.value || 'name-asc';
   list.sort((a, b) => {
     if (sortKey === 'name-desc') return (b.name || '').localeCompare(a.name || '');
-    if (sortKey === 'modified-desc') return String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''));
+    if (sortKey === 'modified-desc') {
+      const d = entityTimestamp(b, 'modified') - entityTimestamp(a, 'modified');
+      return d !== 0 ? d : (a.name || '').localeCompare(b.name || '');
+    }
     if (sortKey === 'stock-asc') return (Number(a.stock) || 0) - (Number(b.stock) || 0);
     if (sortKey === 'stock-desc') return (Number(b.stock) || 0) - (Number(a.stock) || 0);
-    if (sortKey === 'newest') return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    if (sortKey === 'newest') {
+      const d = entityTimestamp(b, 'created') - entityTimestamp(a, 'created');
+      return d !== 0 ? d : (a.name || '').localeCompare(b.name || '');
+    }
+    if (sortKey === 'oldest') {
+      const d = entityTimestamp(a, 'created') - entityTimestamp(b, 'created');
+      return d !== 0 ? d : (a.name || '').localeCompare(b.name || '');
+    }
     return (a.name || '').localeCompare(b.name || '');
   });
 
@@ -1718,6 +1796,8 @@ function clearProductImage() {
 function saveProduct(e) {
   e.preventDefault();
   const id = document.getElementById('product-id').value;
+  const nowIso = new Date().toISOString();
+  const prev = id ? (data.products || []).find(p => p.id === id) : null;
   const item = {
     id: id || uid(),
     sku: document.getElementById('p-sku').value.trim(),
@@ -1731,7 +1811,9 @@ function saveProduct(e) {
     stock: parseInt(document.getElementById('p-stock').value) || 0,
     lowStock: parseInt(document.getElementById('p-low').value) || 0,
     active: document.getElementById('p-active').checked,
-    image: document.getElementById('p-image-data').value || ''
+    image: document.getElementById('p-image-data').value || '',
+    createdAt: (prev && prev.createdAt) ? prev.createdAt : nowIso,
+    updatedAt: nowIso
   };
 
   if (id) {
@@ -2205,13 +2287,23 @@ function exportStockMovementsCsv() {
 
 // -------------------- Clients --------------------
 function renderClients() {
+  if (typeof ensureEntityTimestamps === 'function') ensureEntityTimestamps(data.clients);
   const sortKey = document.getElementById('client-sort')?.value || 'name-asc';
-  let list = data.clients.slice();
+  let list = (data.clients || []).slice();
   list.sort((a, b) => {
     if (sortKey === 'name-desc') return (b.name || '').localeCompare(a.name || '');
-    if (sortKey === 'modified-desc') return String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''));
-    if (sortKey === 'newest') return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
-    if (sortKey === 'oldest') return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+    if (sortKey === 'modified-desc') {
+      const d = entityTimestamp(b, 'modified') - entityTimestamp(a, 'modified');
+      return d !== 0 ? d : (a.name || '').localeCompare(b.name || '');
+    }
+    if (sortKey === 'newest') {
+      const d = entityTimestamp(b, 'created') - entityTimestamp(a, 'created');
+      return d !== 0 ? d : (a.name || '').localeCompare(b.name || '');
+    }
+    if (sortKey === 'oldest') {
+      const d = entityTimestamp(a, 'created') - entityTimestamp(b, 'created');
+      return d !== 0 ? d : (a.name || '').localeCompare(b.name || '');
+    }
     return (a.name || '').localeCompare(b.name || '');
   });
   const el = document.getElementById('clients-list');
@@ -2387,17 +2479,21 @@ function editClient(id) {
 function saveClient(e) {
   e.preventDefault();
   const id = document.getElementById('client-id').value;
+  const nowIso = new Date().toISOString();
+  const prev = id ? (data.clients || []).find(c => c.id === id) : null;
   const item = {
     id: id || uid(),
     name: document.getElementById('c-name').value.trim(),
     contact: document.getElementById('c-contact').value.trim(),
     phone: document.getElementById('c-phone').value.trim(),
     email: document.getElementById('c-email').value.trim(),
-    address: document.getElementById('c-address').value.trim()
+    address: document.getElementById('c-address').value.trim(),
+    createdAt: (prev && prev.createdAt) ? prev.createdAt : nowIso,
+    updatedAt: nowIso
   };
   if (id) {
     const idx = data.clients.findIndex(c => c.id === id);
-    if (idx >= 0) data.clients[idx] = item;
+    if (idx >= 0) data.clients[idx] = { ...prev, ...item };
   } else {
     data.clients.push(item);
   }
