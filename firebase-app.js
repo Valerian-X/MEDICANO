@@ -107,11 +107,31 @@
         .sort(function (a, b) {
           return String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''));
         })
-        .slice(0, 8)
+        .slice(0, 25)
         .map(function (x) {
-          if (key === 'invoice') return x.invoiceNumber || x.title || x.id || 'Invoice';
-          if (key === 'quote') return x.quoteNumber || x.title || x.id || 'Quote';
+          if (key === 'invoice') {
+            return (x.invoiceNumber || x.id || 'Invoice') +
+              (x.status ? ' [' + x.status + ']' : '') +
+              (x.totalNgn != null ? ' · ₦' + Number(x.totalNgn).toLocaleString() : '');
+          }
+          if (key === 'quote') {
+            return (x.quoteNumber || x.title || x.id || 'Quote') +
+              (x.status ? ' [' + x.status + ']' : '') +
+              (x.totalNGN != null ? ' · ₦' + Number(x.totalNGN).toLocaleString() : '');
+          }
           if (key === 'event') return (x.title || 'Event') + (x.date ? ' (' + x.date + ')' : '');
+          if (key === 'service') {
+            return (x.description || 'Service') +
+              (x.clientName ? ' → ' + x.clientName : '') +
+              (x.amountNgn != null ? ' · ₦' + Number(x.amountNgn).toLocaleString() : '');
+          }
+          if (key === 'expense') {
+            return (x.description || x.category || 'Expense') +
+              (x.amountNgn != null ? ' · ₦' + Number(x.amountNgn).toLocaleString() : '');
+          }
+          if (key === 'product') {
+            return (x.name || x.sku || x.id || 'Item') + (x.sku ? ' (' + x.sku + ')' : '');
+          }
           return x[key] || x.title || x.sku || x.id || '—';
         });
     }
@@ -122,11 +142,15 @@
       invoices: (d.invoices || []).length,
       events: (d.calendarEvents || []).length,
       reportRows: (d.reportTableRows || []).length,
+      services: (d.services || []).length,
+      expenses: (d.officeExpenses || []).length,
       clientNames: names(d.clients, 'name'),
-      productNames: names(d.products, 'name'),
+      productNames: names(d.products, 'product'),
       quoteNames: names(d.quotes, 'quote'),
       invoiceNames: names(d.invoices, 'invoice'),
-      eventNames: names(d.calendarEvents, 'event')
+      eventNames: names(d.calendarEvents, 'event'),
+      serviceNames: names(d.services, 'service'),
+      expenseNames: names(d.officeExpenses, 'expense')
     };
   }
 

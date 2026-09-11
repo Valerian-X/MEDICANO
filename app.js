@@ -2468,6 +2468,7 @@ function showNewQuote() {
   document.getElementById('quote-status').value = 'draft';
   document.getElementById('quote-notes').value = '';
   document.getElementById('quote-discount').value = 0;
+  if (document.getElementById('quote-discount-amt')) document.getElementById('quote-discount-amt').value = 0;
   document.getElementById('quote-items-list').innerHTML = '';
   quoteItemCounter = 0;
   if (document.getElementById('quote-product-search')) {
@@ -2498,6 +2499,7 @@ function openQuote(id) {
   document.getElementById('quote-status').value = q.status;
   document.getElementById('quote-notes').value = q.notes || '';
   document.getElementById('quote-discount').value = q.discount || 0;
+  if (document.getElementById('quote-discount-amt')) document.getElementById('quote-discount-amt').value = '0';
 
   document.getElementById('quote-items-list').innerHTML = '';
   quoteItemCounter = 0;
@@ -2675,6 +2677,7 @@ function recalcQuote() {
   });
   const discountPct = parseFloat(document.getElementById('quote-discount')?.value) || 0;
   const total = subtotal * (1 - discountPct / 100);
+  if (typeof syncDiscountAmountField === 'function') syncDiscountAmountField('quote', subtotal, discountPct);
   const subEl = document.getElementById('quote-subtotal');
   const totEl = document.getElementById('quote-total');
   if (subEl) subEl.textContent = formatNGN(subtotal);
@@ -3083,6 +3086,7 @@ function showNewInvoice() {
   document.getElementById('inv-due').value = '';
   document.getElementById('inv-quote-ref').value = '';
   document.getElementById('inv-discount').value = '0';
+  if (document.getElementById('inv-discount-amt')) document.getElementById('inv-discount-amt').value = '0';
   document.getElementById('inv-notes').value = '';
   const sf = document.getElementById('inv-show-footer');
   if (sf) sf.checked = true;
@@ -3108,6 +3112,7 @@ function editInvoice(id) {
   document.getElementById('inv-due').value = (inv.dueDate || '').slice(0, 10);
   document.getElementById('inv-quote-ref').value = inv.quoteRef || '';
   document.getElementById('inv-discount').value = inv.discount || 0;
+  if (document.getElementById('inv-discount-amt')) document.getElementById('inv-discount-amt').value = '0';
   document.getElementById('inv-notes').value = inv.notes || '';
   const sf = document.getElementById('inv-show-footer');
   if (sf) sf.checked = inv.showFooter !== false;
@@ -3206,6 +3211,76 @@ function collectInvoiceItems() {
   return items;
 }
 
+
+/** Discount can be entered as % or ₦ amount; the other field is derived from subtotal */
+function getLineSubtotal(kind) {
+  if (kind === 'quote') {
+    let sub = 0;
+    document.querySelectorAll('#quote-items-list .line-card').forEach(row => {
+      const qty = parseFloat(row.querySelector('.qi-qty')?.value) || 0;
+      const base = parseFloat(row.querySelector('.qi-base')?.value) || 0;
+      const markup = parseFloat(row.querySelector('.qi-markup')?.value) || 0;
+      const unit = (typeof quoteFinalUnit === 'function')
+        ? quoteFinalUnit(base, markup)
+        : base * (1 + markup / 100);
+      sub += qty * unit;
+    });
+    return sub;
+  }
+  let sub = 0;
+  document.querySelectorAll('#invoice-items-list .line-card').forEach(tr => {
+    const qty = parseFloat(tr.querySelector('.inv-qty')?.value) || 0;
+    const unit = parseFloat(tr.querySelector('.inv-unit')?.value) || 0;
+    sub += qty * unit;
+  });
+  return sub;
+}
+
+function discountFieldIds(kind) {
+  if (kind === 'quote') return { pct: 'quote-discount', amt: 'quote-discount-amt' };
+  return { pct: 'inv-discount', amt: 'inv-discount-amt' };
+}
+
+function onDiscountPctInput(kind) {
+  const ids = discountFieldIds(kind);
+  const pctEl = document.getElementById(ids.pct);
+  const amtEl = document.getElementById(ids.amt);
+  const sub = kind === 'quote' ? (typeof getQuoteSubtotal === 'function' ? getQuoteSubtotal() : getLineSubtotal('quote')) : getLineSubtotal('invoice');
+  let pct = parseFloat(pctEl && pctEl.value) || 0;
+  if (pct < 0) pct = 0;
+  if (pct > 100) pct = 100;
+  if (pctEl) pctEl.value = pct;
+  const amt = Math.round(sub * pct / 100 * 100) / 100;
+  if (amtEl && document.activeElement !== amtEl) amtEl.value = amt ? String(amt) : '0';
+  if (kind === 'quote') recalcQuote();
+  else recalcInvoiceTotal();
+}
+
+function onDiscountAmtInput(kind) {
+  const ids = discountFieldIds(kind);
+  const pctEl = document.getElementById(ids.pct);
+  const amtEl = document.getElementById(ids.amt);
+  const sub = kind === 'quote' ? (typeof getQuoteSubtotal === 'function' ? getQuoteSubtotal() : getLineSubtotal('quote')) : getLineSubtotal('invoice');
+  let amt = parseFloat(amtEl && amtEl.value) || 0;
+  if (amt < 0) amt = 0;
+  if (sub > 0 && amt > sub) amt = sub;
+  if (amtEl) amtEl.value = amt ? String(amt) : '0';
+  const pct = sub > 0 ? Math.round((amt / sub) * 10000) / 100 : 0;
+  if (pctEl && document.activeElement !== pctEl) pctEl.value = String(pct);
+  if (kind === 'quote') recalcQuote();
+  else recalcInvoiceTotal();
+}
+
+function syncDiscountAmountField(kind, subtotal, discountPct) {
+  const ids = discountFieldIds(kind);
+  const amtEl = document.getElementById(ids.amt);
+  if (!amtEl) return;
+  if (document.activeElement === amtEl) return;
+  const amt = Math.round((Number(subtotal) || 0) * (Number(discountPct) || 0) / 100 * 100) / 100;
+  amtEl.value = amt ? String(amt) : '0';
+}
+
+
 function recalcInvoiceTotal() {
   let sub = 0;
   document.querySelectorAll('#invoice-items-list .line-card').forEach(tr => {
@@ -3218,6 +3293,7 @@ function recalcInvoiceTotal() {
   });
   const discount = parseFloat(document.getElementById('inv-discount')?.value) || 0;
   const total = sub * (1 - discount / 100);
+  if (typeof syncDiscountAmountField === 'function') syncDiscountAmountField('invoice', sub, discount);
   const s = document.getElementById('inv-subtotal');
   const t = document.getElementById('inv-total');
   if (s) s.textContent = formatNGN(sub);
@@ -3668,7 +3744,7 @@ function generateInvoicePdf(inv) {
     const leftEdge = drawTotalLine('Subtotal', subtotal, y, false);
     if (discount > 0) {
       y += 16;
-      drawTotalLine('Discount (' + discount + '%)', -(subtotal * discount / 100), y, false);
+      drawTotalLine('Discount (' + discount + '% · ' + formatNairaPlain(subtotal * discount / 100) + ')', -(subtotal * discount / 100), y, false);
     }
     y += 10;
     doc.setDrawColor(...TEAL);
@@ -6853,7 +6929,7 @@ function generateQuotePdf(q) {
     const qLeft = drawQTotal('Subtotal', subtotal, y, false);
     if (discount > 0) {
       y += 14;
-      drawQTotal('Discount (' + discount + '%)', -(subtotal * discount / 100), y, false);
+      drawQTotal('Discount (' + discount + '% · ' + formatNairaPlain(subtotal * discount / 100) + ')', -(subtotal * discount / 100), y, false);
     }
     y += 8;
     doc.setDrawColor(...TEAL);
@@ -7063,6 +7139,187 @@ async function renderTeamPanel() {
   renderApprovalsPanel();
 }
 
+function labelEntity(kind, x) {
+  if (!x) return '—';
+  if (kind === 'invoice') {
+    return (x.invoiceNumber || x.id || 'Invoice') +
+      (x.status ? ' [' + x.status + ']' : '') +
+      (x.totalNgn != null ? ' · ₦' + Number(x.totalNgn).toLocaleString() : '');
+  }
+  if (kind === 'quote') {
+    return (x.quoteNumber || x.title || x.id || 'Quote') +
+      (x.status ? ' [' + x.status + ']' : '') +
+      (x.totalNGN != null ? ' · ₦' + Number(x.totalNGN).toLocaleString() : '');
+  }
+  if (kind === 'client') return x.name || x.id || 'Client';
+  if (kind === 'product') return (x.name || x.sku || x.id || 'Item') + (x.sku ? ' (' + x.sku + ')' : '');
+  if (kind === 'event') return (x.title || 'Event') + (x.date ? ' (' + x.date + ')' : '');
+  if (kind === 'service') {
+    return (x.description || 'Service') +
+      (x.clientName ? ' → ' + x.clientName : '') +
+      (x.amountNgn != null ? ' · ₦' + Number(x.amountNgn).toLocaleString() : '');
+  }
+  if (kind === 'expense') {
+    return (x.description || x.category || 'Expense') +
+      (x.amountNgn != null ? ' · ₦' + Number(x.amountNgn).toLocaleString() : '');
+  }
+  return x.name || x.title || x.id || '—';
+}
+
+function fingerprintEntity(kind, x) {
+  if (!x) return '';
+  try {
+    if (kind === 'invoice') {
+      return [x.invoiceNumber, x.status, x.totalNgn, x.clientId, (x.items || []).length, x.discount, x.amountPaid].join('|');
+    }
+    if (kind === 'quote') {
+      return [x.quoteNumber, x.status, x.totalNGN, x.clientId, (x.items || []).length, x.discount].join('|');
+    }
+    if (kind === 'client') {
+      return [x.name, x.contact, x.phone, x.email, x.address].join('|');
+    }
+    if (kind === 'product') {
+      return [x.name, x.sku, x.price, x.currency, x.stock, x.category, x.active].join('|');
+    }
+    if (kind === 'event') {
+      return [x.title, x.date, x.time, x.type, x.color, x.notes].join('|');
+    }
+    if (kind === 'service') {
+      return [x.description, x.clientId, x.amountNgn, x.date, x.notes].join('|');
+    }
+    if (kind === 'expense') {
+      return [x.category, x.description, x.amountNgn, x.date, x.paidTo].join('|');
+    }
+    return JSON.stringify(x);
+  } catch (e) {
+    return String(x.id || '');
+  }
+}
+
+/** Compare staff payload to current live workspace so admin sees what would change */
+function buildApprovalDiff(payload, live) {
+  payload = payload || {};
+  live = live || {};
+  const groups = [
+    { key: 'clients', kind: 'client', label: 'Clients' },
+    { key: 'products', kind: 'product', label: 'Inventory items' },
+    { key: 'quotes', kind: 'quote', label: 'Quotes' },
+    { key: 'invoices', kind: 'invoice', label: 'Invoices' },
+    { key: 'calendarEvents', kind: 'event', label: 'Events' },
+    { key: 'services', kind: 'service', label: 'Services' },
+    { key: 'officeExpenses', kind: 'expense', label: 'Expenses' }
+  ];
+  const result = [];
+  groups.forEach(function (g) {
+    const remoteArr = payload[g.key] || [];
+    const liveArr = live[g.key] || [];
+    const liveMap = {};
+    liveArr.forEach(function (x) { if (x && x.id) liveMap[x.id] = x; });
+    const remoteMap = {};
+    remoteArr.forEach(function (x) { if (x && x.id) remoteMap[x.id] = x; });
+    const added = [];
+    const updated = [];
+    const removed = [];
+    Object.keys(remoteMap).forEach(function (id) {
+      if (!liveMap[id]) added.push(labelEntity(g.kind, remoteMap[id]));
+      else if (fingerprintEntity(g.kind, remoteMap[id]) !== fingerprintEntity(g.kind, liveMap[id])) {
+        updated.push(labelEntity(g.kind, remoteMap[id]));
+      }
+    });
+    Object.keys(liveMap).forEach(function (id) {
+      if (!remoteMap[id]) removed.push(labelEntity(g.kind, liveMap[id]));
+    });
+    if (added.length || updated.length || removed.length) {
+      result.push({
+        label: g.label,
+        remoteCount: remoteArr.length,
+        liveCount: liveArr.length,
+        added: added.slice(0, 30),
+        updated: updated.slice(0, 30),
+        removed: removed.slice(0, 30),
+        addedMore: Math.max(0, added.length - 30),
+        updatedMore: Math.max(0, updated.length - 30),
+        removedMore: Math.max(0, removed.length - 30)
+      });
+    }
+  });
+  return result;
+}
+
+function formatDiffSectionHtml(title, items, more, tone) {
+  if (!items || !items.length) return '';
+  const cls = tone === 'add' ? 'pending-diff-add' : (tone === 'remove' ? 'pending-diff-remove' : 'pending-diff-update');
+  return '<div class="pending-diff-block ' + cls + '">' +
+    '<div class="pending-diff-label">' + escHtml(title) + ' (' + (items.length + (more || 0)) + ')</div>' +
+    '<ul class="pending-diff-list">' +
+    items.map(function (n) { return '<li>' + escHtml(n) + '</li>'; }).join('') +
+    ((more > 0) ? '<li class="pending-diff-more">…and ' + more + ' more</li>' : '') +
+    '</ul></div>';
+}
+
+function formatPendingReviewHtml(p) {
+  const payload = p.payload || {};
+  const d = p.details || {};
+  const live = (typeof data !== 'undefined' && data) ? data : {};
+  const diffs = buildApprovalDiff(payload, live);
+
+  const counts = [
+    ['Clients', d.clients != null ? d.clients : (payload.clients || []).length],
+    ['Items', d.products != null ? d.products : (payload.products || []).length],
+    ['Quotes', d.quotes != null ? d.quotes : (payload.quotes || []).length],
+    ['Invoices', d.invoices != null ? d.invoices : (payload.invoices || []).length],
+    ['Events', d.events != null ? d.events : (payload.calendarEvents || []).length],
+    ['Services', d.services != null ? d.services : (payload.services || []).length],
+    ['Expenses', d.expenses != null ? d.expenses : (payload.officeExpenses || []).length]
+  ];
+
+  let countsHtml = '<div class="pending-counts">' + counts.map(function (c) {
+    return '<span>' + escHtml(c[0]) + ': <strong>' + c[1] + '</strong></span>';
+  }).join('') + '</div>';
+
+  let diffHtml = '';
+  if (diffs.length) {
+    diffHtml = '<div class="pending-diff-wrap">' +
+      '<div class="pending-diff-title">Changes vs current live data</div>' +
+      diffs.map(function (g) {
+        return '<div class="pending-diff-group">' +
+          '<div class="pending-diff-group-title">' + escHtml(g.label) +
+          ' <span class="pending-diff-meta">live ' + g.liveCount + ' → proposed ' + g.remoteCount + '</span></div>' +
+          formatDiffSectionHtml('Added', g.added, g.addedMore, 'add') +
+          formatDiffSectionHtml('Updated', g.updated, g.updatedMore, 'update') +
+          formatDiffSectionHtml('Removed', g.removed, g.removedMore, 'remove') +
+          '</div>';
+      }).join('') +
+      '</div>';
+  } else {
+    diffHtml = '<p class="pending-diff-empty text-sm">No field-level differences detected vs your current data (counts may still differ if only order/timestamps changed).</p>';
+  }
+
+  function listBlock(title, arr) {
+    arr = arr || [];
+    if (!arr.length) return '';
+    return '<div class="pending-detail-block"><span class="pending-detail-label">' + escHtml(title) + '</span>' +
+      '<ul class="pending-detail-list">' + arr.map(function (n) {
+        return '<li>' + escHtml(n) + '</li>';
+      }).join('') + '</ul></div>';
+  }
+
+  const snapshot =
+    listBlock('Clients in proposal', d.clientNames) +
+    listBlock('Inventory in proposal', d.productNames) +
+    listBlock('Quotes in proposal', d.quoteNames) +
+    listBlock('Invoices in proposal', d.invoiceNames) +
+    listBlock('Events in proposal', d.eventNames) +
+    listBlock('Services in proposal', d.serviceNames) +
+    listBlock('Expenses in proposal', d.expenseNames);
+
+  return countsHtml + diffHtml +
+    '<details class="pending-details-expand">' +
+    '<summary>View full content snapshot in this submission</summary>' +
+    '<div class="pending-details-body">' + (snapshot || '<p class="text-sm">No named items listed.</p>') + '</div>' +
+    '</details>';
+}
+
 function renderApprovalsPanel() {
   const cloud = window.MedicanoCloud;
   const list = document.getElementById('team-pending-list');
@@ -7087,12 +7344,14 @@ function renderApprovalsPanel() {
   list.innerHTML = pending.map(function (p) {
     const actions = isAdmin
       ? ('<div class="team-pending-actions">' +
-         '<button type="button" class="btn-primary btn-compact" onclick="teamApprovePending(\'' + p.id + '\')">Approve</button> ' +
+         '<button type="button" class="btn-primary btn-compact" onclick="teamApprovePending(\'' + p.id + '\')">Approve &amp; publish</button> ' +
          '<button type="button" class="btn-soft" onclick="teamRejectPending(\'' + p.id + '\')">Reject</button></div>')
-      : '<span class="text-xs text-slate-500">Waiting for admin</span>';
+      : '<span class="text-xs text-slate-500">Waiting for admin review</span>';
     return '<div class="team-pending-card">' +
       '<div class="select-row-title">' + escHtml(p.byEmail || p.byUid || 'Staff') + '</div>' +
-      '<div class="select-row-sub">' + escHtml(p.summary || '') + ' · ' + escHtml((p.createdAt || '').slice(0, 16).replace('T', ' ')) + '</div>' +
+      '<div class="select-row-sub">Submitted ' + escHtml((p.createdAt || '').slice(0, 19).replace('T', ' ')) +
+      (p.summary ? ' · ' + escHtml(p.summary) : '') + '</div>' +
+      formatPendingReviewHtml(p) +
       actions + '</div>';
   }).join('');
 }

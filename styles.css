@@ -5916,3 +5916,61 @@ html.dark #page-services-expenses .settings-label {
 .se-dash-links {
   margin-top: 0.5rem;
 }
+
+/* Approval change review */
+.pending-diff-wrap {
+  margin: 0.65rem 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  background: rgba(15, 118, 110, 0.06);
+  border: 1px solid rgba(15, 118, 110, 0.15);
+}
+html.dark .pending-diff-wrap {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.1);
+}
+.pending-diff-title {
+  font-weight: 700;
+  font-size: 0.8rem;
+  margin-bottom: 0.45rem;
+}
+.pending-diff-group { margin-bottom: 0.55rem; }
+.pending-diff-group-title {
+  font-weight: 700;
+  font-size: 0.78rem;
+  margin-bottom: 0.25rem;
+}
+.pending-diff-meta {
+  font-weight: 500;
+  opacity: 0.7;
+  font-size: 0.72rem;
+}
+.pending-diff-block { margin: 0.25rem 0 0.35rem; font-size: 0.75rem; }
+.pending-diff-label { font-weight: 700; margin-bottom: 0.15rem; }
+.pending-diff-list { margin: 0; padding-left: 1.1rem; }
+.pending-diff-list li { margin: 0.12rem 0; }
+.pending-diff-add .pending-diff-label { color: #047857; }
+.pending-diff-update .pending-diff-label { color: #b45309; }
+.pending-diff-remove .pending-diff-label { color: #b91c1c; }
+html.dark .pending-diff-add .pending-diff-label { color: #34d399; }
+html.dark .pending-diff-update .pending-diff-label { color: #fbbf24; }
+html.dark .pending-diff-remove .pending-diff-label { color: #f87171; }
+.pending-diff-more { opacity: 0.7; font-style: italic; }
+.pending-diff-empty { opacity: 0.75; margin: 0.4rem 0; }
+.team-pending-card {
+  margin-bottom: 0.85rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: #fff;
+}
+html.dark .team-pending-card {
+  background: #1e1e1e;
+  border-color: rgba(255,255,255,0.08);
+}
+.team-pending-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
