@@ -269,6 +269,7 @@ function applyCloudData(payload) {
   if (!data.calendarEvents) data.calendarEvents = [];
   if (!data.services) data.services = [];
   if (!data.officeExpenses) data.officeExpenses = [];
+  if (!data.deletedRecords || typeof data.deletedRecords !== 'object') data.deletedRecords = {};
   if (!data.stockMovements) data.stockMovements = [];
   if (!data.userProfile) data.userProfile = { username: '' };
       if (!Array.isArray(data.reportTableRows)) data.reportTableRows = [];
@@ -852,6 +853,7 @@ function loadData() {
       });
       // Ensure every product has stock / lowStock numbers
       if (typeof ensureEntityTimestamps === 'function') {
+        if (!data.deletedRecords || typeof data.deletedRecords !== 'object') data.deletedRecords = {};
         ensureEntityTimestamps(data.clients);
         ensureEntityTimestamps(data.products);
         ensureEntityTimestamps(data.quotes);
@@ -882,6 +884,23 @@ function saveDataLocalOnly() {
   } catch (e) {
     console.error('saveDataLocalOnly', e);
   }
+}
+
+
+/** Record a deletion so multi-device merge does not resurrect the item */
+function markDeleted(id, kind) {
+  if (!id) return;
+  if (!data) return;
+  if (!data.deletedRecords || typeof data.deletedRecords !== 'object') data.deletedRecords = {};
+  data.deletedRecords[String(id)] = {
+    at: new Date().toISOString(),
+    kind: kind || 'record'
+  };
+}
+
+function isMarkedDeleted(id) {
+  if (!data || !data.deletedRecords || !id) return false;
+  return !!data.deletedRecords[String(id)];
 }
 
 function saveData() {
@@ -1830,6 +1849,7 @@ function saveProduct(e) {
 }
 
 function deleteProduct(id) {
+  markDeleted(id, 'product');
   data.products = data.products.filter(p => p.id !== id);
   saveData();
   renderProducts();
@@ -2041,6 +2061,7 @@ function saveCalEvent() {
 
 function deleteCalEvent(id) {
   if (!confirm('Delete this event?')) return;
+  markDeleted(id, 'event');
   data.calendarEvents = (data.calendarEvents || []).filter(e => e.id !== id);
   saveData();
   renderCalendar();
@@ -2287,7 +2308,8 @@ function exportStockMovementsCsv() {
 
 // -------------------- Clients --------------------
 function renderClients() {
-  if (typeof ensureEntityTimestamps === 'function') ensureEntityTimestamps(data.clients);
+  if (typeof ensureEntityTimestamps === 'function') if (!data.deletedRecords || typeof data.deletedRecords !== 'object') data.deletedRecords = {};
+        ensureEntityTimestamps(data.clients);
   const sortKey = document.getElementById('client-sort')?.value || 'name-asc';
   let list = (data.clients || []).slice();
   list.sort((a, b) => {
@@ -2504,6 +2526,7 @@ function saveClient(e) {
 }
 
 function deleteClient(id) {
+  markDeleted(id, 'client');
   data.clients = data.clients.filter(c => c.id !== id);
   saveData();
   renderClients();
@@ -2560,7 +2583,7 @@ function renderQuotes() {
           <button type="button" onclick="event.stopPropagation(); openQuote('${q.id}')">Open</button>
           <button type="button" onclick="event.stopPropagation(); printQuoteById('${q.id}')">PDF</button>
           <button type="button" onclick="event.stopPropagation(); createInvoiceFromQuote('${q.id}')">Invoice</button>
-          <button type="button" class="danger" onclick="if(confirm('Delete quote?')) { data.quotes = data.quotes.filter(x => x.id !== '${q.id}'); saveData(); renderQuotes(); renderDashboard(); }">Delete</button>
+          <button type="button" class="danger" onclick="if(confirm('Delete quote?')) { markDeleted('${q.id}', 'quote'); data.quotes = data.quotes.filter(x => x.id !== '${q.id}'); saveData(); renderQuotes(); renderDashboard(); }">Delete</button>
         </div>
       </div>
     </div>`;
@@ -3111,6 +3134,7 @@ function onImportPresItemsFile(ev) {
 
 function deleteCurrentQuote() {
   if (!currentQuoteId) return;
+  markDeleted(currentQuoteId, 'quote');
   data.quotes = data.quotes.filter(q => q.id !== currentQuoteId);
   saveData();
   navigate('quotes');
@@ -3562,6 +3586,7 @@ function saveInvoice() {
 
 function deleteCurrentInvoice() {
   if (!currentInvoiceId) return;
+  markDeleted(currentInvoiceId, 'invoice');
   data.invoices = (data.invoices || []).filter(x => x.id !== currentInvoiceId);
   saveData();
   currentInvoiceId = null;
@@ -4768,12 +4793,14 @@ function saveExpenseRecord(ev) {
 }
 
 function deleteService(id) {
+  markDeleted(id, 'service');
   data.services = (data.services || []).filter(s => s.id !== id);
   saveData();
   renderServicesList();
 }
 
 function deleteExpense(id) {
+  markDeleted(id, 'expense');
   data.officeExpenses = (data.officeExpenses || []).filter(x => x.id !== id);
   saveData();
   renderExpensesList();
@@ -6335,6 +6362,7 @@ function deleteReportTableRow() {
   if (!id) return;
   if (!confirm('Delete this table row?')) return;
   ensureReportRows();
+  markDeleted(id, 'reportRow');
   data.reportTableRows = data.reportTableRows.filter(function (r) { return r.id !== id; });
   saveData();
   closeReportRowEditor();

@@ -292,7 +292,7 @@
     return isNaN(t) ? 0 : t;
   }
 
-  function mergeById(localArr, remoteArr) {
+  function mergeById(localArr, remoteArr, deletedMap) {
     var map = {};
     (remoteArr || []).forEach(function (x) {
       if (x && x.id != null) map[String(x.id)] = x;
@@ -304,7 +304,39 @@
       if (!prev) map[id] = x;
       else map[id] = entityTs(x) >= entityTs(prev) ? x : prev;
     });
-    return Object.keys(map).map(function (k) { return map[k]; });
+    deletedMap = deletedMap || {};
+    return Object.keys(map).map(function (k) { return map[k]; }).filter(function (x) {
+      if (!x || x.id == null) return false;
+      var tomb = deletedMap[String(x.id)];
+      if (!tomb) return true;
+      var delAt = entityTs({ updatedAt: tomb.at || tomb });
+      // Keep only if the record was updated AFTER the deletion (re-created)
+      return entityTs(x) > delAt;
+    });
+  }
+
+  function mergeDeletedMaps(a, b) {
+    var out = {};
+    a = a || {};
+    b = b || {};
+    Object.keys(a).forEach(function (k) { out[k] = a[k]; });
+    Object.keys(b).forEach(function (k) {
+      var cur = out[k];
+      var inc = b[k];
+      if (!cur) out[k] = inc;
+      else {
+        var ta = entityTs({ updatedAt: (cur && cur.at) || cur });
+        var tb = entityTs({ updatedAt: (inc && inc.at) || inc });
+        out[k] = tb >= ta ? inc : cur;
+      }
+    });
+    // Prune tombstones older than 180 days
+    var cutoff = Date.now() - 180 * 24 * 3600 * 1000;
+    Object.keys(out).forEach(function (k) {
+      var t = entityTs({ updatedAt: (out[k] && out[k].at) || out[k] });
+      if (t && t < cutoff) delete out[k];
+    });
+    return out;
   }
 
   function maxIso(a, b) {
@@ -328,9 +360,12 @@
       'services', 'officeExpenses', 'stockMovements', 'reportTableRows',
       'noteTemplates'
     ];
+    // Merge deletion tombstones first
+    out.deletedRecords = mergeDeletedMaps(local.deletedRecords, remote.deletedRecords);
+
     listKeys.forEach(function (k) {
       if (Array.isArray(local[k]) || Array.isArray(remote[k])) {
-        out[k] = mergeById(local[k], remote[k]);
+        out[k] = mergeById(local[k], remote[k], out.deletedRecords);
       }
     });
     // categories are strings
