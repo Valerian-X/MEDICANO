@@ -2675,9 +2675,9 @@ function recalcQuote() {
     row.querySelectorAll('.qi-line, .qi-line-body').forEach(el => { el.textContent = lineStr; });
     subtotal += line;
   });
-  const discountPct = parseFloat(document.getElementById('quote-discount')?.value) || 0;
-  const total = subtotal * (1 - discountPct / 100);
-  if (typeof syncDiscountAmountField === 'function') syncDiscountAmountField('quote', subtotal, discountPct);
+  const disc = resolveDiscount('quote', subtotal);
+  const discountPct = disc.pct;
+  const total = disc.total;
   const subEl = document.getElementById('quote-subtotal');
   const totEl = document.getElementById('quote-total');
   if (subEl) subEl.textContent = formatNGN(subtotal);
@@ -2736,9 +2736,10 @@ function saveQuote() {
     return;
   }
 
-  const discount = parseFloat(document.getElementById('quote-discount').value) || 0;
   const subtotal = items.reduce((s, i) => s + i.lineNGN, 0);
-  const totalNGN = subtotal * (1 - discount / 100);
+  const disc = resolveDiscount('quote', subtotal);
+  const discount = disc.pct;
+  const totalNGN = disc.total;
 
   const quote = {
     id: currentQuoteId || uid(),
@@ -3212,7 +3213,12 @@ function collectInvoiceItems() {
 }
 
 
-/** Discount can be entered as % or ₦ amount; the other field is derived from subtotal */
+/** Discount can be entered as % or ₦ amount.
+ *  Mode 'amt' → total = subtotal − amount (exact remaining balance).
+ *  Mode 'pct' → amount is derived from %, total = subtotal − amount.
+ */
+window._discountMode = window._discountMode || { quote: 'pct', invoice: 'pct' };
+
 function getLineSubtotal(kind) {
   if (kind === 'quote') {
     let sub = 0;
@@ -3225,7 +3231,7 @@ function getLineSubtotal(kind) {
         : base * (1 + markup / 100);
       sub += qty * unit;
     });
-    return sub;
+    return Math.round(sub * 100) / 100;
   }
   let sub = 0;
   document.querySelectorAll('#invoice-items-list .line-card').forEach(tr => {
@@ -3233,7 +3239,7 @@ function getLineSubtotal(kind) {
     const unit = parseFloat(tr.querySelector('.inv-unit')?.value) || 0;
     sub += qty * unit;
   });
-  return sub;
+  return Math.round(sub * 100) / 100;
 }
 
 function discountFieldIds(kind) {
@@ -3241,45 +3247,58 @@ function discountFieldIds(kind) {
   return { pct: 'inv-discount', amt: 'inv-discount-amt' };
 }
 
-function onDiscountPctInput(kind) {
+/** Resolve discount so remaining balance is always subtotal − ₦ amount */
+function resolveDiscount(kind, subtotal) {
+  subtotal = Math.max(0, Number(subtotal) || 0);
   const ids = discountFieldIds(kind);
   const pctEl = document.getElementById(ids.pct);
   const amtEl = document.getElementById(ids.amt);
-  const sub = kind === 'quote' ? (typeof getQuoteSubtotal === 'function' ? getQuoteSubtotal() : getLineSubtotal('quote')) : getLineSubtotal('invoice');
+  const mode = (window._discountMode && window._discountMode[kind]) || 'pct';
   let pct = parseFloat(pctEl && pctEl.value) || 0;
-  if (pct < 0) pct = 0;
-  if (pct > 100) pct = 100;
-  if (pctEl) pctEl.value = pct;
-  const amt = Math.round(sub * pct / 100 * 100) / 100;
-  if (amtEl && document.activeElement !== amtEl) amtEl.value = amt ? String(amt) : '0';
+  let amt = parseFloat(amtEl && amtEl.value) || 0;
+
+  if (mode === 'amt') {
+    if (amt < 0) amt = 0;
+    if (amt > subtotal) amt = subtotal;
+    amt = Math.round(amt * 100) / 100;
+    pct = subtotal > 0 ? Math.round((amt / subtotal) * 10000) / 100 : 0;
+    if (pctEl) pctEl.value = String(pct);
+    if (amtEl && document.activeElement !== amtEl) amtEl.value = String(amt);
+  } else {
+    if (pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+    amt = Math.round(subtotal * pct / 100 * 100) / 100;
+    if (pctEl && document.activeElement !== pctEl) pctEl.value = String(pct);
+    if (amtEl && document.activeElement !== amtEl) amtEl.value = String(amt);
+  }
+
+  const total = Math.round((subtotal - amt) * 100) / 100;
+  return { pct: pct, amt: amt, total: Math.max(0, total) };
+}
+
+function onDiscountPctInput(kind) {
+  window._discountMode = window._discountMode || {};
+  window._discountMode[kind] = 'pct';
   if (kind === 'quote') recalcQuote();
   else recalcInvoiceTotal();
 }
 
 function onDiscountAmtInput(kind) {
-  const ids = discountFieldIds(kind);
-  const pctEl = document.getElementById(ids.pct);
-  const amtEl = document.getElementById(ids.amt);
-  const sub = kind === 'quote' ? (typeof getQuoteSubtotal === 'function' ? getQuoteSubtotal() : getLineSubtotal('quote')) : getLineSubtotal('invoice');
-  let amt = parseFloat(amtEl && amtEl.value) || 0;
-  if (amt < 0) amt = 0;
-  if (sub > 0 && amt > sub) amt = sub;
-  if (amtEl) amtEl.value = amt ? String(amt) : '0';
-  const pct = sub > 0 ? Math.round((amt / sub) * 10000) / 100 : 0;
-  if (pctEl && document.activeElement !== pctEl) pctEl.value = String(pct);
+  window._discountMode = window._discountMode || {};
+  window._discountMode[kind] = 'amt';
   if (kind === 'quote') recalcQuote();
   else recalcInvoiceTotal();
 }
 
 function syncDiscountAmountField(kind, subtotal, discountPct) {
+  // Kept for callers; resolveDiscount handles sync when mode is pct
+  if ((window._discountMode && window._discountMode[kind]) === 'amt') return;
   const ids = discountFieldIds(kind);
   const amtEl = document.getElementById(ids.amt);
-  if (!amtEl) return;
-  if (document.activeElement === amtEl) return;
+  if (!amtEl || document.activeElement === amtEl) return;
   const amt = Math.round((Number(subtotal) || 0) * (Number(discountPct) || 0) / 100 * 100) / 100;
-  amtEl.value = amt ? String(amt) : '0';
+  amtEl.value = String(amt);
 }
-
 
 function recalcInvoiceTotal() {
   let sub = 0;
@@ -3291,14 +3310,14 @@ function recalcInvoiceTotal() {
     const lineStr = formatNGN(line);
     tr.querySelectorAll('.inv-line, .inv-line-body').forEach(cell => { cell.textContent = lineStr; });
   });
-  const discount = parseFloat(document.getElementById('inv-discount')?.value) || 0;
-  const total = sub * (1 - discount / 100);
-  if (typeof syncDiscountAmountField === 'function') syncDiscountAmountField('invoice', sub, discount);
+  const disc = resolveDiscount('invoice', sub);
+  const discount = disc.pct;
+  const total = disc.total;
   const s = document.getElementById('inv-subtotal');
   const t = document.getElementById('inv-total');
   if (s) s.textContent = formatNGN(sub);
   if (t) t.textContent = formatNGN(total);
-  return { sub, total, discount };
+  return { sub, total, discount, discountAmt: disc.amt };
 }
 
 function saveInvoice() {
