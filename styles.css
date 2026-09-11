@@ -5974,3 +5974,25 @@ html.dark .team-pending-card {
   gap: 0.45rem;
   margin-top: 0.75rem;
 }
+
+/* report desktop table only v73 */
+@media (min-width: 701px) {
+  #page-reports .table-mobile-only,
+  #page-reports .report-mobile-cards,
+  #page-reports .entity-cards.report-mobile-cards {
+    display: none !important;
+  }
+  #page-reports .table-desktop-only {
+    display: block !important;
+  }
+}
+@media (max-width: 700px) {
+  #page-reports .table-desktop-only {
+    display: none !important;
+  }
+  #page-reports .table-mobile-only,
+  #page-reports .report-mobile-cards {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+}

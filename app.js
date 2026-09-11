@@ -1548,10 +1548,19 @@ function renderProducts() {
     filterEl.value = currentVal;
   }
 
-  const list = data.products.filter(p => {
-    const matchSearch = !search || p.name.toLowerCase().includes(search) || p.sku.toLowerCase().includes(search) || (p.description || '').toLowerCase().includes(search);
+  let list = data.products.filter(p => {
+    const matchSearch = !search || (p.name || '').toLowerCase().includes(search) || (p.sku || '').toLowerCase().includes(search) || (p.description || '').toLowerCase().includes(search);
     const matchCat = !cat || p.category === cat;
     return matchSearch && matchCat;
+  });
+  const sortKey = document.getElementById('product-sort')?.value || 'name-asc';
+  list.sort((a, b) => {
+    if (sortKey === 'name-desc') return (b.name || '').localeCompare(a.name || '');
+    if (sortKey === 'modified-desc') return String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''));
+    if (sortKey === 'stock-asc') return (Number(a.stock) || 0) - (Number(b.stock) || 0);
+    if (sortKey === 'stock-desc') return (Number(b.stock) || 0) - (Number(a.stock) || 0);
+    if (sortKey === 'newest') return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    return (a.name || '').localeCompare(b.name || '');
   });
 
   const el = document.getElementById('products-list');
@@ -2196,7 +2205,15 @@ function exportStockMovementsCsv() {
 
 // -------------------- Clients --------------------
 function renderClients() {
-  const list = data.clients.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const sortKey = document.getElementById('client-sort')?.value || 'name-asc';
+  let list = data.clients.slice();
+  list.sort((a, b) => {
+    if (sortKey === 'name-desc') return (b.name || '').localeCompare(a.name || '');
+    if (sortKey === 'modified-desc') return String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''));
+    if (sortKey === 'newest') return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    if (sortKey === 'oldest') return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+    return (a.name || '').localeCompare(b.name || '');
+  });
   const el = document.getElementById('clients-list');
   if (!el) return;
   if (!list.length) {
@@ -3829,7 +3846,7 @@ function generateInvoicePdf(inv) {
     y += 16;
     // Show amount paid + remaining on partial (and useful on any open balance with payments)
     if (isPartialDoc || (paidAmount > 0.009 && !isPaidDoc)) {
-      drawTotalLine('Amount paid', paidAmount, y, false);
+      drawTotalLine('Amount paid', paidAmount, y, true);
       y += 16;
       drawTotalLine('Balance due', balanceAmount, y, true);
       y += 12;
@@ -6307,6 +6324,40 @@ function addSelectedReportRowsToInvoice() {
   else navigate('invoices');
 }
 
+
+function fillReportProductSelect() {
+  const sel = document.getElementById('report-product');
+  if (!sel) return;
+  const cur = sel.value;
+  const products = (data.products || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  sel.innerHTML = '<option value="">All products</option>' +
+    products.map(p => '<option value="' + p.id + '">' + escHtml(p.name || p.sku || p.id) + '</option>').join('');
+  if (cur) sel.value = cur;
+}
+
+function onReportTypeChange() {
+  const t = document.getElementById('report-type')?.value || 'all';
+  const methodField = document.getElementById('report-method');
+  if (methodField) methodField.disabled = (t === 'services' || t === 'expenses' || t === 'sales');
+  renderTransactionReport();
+}
+
+function sortReportRows(rows, sortKey) {
+  const list = (rows || []).slice();
+  const key = sortKey || 'date-desc';
+  list.sort((a, b) => {
+    if (key === 'date-asc') return String(a.date || '').localeCompare(String(b.date || ''));
+    if (key === 'date-desc') return String(b.date || '').localeCompare(String(a.date || ''));
+    if (key === 'amount-desc') return (Number(b.amount) || 0) - (Number(a.amount) || 0);
+    if (key === 'amount-asc') return (Number(a.amount) || 0) - (Number(b.amount) || 0);
+    if (key === 'name-asc') return String(a.clientName || a.productName || a.ref || '').localeCompare(String(b.clientName || b.productName || b.ref || ''));
+    if (key === 'name-desc') return String(b.clientName || b.productName || b.ref || '').localeCompare(String(a.clientName || a.productName || a.ref || ''));
+    if (key === 'qty-desc') return (Number(b.qty) || 0) - (Number(a.qty) || 0);
+    return 0;
+  });
+  return list;
+}
+
 function collectLedgerRows({ from, to, clientIds, method, type } = {}) {
   const rows = [];
   const clientSet = (clientIds && clientIds.length) ? new Set(clientIds) : null;
@@ -6428,7 +6479,9 @@ function getReportFilterState() {
     to: document.getElementById('report-date-to')?.value || '',
     clientIds: getSelectedReportClientIds(),
     method: document.getElementById('report-method')?.value || '',
-    type: document.getElementById('report-type')?.value || 'all'
+    type: document.getElementById('report-type')?.value || 'all',
+    productId: document.getElementById('report-product')?.value || '',
+    sort: document.getElementById('report-sort')?.value || 'date-desc'
   };
 }
 
@@ -6446,6 +6499,8 @@ function loadReportFilters() {
 }
 
 function initReportsPage() {
+  if (typeof fillReportProductSelect === 'function') fillReportProductSelect();
+
   const list = document.getElementById('report-client-list');
   const saved = loadReportFilters() || {};
   const clients = (data.clients || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -6500,41 +6555,102 @@ function renderTransactionReport() {
   if (toEl && !toEl.value) toEl.value = localYMD(new Date());
   const typeEl = document.getElementById('report-type');
   if (typeEl && !typeEl.value) typeEl.value = 'all';
+  if (typeof fillReportProductSelect === 'function') fillReportProductSelect();
   const filters = getReportFilterState();
   saveReportFilters();
-  const rows = collectLedgerRows(filters);
-  const summary = document.getElementById('report-summary');
+  let rows = collectLedgerRows(filters);
+  if (typeof sortReportRows === 'function') rows = sortReportRows(rows, filters.sort);
   const preview = document.getElementById('report-preview');
+  const summary = document.getElementById('report-summary');
   if (!preview) return;
 
   const payments = rows.filter(r => r.kind === 'payment');
   const invoices = rows.filter(r => r.kind === 'invoice');
-  const collected = payments.reduce((s, r) => s + r.amount, 0);
-  const invoiced = invoices.reduce((s, r) => s + r.amount, 0);
+  const sales = rows.filter(r => r.kind === 'sale');
+  const services = rows.filter(r => r.kind === 'service');
+  const expenses = rows.filter(r => r.kind === 'expense');
+  const collected = payments.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const invoiced = invoices.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const salesRevenue = sales.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const qtySold = sales.reduce((s, r) => s + (Number(r.qty) || 0), 0);
+  const serviceTotal = services.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const expenseTotal = expenses.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const clientCount = new Set(rows.map(r => r.clientId || r.clientName)).size;
+  const t = filters.type || 'all';
 
   if (summary) {
-    summary.innerHTML = `
+    if (t === 'sales') {
+      summary.innerHTML = `
+      <div class="report-stat"><p class="rsl">Sale lines</p><p class="rsv">${sales.length}</p></div>
+      <div class="report-stat"><p class="rsl">Qty sold</p><p class="rsv">${qtySold}</p></div>
+      <div class="report-stat"><p class="rsl">Sales revenue</p><p class="rsv">${formatNGN(salesRevenue)}</p></div>
+      <div class="report-stat"><p class="rsl">Clients</p><p class="rsv">${clientCount}</p></div>`;
+    } else if (t === 'services') {
+      summary.innerHTML = `
+      <div class="report-stat"><p class="rsl">Services</p><p class="rsv">${services.length}</p></div>
+      <div class="report-stat"><p class="rsl">Total</p><p class="rsv">${formatNGN(serviceTotal)}</p></div>
+      <div class="report-stat"><p class="rsl">Clients</p><p class="rsv">${clientCount}</p></div>
+      <div class="report-stat"><p class="rsl">Rows</p><p class="rsv">${rows.length}</p></div>`;
+    } else if (t === 'expenses') {
+      summary.innerHTML = `
+      <div class="report-stat"><p class="rsl">Expenses</p><p class="rsv">${expenses.length}</p></div>
+      <div class="report-stat"><p class="rsl">Total spent</p><p class="rsv">${formatNGN(expenseTotal)}</p></div>
+      <div class="report-stat"><p class="rsl">Rows</p><p class="rsv">${rows.length}</p></div>
+      <div class="report-stat"><p class="rsl">—</p><p class="rsv">—</p></div>`;
+    } else {
+      summary.innerHTML = `
       <div class="report-stat"><p class="rsl">Rows</p><p class="rsv">${rows.length}</p></div>
       <div class="report-stat"><p class="rsl">Collected</p><p class="rsv">${formatNGN(collected)}</p></div>
       <div class="report-stat"><p class="rsl">Invoiced</p><p class="rsv">${formatNGN(invoiced)}</p></div>
-      <div class="report-stat"><p class="rsl">Clients</p><p class="rsv">${clientCount}</p></div>
-    `;
+      <div class="report-stat"><p class="rsl">Clients</p><p class="rsv">${clientCount}</p></div>`;
+    }
   }
 
   if (!rows.length) {
-    preview.innerHTML = '<div class="panel-soft report-empty">No transactions in this period for the selected filters.</div>' +
-      '<div class="report-add-row-wrap"><button type="button" class="report-add-row-btn" onclick="openReportRowEditor()">+ Add table row</button></div>';
+    preview.innerHTML = '<div class="panel-soft report-empty">No records in this period for the selected filters.</div>' +
+      (t === 'custom' || t === 'all' ? '<div class="report-add-row-wrap"><button type="button" class="report-add-row-btn" onclick="openReportRowEditor()">+ Add table row</button></div>' : '');
     return;
   }
 
+  const typeLabel = (r) => {
+    if (r.kind === 'payment') return 'Payment';
+    if (r.kind === 'custom') return r.method || 'Custom';
+    if (r.kind === 'invoice') return 'Invoice';
+    if (r.kind === 'sale') return 'Sale';
+    if (r.kind === 'service') return 'Service';
+    if (r.kind === 'expense') return 'Expense';
+    return r.kind || '—';
+  };
+  const typePillClass = (r) => {
+    if (r.kind === 'payment') return 'pay';
+    if (r.kind === 'custom') return 'custom';
+    if (r.kind === 'sale') return 'pay';
+    if (r.kind === 'service') return 'custom';
+    if (r.kind === 'expense') return 'inv';
+    return 'inv';
+  };
   const detailOf = (r) => {
+    if (r.kind === 'sale') {
+      return (r.productName || 'Item') + ' · Qty sold: ' + (r.qty || 0) +
+        (r.unitPrice != null ? ' · Unit ' + formatNGN(r.unitPrice) : '');
+    }
     if (r.kind === 'payment') return (r.method || '') + (r.note ? ' · ' + r.note : '');
     if (r.kind === 'custom') return r.note || r.title || r.method || 'Custom';
+    if (r.kind === 'service') return (r.note || r.title || 'Service');
+    if (r.kind === 'expense') return (r.method || '') + (r.note ? ' · ' + r.note : '');
     return r.method || 'issued';
   };
 
-  // Desktop: table · Mobile: entity-style cards (same data)
+  const showQty = (t === 'sales') || rows.some(r => r.kind === 'sale');
+  const footerLabel = t === 'sales' ? 'Sales revenue'
+    : t === 'services' ? 'Services total'
+    : t === 'expenses' ? 'Expenses total'
+    : 'Total collected (payments)';
+  const footerAmount = t === 'sales' ? salesRevenue
+    : t === 'services' ? serviceTotal
+    : t === 'expenses' ? expenseTotal
+    : collected;
+
   preview.innerHTML = `
     <div class="responsive-table-shell panel-soft">
       <div class="table-desktop-only">
@@ -6545,9 +6661,10 @@ function renderTransactionReport() {
                 <th></th>
                 <th>Date</th>
                 <th>Type</th>
-                <th>Client</th>
-                <th>Reference</th>
+                <th>${t === 'expenses' ? 'Payee / category' : (t === 'sales' ? 'Client' : 'Client')}</th>
+                <th>${t === 'sales' ? 'Invoice / product' : 'Reference'}</th>
                 <th>Detail</th>
+                ${showQty ? '<th class="num">Qty sold</th>' : ''}
                 <th class="num">Amount</th>
                 <th></th>
               </tr>
@@ -6557,10 +6674,11 @@ function renderTransactionReport() {
                 <tr>
                   <td>${r.editable ? `<input type="checkbox" class="rr-row-check" value="${r.id}" />` : ''}</td>
                   <td>${escHtml(r.date)}</td>
-                  <td><span class="report-type-pill ${r.kind === 'payment' ? 'pay' : (r.kind === 'custom' ? 'custom' : 'inv')}">${r.kind === 'payment' ? 'Payment' : (r.kind === 'custom' ? escHtml(r.method || 'Custom') : 'Invoice')}</span></td>
+                  <td><span class="report-type-pill ${typePillClass(r)}">${escHtml(typeLabel(r))}</span></td>
                   <td>${escHtml(r.clientName)}</td>
-                  <td>${escHtml(r.ref)}${r.title ? `<div class="text-xs text-slate-400">${escHtml(r.title)}</div>` : ''}</td>
+                  <td>${escHtml(r.ref)}${r.productName && r.kind === 'sale' ? `<div class="text-xs text-slate-400">${escHtml(r.productName)}</div>` : (r.title ? `<div class="text-xs text-slate-400">${escHtml(r.title)}</div>` : '')}</td>
                   <td>${escHtml(detailOf(r))}</td>
+                  ${showQty ? `<td class="num">${r.kind === 'sale' ? (r.qty || 0) : '—'}</td>` : ''}
                   <td class="num">${formatNGN(r.amount)}</td>
                   <td>${r.editable ? `<button type="button" class="text-xs font-semibold text-brand-700" onclick="openReportRowEditor('${r.id}')">Edit</button>` : ''}</td>
                 </tr>
@@ -6568,8 +6686,9 @@ function renderTransactionReport() {
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="6" class="num" style="font-weight:700">Total collected (payments)</td>
-                <td class="num" style="font-weight:800">${formatNGN(collected)}</td>
+                <td colspan="${showQty ? 7 : 6}" class="num" style="font-weight:700">${footerLabel}${showQty && t === 'sales' ? ' · Qty ' + qtySold : ''}</td>
+                <td class="num" style="font-weight:800">${formatNGN(footerAmount)}</td>
+                <td></td>
               </tr>
             </tfoot>
           </table>
@@ -6580,14 +6699,15 @@ function renderTransactionReport() {
           <div class="entity-card report-result-card report-card-spaced">
             <div class="entity-card-header">
               <div class="entity-card-main">
-                <span class="entity-card-title">${escHtml(r.clientName)}</span>
-                <span class="entity-card-sub">${escHtml(r.ref)} · ${escHtml(r.date)}</span>
+                <span class="entity-card-title">${escHtml(r.kind === 'sale' ? (r.productName || r.ref) : r.clientName)}</span>
+                <span class="entity-card-sub">${escHtml(r.ref)} · ${escHtml(r.date)}${r.kind === 'sale' ? ' · Qty ' + (r.qty || 0) : ''}</span>
               </div>
               <span class="entity-card-price">${formatNGN(r.amount)}</span>
             </div>
             <div class="entity-card-body is-open" style="display:block">
-              <div class="entity-detail"><span class="entity-detail-label">Type</span><span class="entity-detail-value"><span class="report-type-pill ${r.kind === 'payment' ? 'pay' : (r.kind === 'custom' ? 'custom' : 'inv')}">${r.kind === 'payment' ? 'Payment' : (r.kind === 'custom' ? (r.method || 'Custom') : 'Invoice')}</span></span></div>
+              <div class="entity-detail"><span class="entity-detail-label">Type</span><span class="entity-detail-value"><span class="report-type-pill ${typePillClass(r)}">${escHtml(typeLabel(r))}</span></span></div>
               <div class="entity-detail"><span class="entity-detail-label">Detail</span><span class="entity-detail-value">${escHtml(detailOf(r) || '—')}</span></div>
+              ${r.kind === 'sale' ? `<div class="entity-detail"><span class="entity-detail-label">Qty sold</span><span class="entity-detail-value">${r.qty || 0}</span></div>` : ''}
               ${r.title ? `<div class="entity-detail"><span class="entity-detail-label">Title</span><span class="entity-detail-value">${escHtml(r.title)}</span></div>` : ''}
               <div class="entity-detail"><span class="entity-detail-label">Amount</span><span class="entity-detail-value">${formatNGN(r.amount)}</span></div>
               ${r.editable ? `<div class="entity-detail"><span class="entity-detail-label"></span><span class="entity-detail-value"><button type="button" class="text-xs font-semibold" onclick="openReportRowEditor('${r.id}')">Edit</button></span></div>` : ''}
@@ -6595,8 +6715,8 @@ function renderTransactionReport() {
           </div>
         `).join('')}
         <div class="panel-soft report-mobile-total">
-          <span class="entity-detail-label">Total collected</span>
-          <span class="entity-card-price">${formatNGN(collected)}</span>
+          <span class="entity-detail-label">${footerLabel}${showQty && t === 'sales' ? ' · Qty sold ' + qtySold : ''}</span>
+          <span class="entity-card-price">${formatNGN(footerAmount)}</span>
         </div>
       </div>
     </div>
