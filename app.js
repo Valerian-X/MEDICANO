@@ -1102,9 +1102,17 @@ function getClient(id) {
 
 // -------------------- Navigation --------------------
 function navigate(page) {
-  document.querySelectorAll('.page').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.page').forEach(el => {
+    el.classList.add('hidden');
+    el.style.display = '';
+  });
   const el = document.getElementById('page-' + page);
-  if (el) el.classList.remove('hidden');
+  if (el) {
+    el.classList.remove('hidden');
+    el.style.display = 'block';
+  } else {
+    console.warn('Page not found:', page);
+  }
   try { sessionStorage.setItem('medicano_last_page', page); } catch (e) {}
   try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch (e) { window.scrollTo(0, 0); }
   const main = document.getElementById('main-content') || document.querySelector('main');
@@ -1141,7 +1149,8 @@ function navigate(page) {
     inventory: 'In Stock',
     presentation: 'Client Presentation',
     rates: 'Exchange Rates',
-    'services-expenses': 'Services & Expenses',
+    services: 'Services',
+    expenses: 'Expenses',
     settings: 'Settings'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
@@ -1167,7 +1176,8 @@ function navigate(page) {
   if (page === 'inventory') renderInventory();
   if (page === 'presentation') renderPresPicker();
   if (page === 'rates') renderRates();
-  if (page === 'services-expenses') renderServicesExpenses();
+  if (page === 'services') renderServicesPage();
+  if (page === 'expenses') renderExpensesPage();
   if (page === 'settings') {
     if (typeof renderTeamPanel === 'function') renderTeamPanel();
     if (typeof renderSettings === 'function') renderSettings();
@@ -3442,10 +3452,22 @@ function generateInvoicePdf(inv) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(20);
     doc.setTextColor(...TEAL);
-    const isPaidDoc = String(inv.status || '').toLowerCase() === 'paid';
+    const statusLower = String(inv.status || '').toLowerCase();
+    const isPaidDoc = statusLower === 'paid';
+    const paidAmount = typeof invoicePaidTotal === 'function' ? invoicePaidTotal(inv) : (Number(inv.amountPaid) || 0);
+    const balanceAmount = typeof invoiceBalance === 'function'
+      ? invoiceBalance(inv)
+      : Math.max(0, (Number(total) || 0) - paidAmount);
+    // Partial if status says so, or any payment that doesn't cover the full total
+    const isPartialDoc = statusLower === 'partial'
+      || (paidAmount > 0.009 && balanceAmount > 0.009 && !isPaidDoc);
     const isProforma = String(inv.docType || '').toLowerCase() === 'proforma';
-    // Fully paid → RECEIPT; otherwise invoice / proforma invoice
-    const docLabel = isPaidDoc ? 'RECEIPT' : (isProforma ? 'PROFORMA INVOICE' : 'INVOICE');
+    // Fully paid → RECEIPT; partial → PARTIAL INVOICE; else invoice / proforma
+    const docLabel = isPaidDoc
+      ? 'RECEIPT'
+      : (isPartialDoc
+        ? 'PARTIAL INVOICE'
+        : (isProforma ? 'PROFORMA INVOICE' : 'INVOICE'));
     doc.text(docLabel, W - M, headerTop + 14, { align: 'right' });
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
@@ -3654,7 +3676,15 @@ function generateInvoicePdf(inv) {
     doc.line(Math.min(leftEdge, totalsRight - 120), y, totalsRight, y);
     y += 16;
     drawTotalLine('TOTAL', total, y, true);
-    y += 28;
+    y += 16;
+    // Show amount paid + remaining on partial (and useful on any open balance with payments)
+    if (isPartialDoc || (paidAmount > 0.009 && !isPaidDoc)) {
+      drawTotalLine('Amount paid', paidAmount, y, false);
+      y += 16;
+      drawTotalLine('Balance due', balanceAmount, y, true);
+      y += 12;
+    }
+    y += 16;
 
     // Bank / payment details — skip when invoice is already paid
     const isPaid = isPaidDoc;
@@ -4276,19 +4306,32 @@ const EXPENSE_CATEGORIES = [
   'Maintenance', 'Marketing', 'Professional fees', 'Other'
 ];
 
-function renderServicesExpenses() {
-  renderServicesList();
-  renderExpensesList();
+function renderServicesPage() {
+  if (!data.services) data.services = [];
+  if (!data.clients) data.clients = [];
   fillServiceClientSelect();
   const ed = document.getElementById('svc-date');
+  const today = (typeof localYMD === 'function') ? localYMD() : new Date().toISOString().slice(0, 10);
+  if (ed) ed.value = ed.value || today;
+  renderServicesList();
+}
+
+function renderExpensesPage() {
+  if (!data.officeExpenses) data.officeExpenses = [];
   const xd = document.getElementById('exp-date');
   const today = (typeof localYMD === 'function') ? localYMD() : new Date().toISOString().slice(0, 10);
-  if (ed && !ed.value) ed.value = today;
-  if (xd && !xd.value) xd.value = today;
+  if (xd) xd.value = xd.value || today;
   const expCat = document.getElementById('exp-category');
-  if (expCat && expCat.options.length <= 1) {
+  if (expCat) {
     expCat.innerHTML = EXPENSE_CATEGORIES.map(c => '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>').join('');
   }
+  renderExpensesList();
+}
+
+/** @deprecated combined page — keep alias */
+function renderServicesExpenses() {
+  renderServicesPage();
+  renderExpensesPage();
 }
 
 function fillServiceClientSelect() {
@@ -4296,9 +4339,41 @@ function fillServiceClientSelect() {
   if (!sel) return;
   const cur = sel.value;
   const clients = (data.clients || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  sel.innerHTML = '<option value="">— Select client —</option>' +
+  sel.innerHTML = '<option value="">— Select existing client —</option>' +
     clients.map(c => '<option value="' + c.id + '">' + escHtml(c.name) + '</option>').join('');
-  if (cur) sel.value = cur;
+  if (cur && clients.some(c => c.id === cur)) sel.value = cur;
+}
+
+function onServiceClientSelectChange() {
+  const sel = document.getElementById('svc-client');
+  const custom = document.getElementById('svc-client-custom');
+  if (!sel || !custom) return;
+  if (sel.value) custom.value = '';
+}
+
+/** Resolve client for a service: custom name creates/finds client; else selected id */
+function resolveServiceClient() {
+  const customName = (document.getElementById('svc-client-custom')?.value || '').trim();
+  const clientId = document.getElementById('svc-client')?.value || '';
+  if (customName) {
+    if (!data.clients) data.clients = [];
+    let existing = data.clients.find(c => (c.name || '').toLowerCase() === customName.toLowerCase());
+    if (!existing) {
+      existing = {
+        id: 'c' + Date.now() + Math.random().toString(36).slice(2, 6),
+        name: customName,
+        contact: '',
+        phone: '',
+        email: '',
+        address: '',
+        createdAt: new Date().toISOString()
+      };
+      data.clients.push(existing);
+    }
+    return existing;
+  }
+  if (clientId) return getClient(clientId) || null;
+  return null;
 }
 
 function renderServicesList() {
@@ -4370,19 +4445,22 @@ function renderExpensesList() {
 
 function saveServiceRecord(ev) {
   if (ev) ev.preventDefault();
-  const clientId = document.getElementById('svc-client')?.value || '';
   const description = (document.getElementById('svc-description')?.value || '').trim();
   const amountNgn = parseFloat(document.getElementById('svc-amount')?.value) || 0;
   const date = document.getElementById('svc-date')?.value || '';
   const notes = (document.getElementById('svc-notes')?.value || '').trim();
   if (!description) { alert('Enter a service description.'); return; }
   if (!date) { alert('Enter a date.'); return; }
+  const client = resolveServiceClient();
+  if (!client) {
+    alert('Select a client from the list or type a new client name.');
+    return;
+  }
   if (!data.services) data.services = [];
-  const client = clientId ? getClient(clientId) : null;
   data.services.push({
     id: 'svc' + Date.now() + Math.random().toString(36).slice(2, 5),
-    clientId: clientId || null,
-    clientName: client ? client.name : '',
+    clientId: client.id,
+    clientName: client.name || '',
     description,
     amountNgn,
     date,
@@ -4393,7 +4471,13 @@ function saveServiceRecord(ev) {
   document.getElementById('svc-description').value = '';
   document.getElementById('svc-amount').value = '';
   document.getElementById('svc-notes').value = '';
+  const custom = document.getElementById('svc-client-custom');
+  if (custom) custom.value = '';
+  fillServiceClientSelect();
+  const sel = document.getElementById('svc-client');
+  if (sel) sel.value = client.id;
   renderServicesList();
+  if (typeof renderClients === 'function') renderClients();
 }
 
 function saveExpenseRecord(ev) {

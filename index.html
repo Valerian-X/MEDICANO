@@ -2181,6 +2181,12 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         <a href="#products" data-page="products" class="sidebar-link flex items-center gap-3">
           <span>📦</span> Inventory
         </a>
+        <a href="#services" data-page="services" class="sidebar-link flex items-center gap-3">
+          <span>🛠️</span> Services
+        </a>
+        <a href="#expenses" data-page="expenses" class="sidebar-link flex items-center gap-3">
+          <span>💸</span> Expenses
+        </a>
         <a href="#clients" data-page="clients" class="sidebar-link flex items-center gap-3">
           <span>🏥</span> Clients
         </a>
@@ -2201,9 +2207,6 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         </a>
         <a href="#rates" data-page="rates" class="sidebar-link flex items-center gap-3">
           <span>💱</span> Exchange Rates
-        </a>
-        <a href="#" class="sidebar-link" data-page="services-expenses" onclick="navigate('services-expenses'); return false;">
-          <span>💼</span> Services &amp; Expenses
         </a>
         <a href="#settings" data-page="settings" class="sidebar-link flex items-center gap-3">
           <span>⚙️</span> Settings
@@ -2363,6 +2366,12 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               <button type="button" class="text-xs font-semibold underline" onclick="navigate('products')">View inventory</button>
               <button type="button" class="text-xs font-semibold opacity-70" onclick="dismissLowStockAlert()">Dismiss for 2 hours</button>
             </div>
+          </div>
+
+          
+          <div class="se-dash-links flex flex-wrap gap-2 mb-4">
+            <button type="button" class="btn-primary" onclick="navigate('services')">🛠️ Services</button>
+            <button type="button" class="btn-soft" onclick="navigate('expenses')">💸 Expenses</button>
           </div>
 
           <div class="dash-intel-layout">
@@ -3302,32 +3311,40 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
 
         <!-- SETTINGS -->
         
-        <!-- SERVICES & OFFICE EXPENSES -->
-        <section id="page-services-expenses" class="page hidden">
-          <div class="flex flex-col gap-5">
+                <!-- SERVICES (client services) -->
+        <section id="page-services" class="page hidden">
+          <div class="flex flex-col gap-5 se-page">
+            <div class="panel-soft p-4 se-intro">
+              <h3 class="font-semibold m-0 se-intro-title">Services rendered to clients</h3>
+              <p class="se-intro-text">Log installations, training, maintenance and other services. Choose an existing client or type a new name — new clients are added to your client list automatically.</p>
+            </div>
             <div class="panel-soft p-4">
               <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <h3 class="font-semibold m-0">Services rendered to clients</h3>
-                <button type="button" class="btn-soft btn-compact" onclick="exportServicesCsv()">Export services CSV</button>
+                <h3 class="font-semibold m-0">New service record</h3>
+                <button type="button" class="btn-soft btn-compact" onclick="exportServicesCsv()">Export CSV</button>
               </div>
               <form class="settings-form-grid mb-4" onsubmit="saveServiceRecord(event)">
                 <div>
-                  <label class="settings-label">Client</label>
-                  <select id="svc-client" class="settings-input w-full"></select>
+                  <label class="settings-label">Client (saved list)</label>
+                  <select id="svc-client" class="settings-input w-full" onchange="onServiceClientSelectChange()"></select>
                 </div>
                 <div>
-                  <label class="settings-label">Date</label>
-                  <input id="svc-date" type="date" class="settings-input w-full" required />
+                  <label class="settings-label">Or type new / custom client</label>
+                  <input id="svc-client-custom" type="text" class="settings-input w-full" placeholder="e.g. New hospital name" autocomplete="organization" />
                 </div>
                 <div class="settings-span-2">
                   <label class="settings-label">Service description *</label>
                   <input id="svc-description" type="text" class="settings-input w-full" placeholder="e.g. Installation, training, maintenance visit" required />
                 </div>
                 <div>
+                  <label class="settings-label">Date</label>
+                  <input id="svc-date" type="date" class="settings-input w-full" required />
+                </div>
+                <div>
                   <label class="settings-label">Amount (₦)</label>
                   <input id="svc-amount" type="number" min="0" step="0.01" class="settings-input w-full" placeholder="0.00" />
                 </div>
-                <div>
+                <div class="settings-span-2">
                   <label class="settings-label">Notes</label>
                   <input id="svc-notes" type="text" class="settings-input w-full" placeholder="Optional" />
                 </div>
@@ -3337,11 +3354,20 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               </form>
               <div id="services-list" class="entity-cards stack-cards"></div>
             </div>
+          </div>
+        </section>
 
+        <!-- OFFICE EXPENSES -->
+        <section id="page-expenses" class="page hidden">
+          <div class="flex flex-col gap-5 se-page">
+            <div class="panel-soft p-4 se-intro">
+              <h3 class="font-semibold m-0 se-intro-title">Office expenditure</h3>
+              <p class="se-intro-text">Track rent, utilities, salaries, transport and other office running costs.</p>
+            </div>
             <div class="panel-soft p-4">
               <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <h3 class="font-semibold m-0">Office expenditure</h3>
-                <button type="button" class="btn-soft btn-compact" onclick="exportExpensesCsv()">Export expenses CSV</button>
+                <h3 class="font-semibold m-0">New expense</h3>
+                <button type="button" class="btn-soft btn-compact" onclick="exportExpensesCsv()">Export CSV</button>
               </div>
               <form class="settings-form-grid mb-4" onsubmit="saveExpenseRecord(event)">
                 <div>
@@ -3377,7 +3403,7 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
           </div>
         </section>
 
-        <section id="page-settings" class="page hidden">
+<section id="page-settings" class="page hidden">
           <div class="settings-page">
             <!-- Company -->
             <div class="settings-card settings-panel" data-panel="company">

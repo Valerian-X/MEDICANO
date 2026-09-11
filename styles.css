@@ -5887,3 +5887,32 @@ html.dark .password-toggle-btn:hover { color: #f3f0ea; background: rgba(255,255,
 html.dark .auth-forgot-link { color: #5eead4; }
 #auth-forgot-success { color: #059669; }
 html.dark #auth-forgot-success { color: #34d399; }
+
+/* Services & Expenses page */
+#page-services-expenses.page:not(.hidden) {
+  display: block !important;
+}
+.se-intro-title {
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
+  color: inherit;
+}
+.se-intro-text {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+  line-height: 1.45;
+}
+html.dark .se-intro-title,
+html.dark #page-services-expenses h3 {
+  color: #f3f0ea !important;
+}
+html.dark .se-intro-text {
+  color: #cbd5e1 !important;
+}
+html.dark #page-services-expenses .settings-label {
+  color: #94a3b8 !important;
+}
+.se-dash-links {
+  margin-top: 0.5rem;
+}
