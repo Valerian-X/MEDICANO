@@ -3240,6 +3240,8 @@ function showNewInvoice() {
   document.getElementById('inv-notes').value = '';
   const sf = document.getElementById('inv-show-footer');
   if (sf) sf.checked = true;
+  const sd = document.getElementById('inv-show-descriptions');
+  if (sd) sd.checked = true;
   document.getElementById('invoice-items-list').innerHTML = '';
   addInvoiceItemRow();
   recalcInvoiceTotal();
@@ -3275,6 +3277,8 @@ function editInvoice(id) {
   document.getElementById('inv-notes').value = inv.notes || '';
   const sf = document.getElementById('inv-show-footer');
   if (sf) sf.checked = inv.showFooter !== false;
+  const sd = document.getElementById('inv-show-descriptions');
+  if (sd) sd.checked = inv.showItemDescriptions !== false;
   const tbody = document.getElementById('invoice-items-list');
   tbody.innerHTML = '';
   (inv.items || []).forEach(it => addInvoiceItemRow(it));
@@ -3532,6 +3536,7 @@ function saveInvoice() {
     quoteRef: document.getElementById('inv-quote-ref')?.value.trim() || '',
     notes: document.getElementById('inv-notes')?.value.trim() || '',
     showFooter: document.getElementById('inv-show-footer')?.checked !== false,
+    showItemDescriptions: document.getElementById('inv-show-descriptions')?.checked !== false,
     discount,
     discountAmount: discountAmt != null ? discountAmt : 0,
     discountMode: (window._discountMode && window._discountMode.invoice) || 'pct',
@@ -3659,6 +3664,7 @@ function printInvoice() {
       accountNumber: (document.getElementById('inv-account-number')?.value || '').trim(),
       bankCode: (document.getElementById('inv-bank-code')?.value || '').trim(),
       showFooter: document.getElementById('inv-show-footer')?.checked !== false,
+      showItemDescriptions: document.getElementById('inv-show-descriptions')?.checked !== false,
       discount, items, subtotalNgn: sub, totalNgn: total
     };
   } else {
@@ -3878,7 +3884,8 @@ function generateInvoicePdf(inv) {
     items.forEach((it) => {
       const prod = it.productId ? getProduct(it.productId) : null;
       const name = it.name || (prod ? prod.name : 'Item');
-      const desc = (it.description || (prod && prod.description) || '').trim();
+      const showDesc = inv.showItemDescriptions !== false;
+      const desc = showDesc ? ((it.description || (prod && prod.description) || '').trim()) : '';
       const qty = Number(it.qty) || 0;
       const unit = Number(it.unitNgn) || 0;
       const line = it.lineNgn != null ? it.lineNgn : qty * unit;
