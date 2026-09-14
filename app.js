@@ -4044,7 +4044,13 @@ function generateInvoicePdf(inv) {
       .slice(0, max || 50);
     const clientName = sanitize(client ? client.name : 'Client', 50) || 'Client';
     const docTitle = sanitize(invNum, 30) || 'Invoice';
-    savePdfFile(doc, clientName + ' - ' + docTitle + '.pdf');
+    const archMeta = invoiceDocArchiveMeta(inv);
+    const typePart = sanitize(archMeta.label, 24);
+    savePdfFile(doc, clientName + ' - ' + docTitle + ' - ' + typePart + '.pdf', {
+      client: client,
+      clientId: inv.clientId,
+      kind: archMeta.kind
+    });
   }).catch(err => {
     console.error(err);
     alert(err.message || 'Could not generate invoice PDF. Check your connection and try again.');
@@ -5255,6 +5261,31 @@ function loadJsPdf() {
 
 /** Save PDF — uses native bridge on Android APK when available */
 
+
+/** Folder + labels for invoice-type PDFs (proforma / partial / receipt / tax invoice) */
+function invoiceDocArchiveMeta(inv) {
+  inv = inv || {};
+  const statusLower = String(inv.status || '').toLowerCase();
+  const isPaidDoc = statusLower === 'paid';
+  const total = Number(inv.totalNGN != null ? inv.totalNGN : inv.totalNgn) || 0;
+  const paidAmount = Number(inv.amountPaid) || ((inv.payments || []).reduce(function (s, p) {
+    return s + (Number(p.amount) || 0);
+  }, 0));
+  const isPartialDoc = statusLower === 'partial'
+    || (paidAmount > 0.009 && !isPaidDoc && paidAmount < total - 0.009);
+  const isProforma = String(inv.docType || '').toLowerCase() === 'proforma';
+  if (isPaidDoc) {
+    return { kind: 'Receipts', label: 'Receipt', docLabel: 'RECEIPT', short: 'Receipt' };
+  }
+  if (isPartialDoc) {
+    return { kind: 'Partial Invoices', label: 'Partial Invoice', docLabel: 'PARTIAL INVOICE', short: 'Partial' };
+  }
+  if (isProforma) {
+    return { kind: 'Proforma Invoices', label: 'Proforma Invoice', docLabel: 'PROFORMA INVOICE', short: 'Proforma' };
+  }
+  return { kind: 'Invoices', label: 'Invoice', docLabel: 'INVOICE', short: 'Invoice' };
+}
+
 // -------------------- Document archive (admin, File System Access API) --------------------
 const ARCHIVE_DB = 'medicano_archive_v1';
 const ARCHIVE_STORE = 'handles';
@@ -5387,7 +5418,7 @@ async function updateArchiveUi() {
   }
   const ok = await ensureArchivePermission(handle);
   status.textContent = ok
-    ? ('Connected: ' + (handle.name || 'folder') + ' — structure: Clients / [Client] / Invoices|Quotes|Reports')
+    ? ('Connected: ' + (handle.name || 'folder') + ' — Clients / [Client] / Invoices · Proforma Invoices · Partial Invoices · Receipts · Quotes')
     : 'Folder saved but permission needed — click Connect folder again.';
 }
 
@@ -5475,13 +5506,13 @@ async function archiveInvoiceRecord(inv, { forceDownload } = {}) {
   if (!inv) return { ok: false };
   const client = getClient(inv.clientId);
   const folder = clientFolderName(client);
-  const status = (inv.status || '').toLowerCase();
-  const title = status === 'paid' ? 'Receipt' : (status === 'partial' ? 'Partial Invoice' : 'Invoice');
-  const filename = (client ? client.name : 'Client') + ' - ' + (inv.invoiceNumber || inv.id) + ' - ' + title + '.pdf';
+  const archMeta = invoiceDocArchiveMeta(inv);
+  const filename = (client ? client.name : 'Client') + ' - ' + (inv.invoiceNumber || inv.id) + ' - ' + archMeta.label + '.pdf';
   try {
     const captured = await invoicePdfBlob(inv);
     const blob = captured.blob;
-    const res = await writeBlobToArchive(['Clients', folder, 'Invoices'], filename, blob);
+    // Separate folders: Proforma Invoices / Partial Invoices / Receipts / Invoices
+    const res = await writeBlobToArchive(['Clients', folder, archMeta.kind], filename, blob);
     return res;
   } catch (e) {
     console.warn('archive invoice', e);
@@ -6380,7 +6411,7 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
     .slice(0, max || 50);
   const clientName = sanitize(forClient, 50) || 'Client';
   const docTitle = sanitize(title, 40) || 'Presentation';
-  savePdfFile(doc, clientName + ' - ' + docTitle + '.pdf');
+  savePdfFile(doc, clientName + ' - ' + docTitle + '.pdf', { kind: 'Presentations' });
 }
 
 function escHtml(s) {
@@ -7650,7 +7681,7 @@ function generateQuotePdf(q) {
     doc.text('Client acknowledgement', W - M - 180, y + 52);
 
     const safe = (s) => String(s || 'Quote').replace(/[\\/:*?"<>|]/g, ' ').trim().slice(0, 40);
-    savePdfFile(doc, safe(client && client.name) + ' - ' + safe(q.quoteNumber) + '.pdf');
+    savePdfFile(doc, safe(client && client.name) + ' - ' + safe(q.quoteNumber) + '.pdf', { client: client, clientId: q.clientId, kind: 'Quotes' });
   }).catch(err => alert(err.message || 'Could not generate quote PDF'));
 }
 
