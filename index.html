@@ -3541,6 +3541,29 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
               </div>
             </div>
 
+            <!-- Document archive (admin) -->
+            <div class="settings-card settings-panel collapsed" data-panel="archive" id="settings-archive-panel">
+              <button type="button" class="settings-panel-toggle" onclick="toggleSettingsPanel('archive')">
+                <span class="settings-card-title">Document archive</span>
+                <span class="settings-chevron">▼</span>
+              </button>
+              <div class="settings-panel-body">
+                <p class="settings-help">Admin only. Choose a folder on this computer (e.g. Desktop → Medicano Docs). The app creates client subfolders and saves invoice, quote, and report PDFs there. Existing files with the same name are skipped.</p>
+                <p id="archive-status" class="text-sm mb-3">No folder connected.</p>
+                <label class="settings-check-row mb-3" style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
+                  <input type="checkbox" id="archive-auto-save" onchange="saveArchiveSettings()" />
+                  <span class="text-sm">Auto-save PDFs to archive when generated</span>
+                </label>
+                <div class="settings-inline-row" style="flex-wrap:wrap;gap:0.5rem">
+                  <button type="button" class="btn-primary btn-compact" onclick="connectArchiveFolder()">Connect folder</button>
+                  <button type="button" class="btn-soft btn-compact" onclick="archiveExportAllInvoices()">Export all invoices</button>
+                  <button type="button" class="btn-soft btn-compact" onclick="archiveExportAllQuotes()">Export all quotes</button>
+                  <button type="button" class="btn-soft btn-compact" onclick="archiveExportReports()">Export current report PDF</button>
+                </div>
+                <p id="archive-progress" class="text-xs mt-2 mb-0" style="opacity:0.8"></p>
+              </div>
+            </div>
+
             <!-- Categories -->
             <div class="settings-card settings-panel collapsed" data-panel="categories">
               <button type="button" class="settings-panel-toggle" onclick="toggleSettingsPanel('categories')">

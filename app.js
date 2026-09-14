@@ -1214,6 +1214,7 @@ function navigate(page) {
   if (page === 'settings') {
     if (typeof renderTeamPanel === 'function') renderTeamPanel();
     if (typeof renderSettings === 'function') renderSettings();
+    if (typeof updateArchiveUi === 'function') updateArchiveUi();
   }
 }
 
@@ -5253,7 +5254,375 @@ function loadJsPdf() {
 }
 
 /** Save PDF — uses native bridge on Android APK when available */
-function savePdfFile(doc, filename) {
+
+// -------------------- Document archive (admin, File System Access API) --------------------
+const ARCHIVE_DB = 'medicano_archive_v1';
+const ARCHIVE_STORE = 'handles';
+const ARCHIVE_KEY = 'root';
+
+function isArchiveAdmin() {
+  try {
+    const cloud = window.MedicanoCloud;
+    if (cloud && typeof cloud.isAdmin === 'function' && cloud.isSignedIn && cloud.isSignedIn()) {
+      return !!cloud.isAdmin();
+    }
+  } catch (e) {}
+  // Not signed into team cloud → treat local owner as allowed
+  try {
+    const cloud = window.MedicanoCloud;
+    if (cloud && cloud.isSignedIn && cloud.isSignedIn() && cloud.isAdmin && !cloud.isAdmin()) return false;
+  } catch (e2) {}
+  return true;
+}
+
+function safeArchiveName(name) {
+  return String(name || 'Untitled')
+    .replace(/[\\/:*?"<>|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80) || 'Untitled';
+}
+
+function openArchiveDb() {
+  return new Promise(function (resolve, reject) {
+    const req = indexedDB.open(ARCHIVE_DB, 1);
+    req.onupgradeneeded = function () {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(ARCHIVE_STORE)) db.createObjectStore(ARCHIVE_STORE);
+    };
+    req.onsuccess = function () { resolve(req.result); };
+    req.onerror = function () { reject(req.error); };
+  });
+}
+
+async function idbGet(key) {
+  const db = await openArchiveDb();
+  return new Promise(function (resolve, reject) {
+    const tx = db.transaction(ARCHIVE_STORE, 'readonly');
+    const req = tx.objectStore(ARCHIVE_STORE).get(key);
+    req.onsuccess = function () { resolve(req.result); };
+    req.onerror = function () { reject(req.error); };
+  });
+}
+
+async function idbSet(key, val) {
+  const db = await openArchiveDb();
+  return new Promise(function (resolve, reject) {
+    const tx = db.transaction(ARCHIVE_STORE, 'readwrite');
+    tx.objectStore(ARCHIVE_STORE).put(val, key);
+    tx.oncomplete = function () { resolve(); };
+    tx.onerror = function () { reject(tx.error); };
+  });
+}
+
+async function getArchiveRootHandle() {
+  try {
+    return await idbGet(ARCHIVE_KEY);
+  } catch (e) {
+    return null;
+  }
+}
+
+async function setArchiveRootHandle(handle) {
+  await idbSet(ARCHIVE_KEY, handle);
+}
+
+async function ensureArchivePermission(handle) {
+  if (!handle) return false;
+  const opts = { mode: 'readwrite' };
+  if (handle.queryPermission) {
+    let p = await handle.queryPermission(opts);
+    if (p === 'granted') return true;
+    if (handle.requestPermission) {
+      p = await handle.requestPermission(opts);
+      return p === 'granted';
+    }
+  }
+  return true;
+}
+
+async function connectArchiveFolder() {
+  if (!isArchiveAdmin()) {
+    alert('Document archive is only available to admin.');
+    return;
+  }
+  if (typeof window.showDirectoryPicker !== 'function') {
+    alert('Your browser does not support choosing a folder.\n\nUse Chrome or Edge on a computer, or the Windows desktop app.');
+    return;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'desktop' });
+    await setArchiveRootHandle(handle);
+    if (data && data.settings) {
+      data.settings.archiveConnected = true;
+      saveData();
+    }
+    updateArchiveUi();
+    alert('Folder connected. Client folders and PDFs will be stored here.');
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    alert((e && e.message) ? e.message : String(e));
+  }
+}
+
+function saveArchiveSettings() {
+  if (!data.settings) data.settings = {};
+  data.settings.archiveAutoSave = !!document.getElementById('archive-auto-save')?.checked;
+  saveData();
+}
+
+async function updateArchiveUi() {
+  const panel = document.getElementById('settings-archive-panel');
+  if (panel) {
+    panel.style.display = isArchiveAdmin() ? '' : 'none';
+  }
+  const status = document.getElementById('archive-status');
+  const auto = document.getElementById('archive-auto-save');
+  if (auto && data && data.settings) auto.checked = !!data.settings.archiveAutoSave;
+  if (!status) return;
+  const handle = await getArchiveRootHandle();
+  if (!handle) {
+    status.textContent = 'No folder connected. Click “Connect folder” (e.g. create Medicano Docs on your Desktop first).';
+    return;
+  }
+  const ok = await ensureArchivePermission(handle);
+  status.textContent = ok
+    ? ('Connected: ' + (handle.name || 'folder') + ' — structure: Clients / [Client] / Invoices|Quotes|Reports')
+    : 'Folder saved but permission needed — click Connect folder again.';
+}
+
+async function ensureDirPath(root, parts) {
+  let dir = root;
+  for (let i = 0; i < parts.length; i++) {
+    dir = await dir.getDirectoryHandle(safeArchiveName(parts[i]), { create: true });
+  }
+  return dir;
+}
+
+async function archiveFileExists(dir, filename) {
+  try {
+    await dir.getFileHandle(filename);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function writeBlobToArchive(pathParts, filename, blob) {
+  const root = await getArchiveRootHandle();
+  if (!root) return { ok: false, reason: 'no-folder' };
+  if (!(await ensureArchivePermission(root))) return { ok: false, reason: 'permission' };
+  const dir = await ensureDirPath(root, pathParts);
+  filename = safeArchiveName(filename.replace(/\.pdf$/i, '')) + '.pdf';
+  if (await archiveFileExists(dir, filename)) {
+    return { ok: true, skipped: true, filename: filename };
+  }
+  const fh = await dir.getFileHandle(filename, { create: true });
+  const writable = await fh.createWritable();
+  await writable.write(blob);
+  await writable.close();
+  return { ok: true, skipped: false, filename: filename };
+}
+
+function clientFolderName(client) {
+  if (!client) return 'Unknown client';
+  return safeArchiveName(client.name || client.id || 'Unknown client');
+}
+
+/** Generate invoice PDF as blob (no download) */
+function invoicePdfBlob(inv) {
+  return new Promise(function (resolve, reject) {
+    // Re-use generate path by temporary hook
+    if (typeof loadJsPdf !== 'function') {
+      reject(new Error('PDF library not available'));
+      return;
+    }
+    // Call internal generator with capture
+    const origSave = window.savePdfFile;
+    let captured = null;
+    window.savePdfFile = function (doc, filename) {
+      try {
+        captured = { blob: doc.output('blob'), filename: filename };
+      } catch (e) {
+        captured = null;
+      }
+    };
+    try {
+      generateInvoicePdf(inv);
+      // generateInvoicePdf is async via loadJsPdf().then
+      // Poll briefly for capture
+      let tries = 0;
+      const t = setInterval(function () {
+        tries++;
+        if (captured) {
+          clearInterval(t);
+          window.savePdfFile = origSave;
+          resolve(captured);
+        } else if (tries > 80) {
+          clearInterval(t);
+          window.savePdfFile = origSave;
+          reject(new Error('PDF generate timeout'));
+        }
+      }, 100);
+    } catch (e) {
+      window.savePdfFile = origSave;
+      reject(e);
+    }
+  });
+}
+
+async function archiveInvoiceRecord(inv, { forceDownload } = {}) {
+  if (!inv) return { ok: false };
+  const client = getClient(inv.clientId);
+  const folder = clientFolderName(client);
+  const status = (inv.status || '').toLowerCase();
+  const title = status === 'paid' ? 'Receipt' : (status === 'partial' ? 'Partial Invoice' : 'Invoice');
+  const filename = (client ? client.name : 'Client') + ' - ' + (inv.invoiceNumber || inv.id) + ' - ' + title + '.pdf';
+  try {
+    const captured = await invoicePdfBlob(inv);
+    const blob = captured.blob;
+    const res = await writeBlobToArchive(['Clients', folder, 'Invoices'], filename, blob);
+    return res;
+  } catch (e) {
+    console.warn('archive invoice', e);
+    return { ok: false, error: e };
+  }
+}
+
+async function archiveQuoteRecord(q) {
+  if (!q) return { ok: false };
+  const client = getClient(q.clientId);
+  const folder = clientFolderName(client);
+  const filename = (client ? client.name : 'Client') + ' - ' + (q.quoteNumber || q.id) + ' - Quote.pdf';
+  return new Promise(function (resolve) {
+    const origSave = window.savePdfFile;
+    let captured = null;
+    window.savePdfFile = function (doc, filename) {
+      try { captured = { blob: doc.output('blob'), filename: filename }; } catch (e) { captured = null; }
+    };
+    try {
+      generateQuotePdf(q);
+      let tries = 0;
+      const t = setInterval(async function () {
+        tries++;
+        if (captured) {
+          clearInterval(t);
+          window.savePdfFile = origSave;
+          try {
+            const res = await writeBlobToArchive(['Clients', folder, 'Quotes'], filename, captured.blob);
+            resolve(res);
+          } catch (e) {
+            resolve({ ok: false, error: e });
+          }
+        } else if (tries > 80) {
+          clearInterval(t);
+          window.savePdfFile = origSave;
+          resolve({ ok: false, error: 'timeout' });
+        }
+      }, 100);
+    } catch (e) {
+      window.savePdfFile = origSave;
+      resolve({ ok: false, error: e });
+    }
+  });
+}
+
+async function archiveExportAllInvoices() {
+  if (!isArchiveAdmin()) { alert('Admin only.'); return; }
+  const root = await getArchiveRootHandle();
+  if (!root) { alert('Connect a folder first.'); return; }
+  const list = data.invoices || [];
+  const prog = document.getElementById('archive-progress');
+  let saved = 0, skipped = 0, failed = 0;
+  for (let i = 0; i < list.length; i++) {
+    if (prog) prog.textContent = 'Invoices ' + (i + 1) + ' / ' + list.length + '…';
+    const r = await archiveInvoiceRecord(list[i]);
+    if (r && r.skipped) skipped++;
+    else if (r && r.ok) saved++;
+    else failed++;
+  }
+  if (prog) prog.textContent = 'Done: ' + saved + ' saved, ' + skipped + ' already existed, ' + failed + ' failed.';
+  alert('Invoice archive complete.\nSaved: ' + saved + '\nSkipped (already exist): ' + skipped + '\nFailed: ' + failed);
+}
+
+async function archiveExportAllQuotes() {
+  if (!isArchiveAdmin()) { alert('Admin only.'); return; }
+  const root = await getArchiveRootHandle();
+  if (!root) { alert('Connect a folder first.'); return; }
+  const list = data.quotes || [];
+  const prog = document.getElementById('archive-progress');
+  let saved = 0, skipped = 0, failed = 0;
+  for (let i = 0; i < list.length; i++) {
+    if (prog) prog.textContent = 'Quotes ' + (i + 1) + ' / ' + list.length + '…';
+    const r = await archiveQuoteRecord(list[i]);
+    if (r && r.skipped) skipped++;
+    else if (r && r.ok) saved++;
+    else failed++;
+  }
+  if (prog) prog.textContent = 'Done: ' + saved + ' saved, ' + skipped + ' already existed, ' + failed + ' failed.';
+  alert('Quote archive complete.\nSaved: ' + saved + '\nSkipped: ' + skipped + '\nFailed: ' + failed);
+}
+
+async function archiveExportReports() {
+  if (!isArchiveAdmin()) { alert('Admin only.'); return; }
+  const root = await getArchiveRootHandle();
+  if (!root) { alert('Connect a folder first.'); return; }
+  // Print area / simple text export of current report as PDF via jsPDF
+  try {
+    const JsPDF = await loadJsPdf();
+    const doc = new JsPDF({ unit: 'pt', format: 'a4' });
+    const filters = typeof getReportFilterState === 'function' ? getReportFilterState() : {};
+    const rows = typeof collectLedgerRows === 'function' ? collectLedgerRows(filters) : [];
+    let y = 48;
+    doc.setFontSize(14);
+    doc.text('Medicano Report', 42, y); y += 20;
+    doc.setFontSize(10);
+    doc.text('Type: ' + (filters.type || 'all') + '  ·  ' + (filters.from || '…') + ' to ' + (filters.to || '…'), 42, y); y += 16;
+    doc.text('Generated: ' + new Date().toLocaleString(), 42, y); y += 24;
+    rows.slice(0, 80).forEach(function (r) {
+      if (y > 780) { doc.addPage(); y = 48; }
+      const line = (r.date || '') + ' | ' + (r.kind || '') + ' | ' + (r.clientName || '') + ' | ' + (r.ref || '') + ' | ' + (r.amount || 0);
+      doc.text(String(line).slice(0, 95), 42, y);
+      y += 12;
+    });
+    if (rows.length > 80) {
+      doc.text('…and ' + (rows.length - 80) + ' more rows', 42, y);
+    }
+    const blob = doc.output('blob');
+    const filename = 'Report-' + (filters.type || 'all') + '-' + (filters.from || 'start') + '-to-' + (filters.to || localYMD()) + '.pdf';
+    const res = await writeBlobToArchive(['Reports'], filename, blob);
+    alert(res.skipped ? 'Report PDF already exists — skipped.' : 'Report PDF saved to archive / Reports.');
+  } catch (e) {
+    alert((e && e.message) ? e.message : String(e));
+  }
+}
+
+/** Optional auto-archive after a normal PDF save */
+async function maybeAutoArchivePdf(doc, filename, meta) {
+  try {
+    if (!isArchiveAdmin()) return;
+    if (!data || !data.settings || !data.settings.archiveAutoSave) return;
+    const root = await getArchiveRootHandle();
+    if (!root) return;
+    const blob = doc.output('blob');
+    meta = meta || {};
+    const client = meta.client || (meta.clientId ? getClient(meta.clientId) : null);
+    const folder = clientFolderName(client);
+    const kind = meta.kind || 'Other';
+    const parts = client ? ['Clients', folder, kind] : [kind];
+    await writeBlobToArchive(parts, filename, blob);
+  } catch (e) {
+    console.warn('auto-archive', e);
+  }
+}
+
+
+function savePdfFile(doc, filename, meta) {
+  try {
+    if (typeof maybeAutoArchivePdf === 'function') {
+      maybeAutoArchivePdf(doc, filename || 'medicano.pdf', meta);
+    }
+  } catch (eA) {}
   try {
     if (window.MedicanoNative && typeof window.MedicanoNative.savePdf === 'function') {
       const dataUri = doc.output('datauristring');
