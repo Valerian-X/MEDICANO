@@ -3898,14 +3898,17 @@ function generateInvoicePdf(inv) {
     }
     y += 6;
 
-    // Table — Description left; Unit Price / Qty / Amount right-aligned
-    // Reserve full width of the Unit Price *numbers* so names never run into them
+    // Table columns (right edges). Amount needs ~105pt for "N2,200,000.00";
+    // Qty ~34pt; Unit Price ~100pt — gaps so nothing overlaps.
     const colDesc = M;
     const colAmount = W - M;
-    const colQty = W - M - 52;
-    const colUnit = W - M - 148;
-    const unitReserve = 96;
-    const descMaxW = Math.max(110, colUnit - unitReserve - colDesc);
+    const amountW = 105;
+    const qtyW = 34;
+    const unitW = 100;
+    const colGap = 10;
+    const colQty = colAmount - amountW - colGap;
+    const colUnit = colQty - qtyW - colGap;
+    const descMaxW = Math.max(100, colUnit - unitW - colGap - colDesc);
 
     // Header row — text sits between horizontal rules with clear padding
     doc.setDrawColor(...LINE);
@@ -7821,8 +7824,15 @@ function generateQuotePdf(q) {
     doc.setTextColor(...INK);
     doc.text('Project: ' + (q.title || ''), M, y); y += 16;
 
-    const colDesc = M, colAmount = W - M, colQty = W - M - 52, colUnit = W - M - 148;
-    const descMaxW = Math.max(110, colUnit - 96 - colDesc);
+    const colDesc = M;
+    const colAmount = W - M;
+    const amountW = 105;
+    const qtyW = 34;
+    const unitW = 100;
+    const colGap = 10;
+    const colQty = colAmount - amountW - colGap;
+    const colUnit = colQty - qtyW - colGap;
+    const descMaxW = Math.max(100, colUnit - unitW - colGap - colDesc);
     doc.setDrawColor(...LINE);
     doc.line(M, y, W - M, y); y += 12;
     doc.setFont('helvetica', 'bold');
