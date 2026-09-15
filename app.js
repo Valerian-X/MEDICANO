@@ -5187,6 +5187,7 @@ function applyQuoteToPresentation() {
 
 function renderPresPicker() {
   populatePresQuoteSelect();
+  if (typeof renderSavedPresentations === 'function') renderSavedPresentations();
   const search = (document.getElementById('pres-search')?.value || '').toLowerCase();
   const container = document.getElementById('pres-picker');
   if (!container) return;
@@ -5673,6 +5674,150 @@ function savePdfFile(doc, filename, meta) {
   doc.save(filename || 'medicano.pdf');
 }
 
+
+// -------------------- Saved presentations --------------------
+function ensurePresentations() {
+  if (!data.presentations || !Array.isArray(data.presentations)) data.presentations = [];
+}
+
+function collectPresentationState() {
+  ensurePresentations();
+  const checked = [...document.querySelectorAll('#pres-picker .pres-check:checked')].map(cb => cb.value);
+  const layout = (document.querySelector('input[name="pres-layout"]:checked') || {}).value || 'picture';
+  const summary = (document.querySelector('input[name="pres-summary"]:checked') || {}).value || 'complex';
+  return {
+    title: document.getElementById('pres-title')?.value || 'Medical Items Portfolio',
+    client: document.getElementById('pres-client')?.value || '',
+    contactPerson: document.getElementById('pres-contact')?.value || '',
+    quoteId: document.getElementById('pres-from-quote')?.value || '',
+    layout: layout,
+    summary: summary,
+    globalMarkup: parseFloat(document.getElementById('pres-global-markup')?.value) || 0,
+    productIds: checked,
+    quoteItems: (window._presQuoteItems || []).map(function (it) {
+      return {
+        productId: it.productId || it.id || '',
+        name: it.name || '',
+        qty: it.qty || 1,
+        price: it.price,
+        currency: it.currency || 'NGN',
+        fromQuote: true
+      };
+    })
+  };
+}
+
+function saveCurrentPresentation() {
+  ensurePresentations();
+  const state = collectPresentationState();
+  if (!(state.productIds || []).length && !(state.quoteItems || []).length) {
+    alert('Select at least one item (or load a quote) before saving.');
+    return;
+  }
+  const existingId = window._currentPresentationId || '';
+  const now = new Date().toISOString();
+  if (existingId) {
+    const idx = data.presentations.findIndex(function (p) { return p.id === existingId; });
+    if (idx >= 0) {
+      data.presentations[idx] = Object.assign({}, data.presentations[idx], state, {
+        id: existingId,
+        updatedAt: now
+      });
+      saveData();
+      renderSavedPresentations();
+      alert('Presentation updated.');
+      return;
+    }
+  }
+  const id = 'pres_' + Date.now().toString(36);
+  data.presentations.unshift(Object.assign({}, state, {
+    id: id,
+    createdAt: now,
+    updatedAt: now
+  }));
+  window._currentPresentationId = id;
+  saveData();
+  renderSavedPresentations();
+  alert('Presentation saved. You can reopen it anytime from this list.');
+}
+
+function loadPresentation(id) {
+  ensurePresentations();
+  const p = data.presentations.find(function (x) { return x.id === id; });
+  if (!p) { alert('Presentation not found.'); return; }
+  window._currentPresentationId = id;
+  if (document.getElementById('pres-title')) document.getElementById('pres-title').value = p.title || '';
+  if (document.getElementById('pres-client')) document.getElementById('pres-client').value = p.client || '';
+  if (document.getElementById('pres-contact')) document.getElementById('pres-contact').value = p.contactPerson || '';
+  if (document.getElementById('pres-global-markup')) document.getElementById('pres-global-markup').value = p.globalMarkup != null ? p.globalMarkup : 0;
+  const layoutEl = document.querySelector('input[name="pres-layout"][value="' + (p.layout || 'picture') + '"]');
+  if (layoutEl) layoutEl.checked = true;
+  const sumEl = document.querySelector('input[name="pres-summary"][value="' + (p.summary || 'complex') + '"]');
+  if (sumEl) sumEl.checked = true;
+  window._presQuoteItems = (p.quoteItems || []).map(function (it) {
+    const prod = it.productId ? getProduct(it.productId) : null;
+    return Object.assign({}, prod || {}, it, {
+      qty: it.qty || 1,
+      price: it.price != null ? it.price : (prod ? toNGN(prod.price, prod.currency) : 0),
+      currency: 'NGN',
+      fromQuote: true
+    });
+  });
+  window._presContact = p.contactPerson || '';
+  renderPresPicker();
+  // Restore checks
+  setTimeout(function () {
+    const ids = new Set(p.productIds || []);
+    (p.quoteItems || []).forEach(function (it) { if (it.productId) ids.add(it.productId); });
+    document.querySelectorAll('#pres-picker .pres-check').forEach(function (cb) {
+      cb.checked = ids.has(cb.value);
+    });
+  }, 50);
+  if (document.getElementById('pres-from-quote') && p.quoteId) {
+    document.getElementById('pres-from-quote').value = p.quoteId;
+  }
+  alert('Loaded: ' + (p.title || 'Presentation') + '. Edit as needed, then Generate PDF or Save.');
+}
+
+function deletePresentation(id) {
+  if (!confirm('Delete this saved presentation?')) return;
+  ensurePresentations();
+  data.presentations = data.presentations.filter(function (p) { return p.id !== id; });
+  if (window._currentPresentationId === id) window._currentPresentationId = null;
+  saveData();
+  renderSavedPresentations();
+}
+
+function renderSavedPresentations() {
+  ensurePresentations();
+  const el = document.getElementById('pres-saved-list');
+  if (!el) return;
+  const list = data.presentations || [];
+  if (!list.length) {
+    el.innerHTML = '<div class="entity-empty">No saved presentations yet</div>';
+    return;
+  }
+  el.innerHTML = list.map(function (p) {
+    const n = (p.productIds || []).length || (p.quoteItems || []).length || 0;
+    const when = (p.updatedAt || p.createdAt || '').slice(0, 10);
+    return '<div class="entity-card">' +
+      '<div class="entity-card-header" style="cursor:default">' +
+      '<div class="entity-card-main">' +
+      '<span class="entity-card-title">' + escHtml(p.title || 'Presentation') + '</span>' +
+      '<span class="entity-card-sub">' + escHtml(p.client || 'No client') +
+      (p.contactPerson ? ' · ' + escHtml(p.contactPerson) : '') +
+      ' · ' + n + ' item(s)' + (when ? ' · ' + when : '') + '</span>' +
+      '</div></div>' +
+      '<div class="entity-card-body is-open" style="display:block">' +
+      '<div class="flex flex-wrap gap-2">' +
+      '<button type="button" class="btn-soft btn-compact" onclick="loadPresentation(\'' + p.id + '\')">Open / Edit</button>' +
+      '<button type="button" class="btn-primary btn-compact" onclick="loadPresentation(\'' + p.id + '\'); setTimeout(generatePresentation, 100)">Generate PDF</button>' +
+      '<button type="button" class="btn-soft btn-compact" style="color:#b91c1c" onclick="deletePresentation(\'' + p.id + '\')">Delete</button>' +
+      '</div></div></div>';
+  }).join('');
+}
+
+
 function generatePresentation() {
   const checked = [...document.querySelectorAll('#pres-picker .pres-check:checked')];
   const quoteItems = window._presQuoteItems || [];
@@ -5783,10 +5928,14 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
       const descLines = desc ? Math.min(2, wrap(desc, 9, W - 2 * M - 160).length) : 0;
       return Math.max(52, 28 + nameLines * 12 + descLines * 11 + 18);
     }
-    const feats = (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).length;
-    const descLines = Math.max(1, wrap(p.description || '', BODY, W - 2 * M - 140).length);
-    let h = 100 + descLines * BODY_LEAD + Math.max(feats, 0) * (BODY_LEAD - 1) + 28;
-    return Math.max(150, Math.min(h + 12, 280));
+    const textW = W - 2 * M - 140;
+    const descLines = Math.min(6, wrap(p.description || '', BODY, textW).length);
+    let featLineCount = 0;
+    (p.features || '').split(String.fromCharCode(10)).map(f => f.trim()).filter(Boolean).slice(0, 6).forEach(function (f) {
+      featLineCount += Math.max(1, wrap(f, BODY, Math.max(40, textW - 12)).length);
+    });
+    let h = 88 + 3 * 13 + descLines * (BODY_LEAD - 2) + featLineCount * (BODY_LEAD - 1) + 44;
+    return Math.max(160, Math.min(h, 320));
   }
 
   function packMachines(list) {
@@ -5818,39 +5967,60 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
     setFill(WHITE); setDraw(LINE); doc.setLineWidth(0.75);
     doc.roundedRect(x, y, w, h, 8, 8, 'FD');
     const pad = 14;
-    const imgSize = Math.min(118, h - 2 * pad);
-    const imgY = y + pad + Math.max(0, (h - 2 * pad - imgSize) / 2);
+    const priceBlockH = 36;
+    const contentBottom = y + h - pad - priceBlockH;
+    const imgSize = Math.min(118, Math.max(72, h - 2 * pad - 4));
+    const imgY = y + pad + Math.max(0, Math.min(imgSize, h - 2 * pad - priceBlockH) * 0 + (h - 2 * pad - priceBlockH - imgSize) / 2);
+    const imgY2 = y + pad + Math.max(0, (h - 2 * pad - priceBlockH - imgSize) / 2);
     setFill(NAVY2); setDraw(GOLD); doc.setLineWidth(1);
-    doc.roundedRect(x + pad, imgY, imgSize, imgSize, 4, 4, 'FD');
+    doc.roundedRect(x + pad, imgY2, imgSize, imgSize, 4, 4, 'FD');
     if (p.image) {
       try {
-        doc.addImage(p.image, 'JPEG', x + pad + 1, imgY + 1, imgSize - 2, imgSize - 2);
+        doc.addImage(p.image, 'JPEG', x + pad + 1, imgY2 + 1, imgSize - 2, imgSize - 2);
       } catch (e) {
         setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(16);
-        doc.text('EQ', x + pad + imgSize / 2, imgY + imgSize / 2 + 5, { align: 'center' });
+        doc.text('EQ', x + pad + imgSize / 2, imgY2 + imgSize / 2 + 5, { align: 'center' });
       }
     } else {
       setCol(GOLDSOFT); doc.setFont('helvetica', 'normal'); doc.setFontSize(16);
-      doc.text('EQ', x + pad + imgSize / 2, imgY + imgSize / 2 + 5, { align: 'center' });
+      doc.text('EQ', x + pad + imgSize / 2, imgY2 + imgSize / 2 + 5, { align: 'center' });
     }
     const tx = x + pad + imgSize + 16;
-    const tw = w - (pad + imgSize + 16) - pad;
+    const tw = Math.max(80, w - (pad + imgSize + 16) - pad);
     let ty = y + pad + 12;
     setCol(GOLD); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.4);
-    doc.text(String(p.category || 'EQUIPMENT').toUpperCase(), tx, ty);
-    ty += 16;
-    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-    wrap(p.name, 13, tw, 'bold').slice(0, 2).forEach(ln => { doc.text(ln, tx, ty); ty += 14; });
-    setDraw(LINE); doc.setLineWidth(1); doc.line(tx, ty, tx + 28, ty);
+    const cat = String(p.category || 'EQUIPMENT').toUpperCase();
+    doc.text(cat.length > 42 ? cat.slice(0, 40) + '…' : cat, tx, ty);
     ty += 14;
+    setCol(NAVY); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    wrap(p.name, 12, tw, 'bold').slice(0, 3).forEach(function (ln) {
+      if (ty + 12 > contentBottom) return;
+      doc.text(ln, tx, ty); ty += 13;
+    });
+    if (ty + 8 < contentBottom) {
+      setDraw(LINE); doc.setLineWidth(1); doc.line(tx, ty, tx + Math.min(28, tw), ty);
+      ty += 12;
+    }
     setCol([87, 88, 92]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
-    wrap(p.description || '', BODY, tw).slice(0, 4).forEach(ln => { doc.text(ln, tx, ty); ty += BODY_LEAD - 2; });
-    ty += 6;
-    (p.features || '').split('\n').map(f => f.trim()).filter(Boolean).slice(0, 5).forEach(f => {
-      setFill(GOLD); doc.circle(tx + 3, ty - 2, 1.6, 'F');
-      setCol([56, 57, 61]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
-      doc.text(f.substring(0, 72), tx + 10, ty);
-      ty += BODY_LEAD - 1;
+    wrap(p.description || '', BODY, tw).forEach(function (ln) {
+      if (ty + (BODY_LEAD - 2) > contentBottom) return;
+      doc.text(ln, tx, ty);
+      ty += BODY_LEAD - 2;
+    });
+    ty += 4;
+    const featLines = (p.features || '').split(String.fromCharCode(10)).map(function (f) { return f.trim(); }).filter(Boolean);
+    featLines.forEach(function (f) {
+      if (ty + (BODY_LEAD - 1) > contentBottom) return;
+      const wrapped = wrap(f, BODY, Math.max(40, tw - 12));
+      wrapped.forEach(function (ln, li) {
+        if (ty + (BODY_LEAD - 1) > contentBottom) return;
+        if (li === 0) {
+          setFill(GOLD); doc.circle(tx + 3, ty - 2, 1.6, 'F');
+        }
+        setCol([56, 57, 61]); doc.setFont('helvetica', 'normal'); doc.setFontSize(BODY);
+        doc.text(ln, tx + 10, ty);
+        ty += BODY_LEAD - 1;
+      });
     });
     const unitNgn = lineUnit(p);
     const qty = lineQty(p);
@@ -6121,7 +6291,14 @@ function buildPresentationPdf(JsPDF, products, co, forClient, dateStr, title, la
   setCol(CREAM); doc.setFontSize(15); doc.text('Medical Equipment Proposal', W / 2, H * 0.40 + 68, { align: 'center' });
   setCol([184, 191, 204]); doc.setFontSize(11.5);
   doc.text('Prepared for ' + forClient, W / 2, H * 0.40 + 92, { align: 'center' });
-  doc.text(dateStr, W / 2, H * 0.40 + 110, { align: 'center' });
+  const forContact = (document.getElementById('pres-contact')?.value || '').trim()
+    || (window._presContact || '');
+  let coverY = H * 0.40 + 110;
+  if (forContact) {
+    doc.text('Attn: ' + forContact, W / 2, coverY, { align: 'center' });
+    coverY += 18;
+  }
+  doc.text(dateStr, W / 2, coverY, { align: 'center' });
 
   // Footer block — measure first, place fully inside navy (above bottom margin)
   const footSize = 9;
