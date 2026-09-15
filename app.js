@@ -3770,9 +3770,10 @@ function generateInvoicePdf(inv) {
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, W, H, 'F');
 
-    // --- Header only: larger logo left, INVOICE / date / status right (unchanged meta) ---
-    const logoW = 210;
-    const logoH = 42;
+    // --- Header: logo left (natural aspect, not squashed), title right — tops aligned ---
+    // Source logo is 1080×258 (~4.186:1). Keep that ratio so "Medicano" is not vertically compressed.
+    const logoW = 240;
+    const logoH = logoW * (258 / 1080); // ≈ 57.3
     const headerTop = 36;
     try {
       if (logo) {
@@ -3800,7 +3801,7 @@ function generateInvoicePdf(inv) {
       : (isPartialDoc
         ? 'PARTIAL INVOICE'
         : (isProforma ? 'PROFORMA INVOICE' : 'INVOICE'));
-    doc.text(docLabel, W - M, headerTop + 14, { align: 'right' });
+    doc.text(docLabel, W - M, headerTop + 15, { align: 'right' });
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(...INK);
@@ -7769,16 +7770,18 @@ function generateQuotePdf(q) {
     const INK = [30, 41, 59];
     const LINE = [226, 232, 240];
     let y = 36;
+    const qLogoW = 240;
+    const qLogoH = qLogoW * (258 / 1080);
     try {
       if (logo) {
-        const fmt = logo.indexOf('image/jpeg') >= 0 ? 'JPEG' : 'PNG';
-        doc.addImage(logo, fmt, M, y, 200, 40);
+        const fmt = logo.indexOf('image/jpeg') >= 0 || logo.indexOf('/9j/') >= 0 ? 'JPEG' : 'PNG';
+        doc.addImage(logo, fmt, M, y, qLogoW, qLogoH);
       }
     } catch (e) {}
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(20);
     doc.setTextColor(...TEAL);
-    doc.text('QUOTATION', W - M, y + 14, { align: 'right' });
+    doc.text('QUOTATION', W - M, y + 15, { align: 'right' });
     doc.setFontSize(11);
     doc.setTextColor(...INK);
     doc.text(String(q.quoteNumber || 'DRAFT'), W - M, y + 30, { align: 'right' });
