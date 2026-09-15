@@ -6087,3 +6087,21 @@ html.dark .pending-diff-remove .pending-check-action { color: #f87171; }
   min-width: 0;
   line-height: 1.35;
 }
+
+textarea.line-name-area {
+  min-height: 3.1rem;
+  max-height: 8rem;
+  resize: vertical;
+  line-height: 1.35;
+  padding: 0.55rem 0.75rem !important;
+  white-space: pre-wrap;
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.line-hint {
+  font-weight: 500;
+  opacity: 0.65;
+  font-size: 0.72rem;
+}
+
