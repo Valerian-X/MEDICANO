@@ -4937,14 +4937,15 @@ function importProductsFromCsv(file) {
         }
         return -1;
       };
-      const iSku = col('sku');
-      const iName = col('name', 'equipment', 'product', 'item');
+      const iSku = col('sku', 'code', 'product code', 'item code', 'variant sku', 'parent sku');
+      const iName = col('name', 'equipment', 'product', 'item', 'parent name', 'full description', 'description of products', 'variant label');
       const iCat = col('category');
       const iBrand = col('brand');
-      const iDesc = col('description', 'description / specs', 'specs');
-      const iFeat = col('features', 'key features');
-      const iPrice = col('price');
+      const iDesc = col('description', 'description / specs', 'specs', 'full description');
+      const iFeat = col('features', 'key features', 'variant label');
+      const iPrice = col('price', 'price eur', 'price euro', 'price display', 'unit price');
       const iCur = col('currency');
+      const priceEurHint = headers.some(h => h.includes('eur') || h.includes('euro'));
       const iStock = col('stock', 'stock qty', 'qty');
       const iLow = col('low stock', 'low stock alert');
       const iActive = col('active');
