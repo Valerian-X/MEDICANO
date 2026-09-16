@@ -904,6 +904,17 @@ function isMarkedDeleted(id) {
 }
 
 function saveData() {
+  // Debounce disk write when catalog is large (import of 9k+ items)
+  if ((data.products || []).length > 1500) {
+    clearTimeout(window._saveDataTimer);
+    window._saveDataTimer = setTimeout(function () { saveDataNow(); }, 400);
+    clearTimeout(window._saveDataTimer);
+    window._saveDataTimer = setTimeout(function () { saveDataNow(); }, 400);
+    return;
+  }
+  return saveDataNow();
+}
+function saveDataNow() {
   if (data && typeof data === 'object') {
     data.updatedAt = new Date().toISOString();
   }
@@ -1710,6 +1721,115 @@ function ensureEntityTimestamps(arr) {
   });
 }
 
+
+/** Product list page size — keeps DOM light with large catalogs */
+const PRODUCT_PAGE_SIZE = 40;
+window._productPage = window._productPage || 1;
+window._productTimestampsReady = false;
+
+function searchProductsLimited(query, limit) {
+  limit = limit || 40;
+  const q = String(query || '').trim().toLowerCase();
+  const list = data.products || [];
+  if (!q) {
+    // show a small slice of active items only
+    return list.filter(function (p) { return p.active !== false; }).slice(0, limit);
+  }
+  const out = [];
+  for (let i = 0; i < list.length && out.length < limit; i++) {
+    const p = list[i];
+    if (p.active === false) continue;
+    const name = (p.name || '').toLowerCase();
+    const sku = (p.sku || '').toLowerCase();
+    if (name.indexOf(q) >= 0 || sku.indexOf(q) >= 0) out.push(p);
+  }
+  // secondary: description only if still room
+  if (out.length < limit) {
+    for (let i = 0; i < list.length && out.length < limit; i++) {
+      const p = list[i];
+      if (p.active === false) continue;
+      if (out.indexOf(p) >= 0) continue;
+      const desc = (p.description || '').toLowerCase();
+      if (desc.indexOf(q) >= 0) out.push(p);
+    }
+  }
+  return out;
+}
+
+function productPickerHtml(selectClass, onchange, selectedId) {
+  // Searchable picker — never inject 9k <option> nodes
+  const selected = selectedId ? getProduct(selectedId) : null;
+  const label = selected ? ((selected.sku ? selected.sku + ' · ' : '') + (selected.name || '')) : '';
+  const rid = 'pp_' + Math.random().toString(36).slice(2, 9);
+  return (
+    '<div class="product-picker" data-picker-id="' + rid + '">' +
+      '<input type="hidden" class="' + selectClass + '" value="' + escHtml(selectedId || '') + '" />' +
+      '<input type="search" class="product-picker-input line-input" placeholder="Type SKU or name to search…" value="' + escHtml(label) + '" ' +
+        'onfocus="openProductPicker(this)" oninput="onProductPickerInput(this)" autocomplete="off" />' +
+      '<div class="product-picker-results hidden"></div>' +
+    '</div>'
+  );
+}
+
+function openProductPicker(input) {
+  onProductPickerInput(input);
+}
+
+function onProductPickerInput(input) {
+  const wrap = input.closest('.product-picker');
+  if (!wrap) return;
+  const box = wrap.querySelector('.product-picker-results');
+  if (!box) return;
+  const q = input.value;
+  const hits = searchProductsLimited(q, 40);
+  if (!hits.length) {
+    box.innerHTML = '<div class="product-picker-empty">No matches</div>';
+    box.classList.remove('hidden');
+    return;
+  }
+  box.innerHTML = hits.map(function (p) {
+    const nVar = (typeof productVariants === 'function') ? productVariants(p).length : 0;
+    const sub = (p.sku || '') + (nVar ? (' · ' + nVar + ' options') : '');
+    return '<button type="button" class="product-picker-item" data-id="' + p.id + '" onmousedown="event.preventDefault(); pickProductFromPicker(this)">' +
+      '<span class="ppi-name">' + escHtml(p.name || 'Item') + '</span>' +
+      (sub ? '<span class="ppi-sub">' + escHtml(sub) + '</span>' : '') +
+      '</button>';
+  }).join('');
+  box.classList.remove('hidden');
+}
+
+function pickProductFromPicker(btn) {
+  const wrap = btn.closest('.product-picker');
+  if (!wrap) return;
+  const id = btn.getAttribute('data-id');
+  const p = getProduct(id);
+  const hidden = wrap.querySelector('input[type="hidden"]');
+  const input = wrap.querySelector('.product-picker-input');
+  const box = wrap.querySelector('.product-picker-results');
+  if (hidden) hidden.value = id || '';
+  if (input) input.value = p ? ((p.sku ? p.sku + ' · ' : '') + (p.name || '')) : '';
+  if (box) { box.innerHTML = ''; box.classList.add('hidden'); }
+  // Fire existing change handlers
+  const row = wrap.closest('.line-card');
+  if (row && row.id) {
+    if (wrap.querySelector('.inv-product')) onInvoiceProductChange(row.id);
+    else if (wrap.querySelector('.qi-product')) onItemProductChange(row.id);
+  }
+}
+
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('.product-picker')) {
+    document.querySelectorAll('.product-picker-results').forEach(function (b) {
+      b.classList.add('hidden');
+    });
+  }
+});
+
+function setProductPage(n) {
+  window._productPage = Math.max(1, n | 0);
+  renderProducts();
+}
+
 function renderProducts() {
   const search = (document.getElementById('product-search')?.value || '').toLowerCase();
   const cat = document.getElementById('product-category-filter')?.value || '';
@@ -1724,11 +1844,22 @@ function renderProducts() {
     filterEl.value = currentVal;
   }
 
-  if (typeof ensureEntityTimestamps === 'function') ensureEntityTimestamps(data.products);
+  // Timestamps once per session — expensive on 9k+ items
+  if (!window._productTimestampsReady && typeof ensureEntityTimestamps === 'function') {
+    ensureEntityTimestamps(data.products);
+    window._productTimestampsReady = true;
+  }
   let list = (data.products || []).filter(p => {
-    const matchSearch = !search || (p.name || '').toLowerCase().includes(search) || (p.sku || '').toLowerCase().includes(search) || (p.description || '').toLowerCase().includes(search);
-    const matchCat = !cat || p.category === cat;
-    return matchSearch && matchCat;
+    if (search) {
+      const name = (p.name || '').toLowerCase();
+      const sku = (p.sku || '').toLowerCase();
+      if (name.indexOf(search) < 0 && sku.indexOf(search) < 0) {
+        // skip full description scan unless query is 3+ chars
+        if (search.length < 3 || (p.description || '').toLowerCase().indexOf(search) < 0) return false;
+      }
+    }
+    if (cat && p.category !== cat) return false;
+    return true;
   });
   const sortKey = document.getElementById('product-sort')?.value || 'name-asc';
   list.sort((a, b) => {
@@ -1752,11 +1883,29 @@ function renderProducts() {
 
   const el = document.getElementById('products-list');
   if (!el) return;
+  const total = list.length;
+  const pageSize = PRODUCT_PAGE_SIZE;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (window._productPage > totalPages) window._productPage = totalPages;
+  if (window._productPage < 1) window._productPage = 1;
+  const page = window._productPage;
+  const start = (page - 1) * pageSize;
+  const pageItems = list.slice(start, start + pageSize);
+
+  const pager = total
+    ? ('<div class="product-pager">' +
+       '<span class="product-pager-meta">' + total.toLocaleString() + ' items · page ' + page + ' / ' + totalPages + '</span>' +
+       '<div class="product-pager-btns">' +
+       '<button type="button" class="btn-soft btn-compact" ' + (page <= 1 ? 'disabled' : '') + ' onclick="setProductPage(' + (page - 1) + ')">Prev</button>' +
+       '<button type="button" class="btn-soft btn-compact" ' + (page >= totalPages ? 'disabled' : '') + ' onclick="setProductPage(' + (page + 1) + ')">Next</button>' +
+       '</div></div>')
+    : '';
+
   if (!list.length) {
     el.innerHTML = '<div class="entity-empty">No items found</div>';
     return;
   }
-  el.innerHTML = list.map(p => {
+  el.innerHTML = pager + pageItems.map(p => {
     const ngn = toNGN(p.price, p.currency);
     const low = p.stock <= p.lowStock;
     const thumb = p.image
@@ -1794,7 +1943,7 @@ function renderProducts() {
         </div>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + pager;
 }
 
 function fillProductEditorForm(id) {
@@ -2802,10 +2951,7 @@ function addQuoteItemRow(existing = null) {
     <div class="line-card-body">
       <div class="line-field">
         <label class="line-label">Inventory</label>
-        <select class="qi-product line-input" onchange="onItemProductChange('${rowId}')">
-          <option value="">Custom / from sheet...</option>
-          ${options}
-        </select>
+        ${productPickerHtml('qi-product', 'onItemProductChange', item && item.productId)}
       </div>
       <div class="line-field qi-variant-wrap hidden">
         <label class="line-label">Variant</label>
@@ -3436,13 +3582,8 @@ function addInvoiceItemRow(item) {
   const list = document.getElementById('invoice-items-list');
   if (!list) return;
   const id = 'invrow' + (++invoiceItemCounter);
-  const productOpts = (data.products || []).map(p => {
-    const desc = (p.description || '').trim().replace(/\s+/g, ' ');
-    const shortDesc = desc ? (desc.length > 60 ? desc.slice(0, 57) + '…' : desc) : '';
-    const label = shortDesc ? `${escHtml(p.name)} · ${escHtml(shortDesc)}` : escHtml(p.name);
-    return `<option value="${p.id}" ${item && item.productId === p.id ? 'selected' : ''} title="${escHtml(p.description || p.name || '')}">${label}</option>`;
-  }).join('');
-  const nameVal = item ? (item.name || '') : '';
+  const productOpts = ''; // use searchable picker
+    const nameVal = item ? (item.name || '') : '';
   const titleText = nameVal || 'New line item';
   const card = document.createElement('div');
   card.id = id;
@@ -3456,10 +3597,7 @@ function addInvoiceItemRow(item) {
     <div class="line-card-body">
       <div class="line-field">
         <label class="line-label">Inventory</label>
-        <select class="inv-product line-input" onchange="onInvoiceProductChange('${id}')">
-          <option value="">— Custom / select —</option>
-          ${productOpts}
-        </select>
+        ${productPickerHtml('inv-product', 'onInvoiceProductChange', item && item.productId)}
       </div>
       <div class="line-field inv-variant-wrap hidden">
         <label class="line-label">Variant</label>
@@ -7211,8 +7349,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Search listeners
-  document.getElementById('product-search')?.addEventListener('input', renderProducts);
-  document.getElementById('product-category-filter')?.addEventListener('change', renderProducts);
+  (function () {
+    let t;
+    document.getElementById('product-search')?.addEventListener('input', function () {
+      window._productPage = 1;
+      clearTimeout(t);
+      t = setTimeout(renderProducts, 200);
+    });
+  })();
+  document.getElementById('product-category-filter')?.addEventListener('change', function(){ window._productPage = 1; renderProducts(); });
   document.getElementById('quote-status-filter')?.addEventListener('change', renderQuotes);
   document.getElementById('quote-date-from')?.addEventListener('change', renderQuotes);
   document.getElementById('quote-date-to')?.addEventListener('change', renderQuotes);
