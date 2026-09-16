@@ -2196,6 +2196,9 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         <a href="#invoices" data-page="invoices" class="sidebar-link flex items-center gap-3">
           <span>🧾</span> Invoices
         </a>
+        <a href="#receivables" data-page="receivables" class="sidebar-link flex items-center gap-3">
+          <span>📒</span> Receivables
+        </a>
         <a href="#reports" data-page="reports" class="sidebar-link flex items-center gap-3">
           <span>📊</span> Reports
         </a>
@@ -2535,6 +2538,16 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                   <input id="p-low" type="number" min="0" value="2" class="settings-input w-full" inputmode="numeric" />
                 </div>
               </div>
+            </div>
+
+            <div class="panel-soft">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h4 class="font-semibold text-sm m-0">Variants (optional)</h4>
+                <button type="button" class="btn-soft btn-compact" onclick="addProductVariantRow()">Add variant</button>
+              </div>
+              <p class="text-xs text-slate-500 mb-2">Same product, different size, colour, dimension, etc. When selling, the user picks the parent item then selects a variant from a dropdown.</p>
+              <div id="p-variants-list" class="flex flex-col gap-2"></div>
+              <p class="text-xs text-slate-500 mt-2 mb-0">Leave empty if this item has no options. Parent price/stock are used when there are no variants; with variants, each option has its own SKU, price and stock.</p>
             </div>
 
             <div class="panel-soft">
@@ -2962,8 +2975,8 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                       <label class="select-row">
                         <span class="select-row-icon">📄</span>
                         <span class="select-row-text">
-                          <span class="select-row-title">Standard footer on PDF</span>
-                          <span class="select-row-sub">Payment notice &amp; exchange rates</span>
+                          <span class="select-row-title">Show exchange rates on PDF</span>
+                          <span class="select-row-sub">USD / EUR rate line only — payment notice is always shown on unpaid invoices</span>
                         </span>
                         <input id="inv-show-footer" type="checkbox" class="select-row-check" checked />
                       </label>
@@ -3018,6 +3031,49 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         <!-- IN STOCK / INVENTORY -->
         
         <!-- REPORTS -->
+
+        <section id="page-receivables" class="page hidden">
+          <div class="max-w-5xl space-y-5">
+            <div class="panel-soft">
+              <h3 class="font-semibold text-lg mb-1">Receivables</h3>
+              <p class="text-sm text-slate-500 mb-4">Customer statements and aged open balances.</p>
+              <div class="report-filter-grid mb-4">
+                <div class="filter-date-field">
+                  <label class="filter-date-label">Client (statement)</label>
+                  <select id="recv-client" class="filter-control w-full" onchange="renderReceivablesPage()"></select>
+                </div>
+                <div class="filter-date-field">
+                  <label class="filter-date-label">Statement from</label>
+                  <input type="date" id="recv-from" class="filter-control w-full" onchange="renderReceivablesPage()" />
+                </div>
+                <div class="filter-date-field">
+                  <label class="filter-date-label">Statement to</label>
+                  <input type="date" id="recv-to" class="filter-control w-full" onchange="renderReceivablesPage()" />
+                </div>
+                <div class="filter-date-field">
+                  <label class="filter-date-label">Age as of</label>
+                  <input type="date" id="recv-asof" class="filter-control w-full" onchange="renderReceivablesPage()" />
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button type="button" class="btn-primary btn-compact" onclick="generateClientStatementPdf()">Download statement PDF</button>
+                <button type="button" class="btn-soft btn-compact" onclick="renderReceivablesPage()">Refresh</button>
+              </div>
+            </div>
+
+            <div class="panel-soft">
+              <h4 class="font-semibold text-sm mb-3">Customer statement</h4>
+              <div id="recv-statement" class="text-sm text-slate-600">Select a client to view their statement.</div>
+            </div>
+
+            <div class="panel-soft">
+              <h4 class="font-semibold text-sm mb-3">Ageing (open balances)</h4>
+              <p class="text-xs text-slate-500 mb-3">Unpaid amounts by how long they have been outstanding (from invoice date).</p>
+              <div id="recv-ageing" class="overflow-x-auto"></div>
+            </div>
+          </div>
+        </section>
+
         <section id="page-reports" class="page hidden">
           <div class="flex flex-col gap-4">
             <div class="report-filter-grid">

@@ -6105,3 +6105,6 @@ textarea.line-name-area {
   font-size: 0.72rem;
 }
 
+
+.variant-row { border: 1px solid rgba(15, 118, 110, 0.15); }
+.inv-variant-wrap.hidden, .qi-variant-wrap.hidden { display: none !important; }
