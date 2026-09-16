@@ -61,6 +61,67 @@
   function pendingCol(oid) {
     return db.collection('orgs').doc(oid).collection('pending');
   }
+  function productChunksCol(oid) {
+    return db.collection('orgs').doc(oid).collection('productChunks');
+  }
+
+  // Firestore document limit is ~1MB. Large catalogs (e.g. GIMA) are stored in chunks.
+  var PRODUCT_CHUNK_SIZE = 250;
+
+  function slimProductsForSync(products) {
+    return (products || []).map(function (p) {
+      var copy = Object.assign({}, p);
+      if (copy.image && String(copy.image).length > 500) {
+        copy.image = '';
+        copy._imageOmittedForSync = true;
+      }
+      return copy;
+    });
+  }
+
+  async function writeProductChunks(oid, products) {
+    var col = productChunksCol(oid);
+    var list = slimProductsForSync(products);
+    var n = list.length ? Math.ceil(list.length / PRODUCT_CHUNK_SIZE) : 0;
+    var existing = await col.get();
+    var ops = [];
+    for (var i = 0; i < n; i++) {
+      var slice = list.slice(i * PRODUCT_CHUNK_SIZE, (i + 1) * PRODUCT_CHUNK_SIZE);
+      ops.push(col.doc('chunk_' + i).set({
+        index: i,
+        count: slice.length,
+        updatedAt: new Date().toISOString(),
+        items: slice
+      }));
+    }
+    existing.forEach(function (doc) {
+      var m = String(doc.id).match(/^chunk_(\d+)$/);
+      var idx = m ? parseInt(m[1], 10) : -1;
+      if (idx < 0 || idx >= n) ops.push(doc.ref.delete());
+    });
+    for (var j = 0; j < ops.length; j += 40) {
+      await Promise.all(ops.slice(j, j + 40));
+    }
+    return n;
+  }
+
+  async function readProductChunks(oid) {
+    var qs = await productChunksCol(oid).get();
+    var chunks = [];
+    qs.forEach(function (doc) {
+      var d = doc.data() || {};
+      var idx = d.index;
+      if (idx == null) {
+        var m = String(doc.id).match(/^chunk_(\d+)$/);
+        idx = m ? parseInt(m[1], 10) : 0;
+      }
+      chunks.push({ index: idx, items: d.items || [] });
+    });
+    chunks.sort(function (a, b) { return a.index - b.index; });
+    var products = [];
+    chunks.forEach(function (c) { products = products.concat(c.items || []); });
+    return products;
+  }
 
   function cloudSafePayload(src) {
     const data = JSON.parse(JSON.stringify(src || {}));
@@ -155,6 +216,51 @@
   }
 
 
+
+  function finishApplyRemote(payload, resolve) {
+    try {
+      var localSrc2 = (typeof window.getAppData === 'function' ? window.getAppData() : window.data) || {};
+
+      if (localSrc2 && (localSrc2.clients || localSrc2.products || localSrc2.invoices || localSrc2.quotes || localSrc2.services)) {
+        if (typeof mergeWorkspacePayloads === 'function') {
+          payload = mergeWorkspacePayloads(localSrc2, payload);
+        }
+      }
+
+      var localName = '';
+      try {
+        localName = (localSrc2 && localSrc2.userProfile && localSrc2.userProfile.username) || '';
+        if (!localName) localName = localStorage.getItem('medicano_username_local') || '';
+      } catch (eN) {}
+      if (!payload.userProfile) payload.userProfile = {};
+      payload.userProfile.username = localName || '';
+
+      if (localSrc2 && Array.isArray(localSrc2.products) && Array.isArray(payload.products)) {
+        var localById = {};
+        localSrc2.products.forEach(function (p) { localById[p.id] = p; });
+        payload.products.forEach(function (p) {
+          if ((!p.image || p._imageOmittedForSync) && localById[p.id] && localById[p.id].image) {
+            p.image = localById[p.id].image;
+          }
+          delete p._imageOmittedForSync;
+        });
+      }
+
+      if (typeof window.applyCloudData === 'function') {
+        window.applyCloudData(payload);
+      } else {
+        window.data = payload;
+        localStorage.setItem('medicano_data_v1', JSON.stringify(payload));
+      }
+      resolve(true);
+    } catch (e) {
+      console.error('apply remote', e);
+      resolve(false);
+    } finally {
+      setTimeout(function () { applyingRemote = false; }, 400);
+    }
+  }
+
   function applyRemotePayload(remote, opts) {
     opts = opts || {};
     const force = !!opts.force;
@@ -182,41 +288,19 @@
           return;
         }
 
-        var localSrc2 = (typeof window.getAppData === 'function' ? window.getAppData() : window.data) || {};
-
-        // Multi-device: merge instead of replace so neither side loses records
-        if (localSrc2 && (localSrc2.clients || localSrc2.products || localSrc2.invoices || localSrc2.quotes || localSrc2.services)) {
-          if (typeof mergeWorkspacePayloads === 'function') {
-            payload = mergeWorkspacePayloads(localSrc2, payload);
-          }
-        }
-
-        var localName = '';
-        try {
-          localName = (localSrc2 && localSrc2.userProfile && localSrc2.userProfile.username) || '';
-          if (!localName) localName = localStorage.getItem('medicano_username_local') || '';
-        } catch (eN) {}
-        if (!payload.userProfile) payload.userProfile = {};
-        payload.userProfile.username = localName || '';
-
-        if (localSrc2 && Array.isArray(localSrc2.products) && Array.isArray(payload.products)) {
-          var localById = {};
-          localSrc2.products.forEach(function (p) { localById[p.id] = p; });
-          payload.products.forEach(function (p) {
-            if ((!p.image || p._imageOmittedForSync) && localById[p.id] && localById[p.id].image) {
-              p.image = localById[p.id].image;
-            }
-            delete p._imageOmittedForSync;
+        var needChunks = !!(payload._productsInChunks || remote.productCount || payload._productCount);
+        if (needChunks && (!payload.products || !payload.products.length) && orgId) {
+          readProductChunks(orgId).then(function (chunkProducts) {
+            if (chunkProducts && chunkProducts.length) payload.products = chunkProducts;
+            finishApplyRemote(payload, resolve);
+          }).catch(function (err) {
+            console.error('product chunks', err);
+            finishApplyRemote(payload, resolve);
           });
+          return;
         }
 
-        if (typeof window.applyCloudData === 'function') {
-          window.applyCloudData(payload);
-        } else {
-          window.data = payload;
-          localStorage.setItem('medicano_data_v1', JSON.stringify(payload));
-        }
-        resolve(true);
+        finishApplyRemote(payload, resolve);
       } catch (e) {
         console.error('apply remote', e);
         resolve(false);
@@ -440,10 +524,18 @@
       if (src) src.updatedAt = payload.updatedAt;
       if (typeof window.saveDataLocalOnly === 'function') window.saveDataLocalOnly();
 
+      // Keep main workspace doc under 1MB — products go to productChunks
+      var productsForChunks = Array.isArray(payload.products) ? payload.products.slice() : [];
+      var productCount = productsForChunks.length;
+      payload.products = [];
+      payload._productsInChunks = true;
+      payload._productCount = productCount;
+
       const meta = {
         updatedAt: payload.updatedAt,
         email: auth.currentUser.email || '',
-        recordCount: countRecords(payload),
+        recordCount: countRecords(Object.assign({}, payload, { products: productsForChunks })),
+        productCount: productCount,
         payload: payload
       };
 
@@ -451,9 +543,12 @@
         status('Publishing…', 'syncing');
         try {
           lastPushUpdatedAt = payload.updatedAt;
+          var chunkCount = await writeProductChunks(orgId, productsForChunks);
+          meta.productChunkCount = chunkCount;
+          payload._productChunkCount = chunkCount;
           await orgWorkspaceRef(orgId).set(meta, { merge: false });
-          status('Synced · Admin · ' + (auth.currentUser.email || ''), 'online');
-          return { ok: true, mode: 'published' };
+          status('Synced · Admin · ' + productCount + ' items · ' + (auth.currentUser.email || ''), 'online');
+          return { ok: true, mode: 'published', products: productCount, chunks: chunkCount };
         } catch (e) {
           console.error(e);
           status(permissionMsg(e), 'error');
@@ -461,20 +556,22 @@
         }
       }
 
-      // Staff → pending
+      // Staff → pending (payload without full product list for size)
       status('Submitting for approval…', 'syncing');
       try {
         const id = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+        var detailsSrc = Object.assign({}, payload, { products: productsForChunks.slice(0, 40) });
         await pendingCol(orgId).doc(id).set({
           id: id,
           status: 'pending',
           byUid: auth.currentUser.uid,
           byEmail: auth.currentUser.email || '',
           createdAt: new Date().toISOString(),
-          summary: summarizePayload(payload),
-          recordCount: countRecords(payload),
-          details: buildPendingDetails(payload),
-          payload: payload
+          summary: summarizePayload(Object.assign({}, payload, { products: productsForChunks })),
+          recordCount: countRecords(Object.assign({}, payload, { products: productsForChunks })),
+          details: buildPendingDetails(detailsSrc),
+          payload: payload,
+          productCount: productCount
         });
         status('Submitted · waiting for admin · ' + (auth.currentUser.email || ''), 'online');
         if (typeof window.renderApprovalsPanel === 'function') {
