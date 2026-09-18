@@ -903,6 +903,37 @@ function isMarkedDeleted(id) {
   return !!data.deletedRecords[String(id)];
 }
 
+
+async function forceSyncCatalogNow() {
+  const cloud = window.MedicanoCloud;
+  if (!cloud || !cloud.pushNow) {
+    alert('Cloud sync is not available. Sign in first.');
+    return;
+  }
+  const info = cloud.getSyncInfo ? cloud.getSyncInfo() : {};
+  if (!info.signedIn) {
+    alert('Sign in as admin first.');
+    return;
+  }
+  if (info.role && info.role !== 'admin') {
+    alert('Only the admin can publish the full inventory to the team.');
+    return;
+  }
+  try {
+    const res = await (cloud.forcePublishCatalog ? cloud.forcePublishCatalog() : cloud.pushNow());
+    if (res && res.ok) {
+      alert('Published to the team.\n\nItems: ' + ((res.products != null) ? res.products : (data.products || []).length) +
+        (res.chunks != null ? ('\nChunks: ' + res.chunks) : '') +
+        '\n\nOther devices should refresh / reopen the app while signed into the same organisation.');
+    } else {
+      alert('Publish failed: ' + ((res && (res.reason || (res.error && res.error.message))) || 'unknown') +
+        '\n\nIf this says permission/rules, add productChunks rules in Firebase Console.');
+    }
+  } catch (e) {
+    alert('Publish error: ' + (e && e.message ? e.message : e));
+  }
+}
+
 function saveData() {
   // Debounce disk write when catalog is large (import of 9k+ items)
   if ((data.products || []).length > 1500) {
@@ -3144,7 +3175,7 @@ function saveQuote() {
     if (!displayName && !productId) return;
     if (productId && row.querySelector('.qi-product')) {
       const sel = row.querySelector('.qi-product');
-      if (![...sel.options].some(o => o.value === productId)) {
+      if (sel.tagName === 'SELECT' && sel.options && ![...sel.options].some(o => o.value === productId)) {
         const opt = document.createElement('option');
         opt.value = productId;
         opt.textContent = displayName;
@@ -3732,6 +3763,7 @@ function recalcInvoiceTotal() {
 }
 
 function saveInvoice() {
+  try {
   const clientId = resolveClientForSave('inv-client', 'inv-client-manual', 'inv-client');
   if (!clientId) { alert('Please select or type a client name.'); return; }
   // Ensure products for custom lines before collect
@@ -3743,27 +3775,37 @@ function saveInvoice() {
     productId = ensureProductForLine(productId, name, unitNgn, addInvItems);
     const sel = tr.querySelector('.inv-product');
     if (sel && productId) {
-      if (![...sel.options].some(o => o.value === productId)) {
-        const opt = document.createElement('option');
-        opt.value = productId;
-        opt.textContent = name || (getProduct(productId) || {}).name || 'Item';
-        sel.appendChild(opt);
+      // Works for both <select> and searchable picker hidden input
+      if (sel.tagName === 'SELECT' && sel.options) {
+        if (sel.tagName === 'SELECT' && sel.options && ![...sel.options].some(o => o.value === productId)) {
+          const opt = document.createElement('option');
+          opt.value = productId;
+          opt.textContent = name || (getProduct(productId) || {}).name || 'Item';
+          sel.appendChild(opt);
+        }
       }
       sel.value = productId;
+      const pickerInput = tr.querySelector('.product-picker-input');
+      if (pickerInput) {
+        const p = getProduct(productId);
+        pickerInput.value = p ? ((p.sku ? p.sku + ' · ' : '') + (p.name || name || '')) : (name || productId);
+      }
     }
   });
   const items = collectInvoiceItems();
   if (!items.length) { alert('Add at least one line item.'); return; }
   const { sub, total, discount } = recalcInvoiceTotal();
+  const statusVal = (document.getElementById('inv-status')?.value || 'draft').trim() || 'draft';
   const payload = {
     clientId,
     title: document.getElementById('inv-title')?.value.trim() || 'Invoice',
-    status: document.getElementById('inv-status')?.value || 'draft',
+    status: statusVal,
     date: document.getElementById('inv-date')?.value || new Date().toISOString().slice(0, 10),
     dueDate: document.getElementById('inv-due')?.value || '',
     quoteRef: document.getElementById('inv-quote-ref')?.value.trim() || '',
     notes: document.getElementById('inv-notes')?.value.trim() || '',
     showFooter: document.getElementById('inv-show-footer')?.checked !== false,
+    showItemDescriptions: document.getElementById('inv-show-descriptions')?.checked !== false,
     discount,
     items,
     subtotalNgn: sub,
@@ -3808,11 +3850,23 @@ function saveInvoice() {
   }
   saveData();
   logAudit('invoice_save', (data.invoices.find(x => x.id === currentInvoiceId) || {}).invoiceNumber || '');
-  alert('Invoice saved.');
-  renderInvoices();
+  // Keep editor status in sync with what was saved (avoid stuck "draft")
+  const savedInv = (data.invoices || []).find(x => x.id === currentInvoiceId);
+  if (savedInv) {
+    const st = document.getElementById('inv-status');
+    if (st) st.value = savedInv.status || 'draft';
+    const title = document.getElementById('invoice-editor-title');
+    if (title) title.textContent = 'Invoice ' + (savedInv.invoiceNumber || '');
+  }
+  if (typeof renderInvoices === 'function') renderInvoices();
   renderInvoicePaymentsPanel();
   if (typeof renderClients === 'function') renderClients();
   if (typeof renderProducts === 'function') renderProducts();
+  alert('Invoice saved' + (statusVal ? (' · Status: ' + statusVal) : '') + '.');
+  } catch (err) {
+    console.error('saveInvoice', err);
+    alert('Could not save invoice: ' + (err && err.message ? err.message : err));
+  }
 }
 
 function deleteCurrentInvoice() {
@@ -4545,11 +4599,7 @@ function generateInvoicePdf(inv) {
       doc.text('This invoice is issued by ' + (co.name || 'Medicano Resources Limited') + '. Please make payment by the due date unless otherwise agreed.', M, y);
       y += 12;
     }
-    if (inv.showFooter !== false) {
-      const rates = data.rates || {};
-      doc.text('Rates reference: 1 USD = NGN ' + Number(rates.USD || 0).toLocaleString() + ' | 1 EUR = NGN ' + Number(rates.EUR || 0).toLocaleString(), M, y);
-      y += 14;
-    }
+    // Exchange rates are no longer printed on invoices / receipts / proformas
     doc.text('Thank you for your business.', M, y);
 
     // Download file (same as presentation)
@@ -5145,11 +5195,28 @@ function importProductsFromCsv(file) {
       }
 
       data.categories.sort();
-      saveData();
+      window._productTimestampsReady = false;
+      if (typeof saveDataNow === 'function') saveDataNow();
+      else saveData();
       renderProducts();
       renderDashboard();
       if (typeof populateCategorySelect === 'function') populateCategorySelect();
-      alert('Import complete.\n\nAdded: ' + added + '\nUpdated: ' + updated + '\nSkipped: ' + skipped);
+      var syncNote = '';
+      var cloud = window.MedicanoCloud;
+      if (cloud && cloud.pushNow) {
+        cloud.pushNow().then(function (res) {
+          if (res && res.ok) {
+            syncNote = '\n\nCloud sync: published ' + ((res.products != null) ? res.products : (data.products || []).length) + ' items to the team.';
+          } else {
+            syncNote = '\n\nCloud sync did not finish (' + ((res && (res.reason || res.error && res.error.message)) || 'check sign-in / Firestore rules for productChunks') + '). Data is saved on this device only until sync succeeds.';
+          }
+          alert('Import complete.\n\nAdded: ' + added + '\nUpdated: ' + updated + '\nSkipped: ' + skipped + syncNote);
+        }).catch(function (e) {
+          alert('Import complete.\n\nAdded: ' + added + '\nUpdated: ' + updated + '\nSkipped: ' + skipped + '\n\nCloud sync error: ' + (e && e.message ? e.message : e) + '\n\nUpdate Firestore rules for productChunks, stay signed in as admin, then use Force sync.');
+        });
+      } else {
+        alert('Import complete.\n\nAdded: ' + added + '\nUpdated: ' + updated + '\nSkipped: ' + skipped + '\n\nNot signed in to cloud — items are only on this device.');
+      }
     } catch (err) {
       console.error(err);
       alert('Could not read the spreadsheet. Save as CSV (UTF-8) from Excel and try again.');

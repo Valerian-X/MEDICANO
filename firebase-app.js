@@ -291,22 +291,34 @@
         var needChunks = !!(payload._productsInChunks || remote.productCount || payload._productCount);
         if (needChunks && (!payload.products || !payload.products.length) && orgId) {
           readProductChunks(orgId).then(function (chunkProducts) {
-            if (chunkProducts && chunkProducts.length) payload.products = chunkProducts;
+            if (chunkProducts && chunkProducts.length) {
+              payload.products = chunkProducts;
+            } else {
+              // Keep local catalog if chunks missing (rules/error) — never wipe inventory
+              var loc = (typeof window.getAppData === 'function' ? window.getAppData() : window.data) || {};
+              if (Array.isArray(loc.products) && loc.products.length) {
+                payload.products = loc.products;
+              }
+            }
             finishApplyRemote(payload, resolve);
           }).catch(function (err) {
             console.error('product chunks', err);
+            var loc = (typeof window.getAppData === 'function' ? window.getAppData() : window.data) || {};
+            if (Array.isArray(loc.products) && loc.products.length) {
+              payload.products = loc.products;
+            }
             finishApplyRemote(payload, resolve);
           });
-          return;
+          return; // finishApplyRemote clears applyingRemote
         }
 
         finishApplyRemote(payload, resolve);
       } catch (e) {
         console.error('apply remote', e);
+        applyingRemote = false;
         resolve(false);
-      } finally {
-        setTimeout(function () { applyingRemote = false; }, 400);
       }
+      // applyingRemote cleared inside finishApplyRemote
     });
   }
 
@@ -503,7 +515,19 @@
               try { remotePayload = JSON.parse(remotePayload); } catch (eP) { remotePayload = null; }
             }
             if (remotePayload && typeof remotePayload === 'object') {
+              // Hydrate products from chunks before merge (main doc has products: [])
+              if ((remotePayload._productsInChunks || rd.productCount) &&
+                  (!remotePayload.products || !remotePayload.products.length)) {
+                try {
+                  var remoteProds = await readProductChunks(orgId);
+                  if (remoteProds && remoteProds.length) remotePayload.products = remoteProds;
+                } catch (eCh) { console.warn('pre-push chunks', eCh); }
+              }
               working = mergeWorkspacePayloads(src, remotePayload);
+              // Prefer local products if still richer (this device just imported)
+              if ((src.products || []).length > (working.products || []).length) {
+                working.products = src.products;
+              }
               if (src.userProfile) working.userProfile = src.userProfile;
               if (typeof window.applyCloudData === 'function') {
                 applyingRemote = true;
@@ -590,9 +614,12 @@
 
   function permissionMsg(e) {
     var msg = (e && e.message) ? e.message : String(e);
-    if (/permission/i.test(msg)) return 'Sync failed: Firestore rules';
-    if (/size|too big|exceeds/i.test(msg)) return 'Sync failed: data too large';
+    if (/permission/i.test(msg)) {
+      return 'Sync failed: Firestore rules — add productChunks read/write for org members (see Settings or FIRESTORE_RULES_productChunks.txt)';
+    }
+    if (/size|too big|exceeds|Payload/i.test(msg)) return 'Sync failed: data too large';
     if (typeof navigator !== 'undefined' && !navigator.onLine) return 'Sync failed: offline';
+    if (msg && msg.length < 120) return 'Sync failed: ' + msg;
     return 'Sync failed';
   }
 
@@ -1018,6 +1045,21 @@
     pushNow: pushWorkspace,
     schedulePush: schedulePush,
     syncNow: syncNow,
+    forcePublishCatalog: async function () {
+      if (!ready || !auth || !auth.currentUser) return { ok: false, reason: 'not-signed-in' };
+      if (memberRole !== 'admin') return { ok: false, reason: 'admin-only' };
+      status('Publishing full catalog…', 'syncing');
+      return pushWorkspace();
+    },
+    getSyncInfo: function () {
+      return {
+        ready: ready,
+        signedIn: !!(auth && auth.currentUser),
+        orgId: orgId,
+        role: memberRole,
+        email: (auth && auth.currentUser && auth.currentUser.email) || ''
+      };
+    },
     listMembers: listMembers,
     createInvite: createInvite,
     joinWithCode: joinWithCode,
