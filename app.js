@@ -3502,12 +3502,13 @@ function renderInvoices() {
         <span class="entity-card-chevron">▾</span>
         <span class="entity-card-main">
           <span class="entity-card-title">${escHtml(clientName)}</span>
-          <span class="entity-card-sub">${escHtml(inv.invoiceNumber || '')} · ${escHtml(inv.title || '')}</span>
+          <span class="entity-card-sub">${escHtml(inv.invoiceNumber || '')} · ${escHtml(typeof invoiceDocLabel === 'function' ? invoiceDocLabel(inv) : '')} · ${escHtml(inv.title || '')}</span>
         </span>
         <span class="entity-card-price">${formatNGN(inv.totalNgn || 0)}</span>
       </button>
       <div class="entity-card-body">
         <div class="entity-detail"><span class="entity-detail-label">Invoice #</span><span class="entity-detail-value">${escHtml(inv.invoiceNumber || '')}</span></div>
+        <div class="entity-detail"><span class="entity-detail-label">Document</span><span class="entity-detail-value">${escHtml(typeof invoiceDocLabel === 'function' ? invoiceDocLabel(inv) : (inv.title || ''))}</span></div>
         <div class="entity-detail"><span class="entity-detail-label">Title</span><span class="entity-detail-value">${escHtml(inv.title || '')}</span></div>
         <div class="entity-detail"><span class="entity-detail-label">Status</span><span class="entity-detail-value">${statusPill(inv.status)}</span></div>
         <div class="entity-detail"><span class="entity-detail-label">Date</span><span class="entity-detail-value">${escHtml((inv.date || '').slice(0, 10))}</span></div>
@@ -3762,6 +3763,24 @@ function recalcInvoiceTotal() {
   return { sub, total, discount };
 }
 
+
+/** Display name for invoice document type (PDF + lists + default title) */
+function invoiceDocLabel(inv) {
+  inv = inv || {};
+  const status = String(inv.status || '').toLowerCase();
+  const docType = String(inv.docType || 'tax').toLowerCase();
+  if (status === 'paid') return 'Receipt';
+  if (status === 'partial') return 'Partial Invoice';
+  if (docType === 'proforma' || docType === 'pro forma') return 'Proforma Invoice';
+  return 'Invoice';
+}
+
+function isGenericInvoiceTitle(title) {
+  const t = String(title || '').trim().toLowerCase();
+  if (!t) return true;
+  return /^(invoice|proforma invoice|pro forma invoice|receipt|partial invoice|new invoice)$/i.test(t);
+}
+
 function saveInvoice() {
   try {
   const clientId = resolveClientForSave('inv-client', 'inv-client-manual', 'inv-client');
@@ -3796,9 +3815,15 @@ function saveInvoice() {
   if (!items.length) { alert('Add at least one line item.'); return; }
   const { sub, total, discount } = recalcInvoiceTotal();
   const statusVal = (document.getElementById('inv-status')?.value || 'draft').trim() || 'draft';
+  const docTypeVal = document.getElementById('inv-doc-type')?.value || 'tax';
+  let titleVal = document.getElementById('inv-title')?.value.trim() || '';
+  const autoLabel = invoiceDocLabel({ status: statusVal, docType: docTypeVal });
+  if (isGenericInvoiceTitle(titleVal)) titleVal = autoLabel;
+  const titleEl = document.getElementById('inv-title');
+  if (titleEl && isGenericInvoiceTitle(titleEl.value)) titleEl.value = titleVal;
   const payload = {
     clientId,
-    title: document.getElementById('inv-title')?.value.trim() || 'Invoice',
+    title: titleVal || autoLabel,
     status: statusVal,
     date: document.getElementById('inv-date')?.value || new Date().toISOString().slice(0, 10),
     dueDate: document.getElementById('inv-due')?.value || '',
@@ -3816,7 +3841,7 @@ function saveInvoice() {
   payload.accountName = (document.getElementById('inv-account-name')?.value || '').trim();
   payload.accountNumber = (document.getElementById('inv-account-number')?.value || '').trim();
   payload.bankCode = (document.getElementById('inv-bank-code')?.value || '').trim();
-  payload.docType = document.getElementById('inv-doc-type')?.value || 'tax';
+  payload.docType = docTypeVal;
   if (!data.invoices) data.invoices = [];
   if (currentInvoiceId) {
     const idx = data.invoices.findIndex(x => x.id === currentInvoiceId);
@@ -3848,15 +3873,18 @@ function saveInvoice() {
     document.getElementById('invoice-editor-title').textContent = 'Invoice ' + invNum;
     document.getElementById('btn-delete-invoice')?.classList.remove('hidden');
   }
-  saveData();
+  if (typeof saveDataNow === 'function') saveDataNow();
+  else saveData();
   logAudit('invoice_save', (data.invoices.find(x => x.id === currentInvoiceId) || {}).invoiceNumber || '');
-  // Keep editor status in sync with what was saved (avoid stuck "draft")
+  if (window.MedicanoCloud && typeof window.MedicanoCloud.pushNow === 'function') {
+    window.MedicanoCloud.pushNow().catch(function (e) { console.warn('invoice push', e); });
+  }
   const savedInv = (data.invoices || []).find(x => x.id === currentInvoiceId);
   if (savedInv) {
     const st = document.getElementById('inv-status');
     if (st) st.value = savedInv.status || 'draft';
     const title = document.getElementById('invoice-editor-title');
-    if (title) title.textContent = 'Invoice ' + (savedInv.invoiceNumber || '');
+    if (title) title.textContent = invoiceDocLabel(savedInv) + ' ' + (savedInv.invoiceNumber || '');
   }
   if (typeof renderInvoices === 'function') renderInvoices();
   renderInvoicePaymentsPanel();
