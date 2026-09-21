@@ -3744,6 +3744,89 @@ function collectInvoiceItems() {
   return items;
 }
 
+
+/** Bidirectional discount: % ↔ amount. Mode tracks which field the user last edited. */
+function getLineSubtotal(kind) {
+  kind = kind || 'invoice';
+  let sub = 0;
+  if (kind === 'quote') {
+    document.querySelectorAll('#quote-items-list .line-card, #quote-items-list tr').forEach(function (row) {
+      const qty = parseFloat(row.querySelector('.qi-qty')?.value) || 0;
+      const base = parseFloat(row.querySelector('.qi-base')?.value) || 0;
+      const markup = parseFloat(row.querySelector('.qi-markup')?.value) || 0;
+      const unit = base * (1 + markup / 100);
+      // prefer displayed line total if present
+      const lineEl = row.querySelector('.qi-line, .qi-line-body');
+      if (lineEl && lineEl.textContent) {
+        const n = parseFloat(String(lineEl.textContent).replace(/[^\d.-]/g, ''));
+        if (!isNaN(n) && n > 0) { sub += n; return; }
+      }
+      sub += qty * unit;
+    });
+  } else {
+    document.querySelectorAll('#invoice-items-list .line-card').forEach(function (tr) {
+      const qty = parseFloat(tr.querySelector('.inv-qty')?.value) || 0;
+      const unit = parseFloat(tr.querySelector('.inv-unit')?.value) || 0;
+      sub += qty * unit;
+    });
+  }
+  return sub;
+}
+
+function resolveDiscount(kind, subtotal) {
+  kind = kind || 'invoice';
+  window._discountMode = window._discountMode || {};
+  const mode = window._discountMode[kind] || 'pct';
+  const pctEl = document.getElementById(kind === 'quote' ? 'quote-discount' : 'inv-discount');
+  const amtEl = document.getElementById(kind === 'quote' ? 'quote-discount-amt' : 'inv-discount-amt');
+  let pct = parseFloat(pctEl && pctEl.value) || 0;
+  let amt = parseFloat(amtEl && amtEl.value) || 0;
+  subtotal = Number(subtotal) || 0;
+  if (mode === 'amt') {
+    amt = Math.max(0, Math.min(amt, subtotal));
+    pct = subtotal > 0 ? (amt / subtotal) * 100 : 0;
+  } else {
+    pct = Math.max(0, Math.min(pct, 100));
+    amt = subtotal * (pct / 100);
+  }
+  const total = Math.max(0, subtotal - amt);
+  return { pct: pct, amt: amt, total: total, mode: mode };
+}
+
+function onDiscountPctInput(kind) {
+  window._discountMode = window._discountMode || {};
+  window._discountMode[kind] = 'pct';
+  const sub = getLineSubtotal(kind);
+  const disc = resolveDiscount(kind, sub);
+  const amtEl = document.getElementById(kind === 'quote' ? 'quote-discount-amt' : 'inv-discount-amt');
+  if (amtEl) {
+    // Show rounded amount without fighting the user typing %
+    amtEl.value = disc.amt ? (Math.round(disc.amt * 100) / 100) : 0;
+  }
+  if (kind === 'quote') {
+    if (typeof recalcQuoteTotal === 'function') recalcQuoteTotal();
+  } else {
+    recalcInvoiceTotal();
+  }
+}
+
+function onDiscountAmtInput(kind) {
+  window._discountMode = window._discountMode || {};
+  window._discountMode[kind] = 'amt';
+  const sub = getLineSubtotal(kind);
+  const disc = resolveDiscount(kind, sub);
+  const pctEl = document.getElementById(kind === 'quote' ? 'quote-discount' : 'inv-discount');
+  if (pctEl) {
+    // Approximate % for display; amount drives the total
+    pctEl.value = disc.pct ? (Math.round(disc.pct * 100) / 100) : 0;
+  }
+  if (kind === 'quote') {
+    if (typeof recalcQuoteTotal === 'function') recalcQuoteTotal();
+  } else {
+    recalcInvoiceTotal();
+  }
+}
+
 function recalcInvoiceTotal() {
   let sub = 0;
   document.querySelectorAll('#invoice-items-list .line-card').forEach(tr => {
@@ -3754,13 +3837,21 @@ function recalcInvoiceTotal() {
     const lineStr = formatNGN(line);
     tr.querySelectorAll('.inv-line, .inv-line-body').forEach(cell => { cell.textContent = lineStr; });
   });
-  const discount = parseFloat(document.getElementById('inv-discount')?.value) || 0;
-  const total = sub * (1 - discount / 100);
+  const disc = resolveDiscount('invoice', sub);
+  // Keep the passive field in sync without changing mode
+  const mode = (window._discountMode && window._discountMode.invoice) || 'pct';
+  if (mode === 'pct') {
+    const amtEl = document.getElementById('inv-discount-amt');
+    if (amtEl && document.activeElement !== amtEl) amtEl.value = disc.amt ? (Math.round(disc.amt * 100) / 100) : 0;
+  } else {
+    const pctEl = document.getElementById('inv-discount');
+    if (pctEl && document.activeElement !== pctEl) pctEl.value = disc.pct ? (Math.round(disc.pct * 100) / 100) : 0;
+  }
   const s = document.getElementById('inv-subtotal');
   const t = document.getElementById('inv-total');
   if (s) s.textContent = formatNGN(sub);
-  if (t) t.textContent = formatNGN(total);
-  return { sub, total, discount };
+  if (t) t.textContent = formatNGN(disc.total);
+  return { sub, total: disc.total, discount: disc.pct, discountAmount: disc.amt };
 }
 
 
@@ -3796,7 +3887,7 @@ function saveInvoice() {
     if (sel && productId) {
       // Works for both <select> and searchable picker hidden input
       if (sel.tagName === 'SELECT' && sel.options) {
-        if (sel.tagName === 'SELECT' && sel.options && ![...sel.options].some(o => o.value === productId)) {
+        if (![...sel.options].some(o => o.value === productId)) {
           const opt = document.createElement('option');
           opt.value = productId;
           opt.textContent = name || (getProduct(productId) || {}).name || 'Item';
@@ -3813,7 +3904,9 @@ function saveInvoice() {
   });
   const items = collectInvoiceItems();
   if (!items.length) { alert('Add at least one line item.'); return; }
-  const { sub, total, discount } = recalcInvoiceTotal();
+  const totals = recalcInvoiceTotal();
+  const sub = totals.sub;
+  const disc = resolveDiscount('invoice', sub);
   const statusVal = (document.getElementById('inv-status')?.value || 'draft').trim() || 'draft';
   const docTypeVal = document.getElementById('inv-doc-type')?.value || 'tax';
   let titleVal = document.getElementById('inv-title')?.value.trim() || '';
@@ -3831,10 +3924,12 @@ function saveInvoice() {
     notes: document.getElementById('inv-notes')?.value.trim() || '',
     showFooter: document.getElementById('inv-show-footer')?.checked !== false,
     showItemDescriptions: document.getElementById('inv-show-descriptions')?.checked !== false,
-    discount,
+    discount: disc.pct,
+    discountAmount: disc.amt,
+    discountMode: (window._discountMode && window._discountMode.invoice) || 'pct',
     items,
     subtotalNgn: sub,
-    totalNgn: total,
+    totalNgn: disc.total,
     updatedAt: new Date().toISOString()
   };
   payload.bankName = (document.getElementById('inv-bank-name')?.value || '').trim();
@@ -3947,7 +4042,8 @@ function printInvoice() {
   if (!inv) {
     const items = collectInvoiceItems();
     if (!items.length) { alert('Add line items or save the invoice first.'); return; }
-    const { sub, total, discount } = recalcInvoiceTotal();
+    const totals = recalcInvoiceTotal();
+    const disc = resolveDiscount('invoice', totals.sub);
     inv = {
       invoiceNumber: 'DRAFT',
       clientId: document.getElementById('inv-client')?.value,
@@ -3962,7 +4058,12 @@ function printInvoice() {
       accountNumber: (document.getElementById('inv-account-number')?.value || '').trim(),
       bankCode: (document.getElementById('inv-bank-code')?.value || '').trim(),
       showFooter: document.getElementById('inv-show-footer')?.checked !== false,
-      discount, items, subtotalNgn: sub, totalNgn: total
+      discount: disc.pct,
+      discountAmount: disc.amt,
+      discountMode: (window._discountMode && window._discountMode.invoice) || 'pct',
+      items,
+      subtotalNgn: totals.sub,
+      totalNgn: disc.total
     };
   } else {
     // Merge latest form bank fields if editor is open
@@ -4313,12 +4414,21 @@ function generateInvoicePdf(inv) {
   const co = data.company || {};
   const client = getClient(inv.clientId);
   const logo = (typeof COMPANY_LOGO_DATAURL !== 'undefined') ? COMPANY_LOGO_DATAURL : null;
-  const discount = Number(inv.discount) || 0;
   const items = inv.items || [];
   const subtotal = inv.subtotalNgn != null
     ? inv.subtotalNgn
     : items.reduce((s, it) => s + (it.lineNgn != null ? it.lineNgn : (it.qty || 0) * (it.unitNgn || 0)), 0);
-  const total = inv.totalNgn != null ? inv.totalNgn : subtotal * (1 - discount / 100);
+  let discountAmt = (inv.discountAmount != null && inv.discountAmount !== '')
+    ? Number(inv.discountAmount)
+    : NaN;
+  let discount = Number(inv.discount) || 0;
+  if (isNaN(discountAmt) || discountAmt < 0) {
+    discountAmt = subtotal * (discount / 100);
+  } else if (subtotal > 0 && !discount) {
+    discount = (discountAmt / subtotal) * 100;
+  }
+  discountAmt = Math.max(0, Math.min(discountAmt, subtotal));
+  const total = inv.totalNgn != null ? inv.totalNgn : Math.max(0, subtotal - discountAmt);
   const invNum = inv.invoiceNumber || 'DRAFT';
   const status = (inv.status || 'draft').toUpperCase();
   const dateStr = inv.date ? new Date(inv.date).toLocaleDateString() : new Date().toLocaleDateString();
@@ -4557,9 +4667,11 @@ function generateInvoicePdf(inv) {
       return totalsRight - amountW - gap - doc.getTextWidth(label);
     };
     const leftEdge = drawTotalLine('Subtotal', subtotal, y, false);
-    if (discount > 0) {
+    if (discountAmt > 0.009) {
       y += 16;
-      drawTotalLine('Discount (' + discount + '%)', -(subtotal * discount / 100), y, false);
+      // Label shows approximate %; amount is the exact Naira subtracted
+      const pctLabel = (Math.round(discount * 100) / 100).toFixed(discount >= 10 || discount === Math.floor(discount) ? 0 : 2);
+      drawTotalLine('Discount (' + pctLabel + '%)', -discountAmt, y, false);
     }
     y += 10;
     doc.setDrawColor(...TEAL);
@@ -7261,10 +7373,17 @@ function generateQuotePdf(q) {
   const co = data.company || {};
   const client = getClient(q.clientId);
   const logo = (typeof COMPANY_LOGO_DATAURL !== 'undefined') ? COMPANY_LOGO_DATAURL : null;
-  const discount = Number(q.discount) || 0;
   const items = q.items || [];
   const subtotal = q.subtotalNGN != null ? q.subtotalNGN : items.reduce((s, it) => s + (it.lineNGN || it.lineNgn || 0), 0);
-  const total = q.totalNGN != null ? q.totalNGN : subtotal * (1 - discount / 100);
+  let discountAmt = (q.discountAmount != null && q.discountAmount !== '') ? Number(q.discountAmount) : NaN;
+  let discount = Number(q.discount) || 0;
+  if (isNaN(discountAmt) || discountAmt < 0) {
+    discountAmt = subtotal * (discount / 100);
+  } else if (subtotal > 0 && !discount) {
+    discount = (discountAmt / subtotal) * 100;
+  }
+  discountAmt = Math.max(0, Math.min(discountAmt, subtotal));
+  const total = q.totalNGN != null ? q.totalNGN : Math.max(0, subtotal - discountAmt);
 
   loadJsPdf().then(JsPDF => {
     const doc = new JsPDF({ unit: 'pt', format: 'a4' });
