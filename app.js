@@ -4430,12 +4430,12 @@ function drawPdfSignatureBlock(doc, M, W, yStart) {
   try {
     const sig = (typeof COMPANY_SIGNATURE_DATAURL !== 'undefined') ? COMPANY_SIGNATURE_DATAURL : null;
     const stamp = (typeof COMPANY_STAMP_DATAURL !== 'undefined') ? COMPANY_STAMP_DATAURL : null;
+    // jsPDF origin is TOP-LEFT (y increases downward) — place stamp at bottom-right
     const H = doc.internal.pageSize.getHeight();
-    // Anchor stamp near the bottom-right of the page (red-dot area)
     const stampSize = 140;
-    const marginBottom = 28;
+    const marginBottom = 36;
     const stampX = W - M - stampSize;
-    const stampY = marginBottom;
+    const stampY = H - marginBottom - stampSize;
 
     if (stamp) {
       try {
@@ -4443,19 +4443,19 @@ function drawPdfSignatureBlock(doc, M, W, yStart) {
         doc.addImage(stamp, fmt, stampX, stampY, stampSize, stampSize);
       } catch (e2) { console.warn('stamp image', e2); }
     }
-    // Thicker/larger signature inside stamp over Date / Sign lines
+    // Signature inside stamp over Date / Sign lines
     if (sig) {
       try {
         const fmt = sig.indexOf('image/png') >= 0 ? 'PNG' : 'JPEG';
-        const sigW = 88;
-        const sigH = 48;
+        const sigW = 95;
+        const sigH = 55;
         const sigX = stampX + (stampSize - sigW) / 2;
         const sigY = stampY + stampSize * 0.50 - sigH / 2;
         doc.addImage(sig, fmt, sigX, sigY, sigW, sigH);
       } catch (e1) { console.warn('sig image', e1); }
     }
 
-    return Math.max(yStart, stampY + stampSize + 4);
+    return yStart;
   } catch (e) {
     console.warn('signature block', e);
     return yStart;
