@@ -7622,25 +7622,52 @@ function printTransactionReport() {
           }
         } catch (eL) {}
 
+        // Right-side title + organised meta block (clear of the logo)
+        const rightX = W - M;
+        const metaLabelW = 52; // width reserved for "Period:" etc.
+        const metaValMax = 210;
+
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(20);
+        doc.setFontSize(18);
         doc.setTextColor(INK[0], INK[1], INK[2]);
-        doc.text('Sales Report', W - M, y + 18, { align: 'right' });
+        doc.text('Sales Report', rightX, y + 12, { align: 'right' });
+
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-        doc.text(co.name || 'Medicano Resources Limited', W - M, y + 34, { align: 'right' });
-
-        y = Math.max(y + logoH, y + 42) + 8;
-
-        // Compact meta
         doc.setFontSize(8);
-        doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-        const metaStr = 'Period  ' + period + '    ·    Client  ' + clientLabel +
-          '    ·    Product  ' + productLabel + '    ·    Type  ' + typeLabel;
-        const metaWrap = doc.splitTextToSize(metaStr, usable);
-        doc.text(metaWrap, M, y);
-        y += metaWrap.length * 11 + 10;
+        doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+        doc.text(co.name || 'Medicano Resources Limited', rightX, y + 26, { align: 'right' });
+
+        // Organised label : value pairs, right-aligned column
+        const metaPairs = [
+          ['Period:', period],
+          ['Client:', clientLabel],
+          ['Product:', productLabel],
+          ['Type:', typeLabel]
+        ];
+        let metaY = y + 44;
+        metaPairs.forEach(function (pair) {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+          // Label sits to the left of the value, both right-stack
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(INK[0], INK[1], INK[2]);
+          const valLines = doc.splitTextToSize(String(pair[1] || '—'), metaValMax);
+          // Draw label at a fixed offset left of the right margin value column
+          const valX = rightX;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+          doc.text(pair[0], valX - metaValMax - 8, metaY, { align: 'right' });
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(INK[0], INK[1], INK[2]);
+          doc.text(valLines, valX, metaY, { align: 'right' });
+          metaY += Math.max(valLines.length, 1) * 12 + 2;
+        });
+
+        y = Math.max(y + logoH + 12, metaY) + 8;
 
         // Top rule before list
         doc.setDrawColor(INK[0], INK[1], INK[2]);
