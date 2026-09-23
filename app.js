@@ -7043,6 +7043,29 @@ function initReportsPage() {
   renderTransactionReport();
 }
 
+
+function appendReportProductSalesPanel(preview, filters, productSales) {
+  if (!preview) return;
+  try {
+    const sales = productSales || collectProductSalesByClient(filters || getReportFilterState());
+    if (preview.innerHTML.indexOf('Products by client') >= 0) return;
+    const salesHtml = '<div class="panel-soft mt-4 p-4">' +
+      '<h3 class="font-semibold text-slate-800 mb-3">Products by client</h3>' +
+      (sales.length
+        ? ('<div class="table-desktop-only overflow-x-auto"><table class="w-full text-sm"><thead><tr>' +
+           '<th class="text-left">Client</th><th class="text-left">SKU</th><th class="text-left">Product</th>' +
+           '<th class="text-right">Qty</th><th class="text-right">Amount</th></tr></thead><tbody>' +
+           sales.map(function (s) {
+             return '<tr><td>' + escHtml(s.clientName) + '</td><td>' + escHtml(s.sku || '—') + '</td><td>' +
+               escHtml(s.productName) + '</td><td class="text-right">' + s.qty + '</td><td class="text-right">' +
+               formatNGN(s.amount) + '</td></tr>';
+           }).join('') + '</tbody></table></div>')
+        : '<p class="text-slate-500 text-sm mb-0">No products sold in this period for the selected filters.</p>') +
+      '</div>';
+    preview.innerHTML += salesHtml;
+  } catch (e) { console.warn(e); }
+}
+
 function renderTransactionReport() {
   const toEl = document.getElementById('report-date-to');
   if (toEl && !toEl.value) toEl.value = localYMD(new Date());
@@ -7073,6 +7096,7 @@ function renderTransactionReport() {
   if (!rows.length) {
     preview.innerHTML = '<div class="panel-soft report-empty">No transactions in this period for the selected filters.</div>' +
       '<div class="report-add-row-wrap"><button type="button" class="report-add-row-btn" onclick="openReportRowEditor()">+ Add table row</button></div>';
+    appendReportProductSalesPanel(preview, filters, productSales);
     return;
   }
 
@@ -7151,6 +7175,7 @@ function renderTransactionReport() {
   `;
 }
 
+
 function ensureBackupBeforeSensitiveAction(actionLabel) {
   const last = data.lastBackupAt ? new Date(data.lastBackupAt) : null;
   const days = last ? Math.floor((Date.now() - last.getTime()) / 86400000) : 999;
@@ -7182,90 +7207,243 @@ function exportDataQuiet() {
 }
 
 function printTransactionReport() {
-  ensureBackupBeforeSensitiveAction('printing this statement');
+  ensureBackupBeforeSensitiveAction('printing this report');
   const filters = getReportFilterState();
-  const rows = collectLedgerRows(filters);
-  const co = data.company || (data.settings && data.settings.company) || {};
-  let clientLabel = 'All clients';
-  if (filters.clientIds && filters.clientIds.length === 1) {
-    clientLabel = (getClient(filters.clientIds[0]) || {}).name || 'Client';
-  } else if (filters.clientIds && filters.clientIds.length > 1) {
-    clientLabel = filters.clientIds.length + ' selected clients';
+  const productSales = collectProductSalesByClient(filters);
+  const rows = filters.type === 'sales'
+    ? productSales.map(function (s) {
+        return {
+          kind: 'sale', date: '—', clientName: s.clientName, ref: s.sku || '—',
+          title: s.productName, method: 'Qty ' + s.qty, note: '', amount: s.amount, qty: s.qty
+        };
+      })
+    : collectLedgerRows(filters);
+  const co = data.company || {};
+  const clientLabel = filters.clientIds && filters.clientIds.length
+    ? filters.clientIds.map(function (id) { const c = getClient(id); return c ? c.name : id; }).join(', ')
+    : 'All clients';
+  const period = (filters.from || '…') + ' → ' + (filters.to || '…');
+  const productLabel = filters.productId
+    ? ((getProduct(filters.productId) || {}).name || filters.productId)
+    : 'All products';
+
+  // Prefer jsPDF download (same style as invoices)
+  if (typeof loadJsPdf === 'function') {
+    loadJsPdf().then(function (JsPDF) {
+      const doc = new JsPDF({ unit: 'pt', format: 'a4' });
+      const W = doc.internal.pageSize.getWidth();
+      const H = doc.internal.pageSize.getHeight();
+      const M = 42;
+      const TEAL = [15, 118, 110];
+      const GRAY = [100, 116, 139];
+      const INK = [30, 41, 59];
+      let y = 48;
+      try {
+        const logo = (typeof COMPANY_LOGO_DATAURL !== 'undefined') ? COMPANY_LOGO_DATAURL : null;
+        if (logo) {
+          const fmt = logo.indexOf('image/jpeg') >= 0 ? 'JPEG' : 'PNG';
+          doc.addImage(logo, fmt, M, y - 10, 160, 32);
+        }
+      } catch (eL) {}
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor.apply(doc, TEAL);
+      doc.text('TRANSACTION REPORT', W - M, y, { align: 'right' });
+      y += 16;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor.apply(doc, GRAY);
+      doc.text('Period: ' + period, W - M, y, { align: 'right' });
+      y += 12;
+      doc.text('Client: ' + clientLabel, W - M, y, { align: 'right' });
+      y += 12;
+      doc.text('Product: ' + productLabel, W - M, y, { align: 'right' });
+      y += 18;
+      doc.setDrawColor.apply(doc, TEAL);
+      doc.setLineWidth(2);
+      doc.line(M, y, W - M, y);
+      y += 20;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor.apply(doc, TEAL);
+      doc.text(co.name || 'Medicano Resources Limited', M, y);
+      y += 22;
+
+      // Transactions table
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor.apply(doc, TEAL);
+      const cols = [M, M + 70, M + 120, M + 220, M + 320, W - M];
+      doc.text('Date', cols[0], y);
+      doc.text('Type', cols[1], y);
+      doc.text('Client', cols[2], y);
+      doc.text('Ref', cols[3], y);
+      doc.text('Detail', cols[4], y);
+      doc.text('Amount', cols[5], y, { align: 'right' });
+      y += 8;
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.6);
+      doc.line(M, y, W - M, y);
+      y += 12;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor.apply(doc, INK);
+      rows.forEach(function (r) {
+        if (y > H - 80) { doc.addPage(); y = 48; }
+        const typ = r.kind === 'payment' ? 'Payment' : (r.kind === 'sale' ? 'Sale' : (r.kind === 'custom' ? 'Custom' : 'Invoice'));
+        const detail = r.kind === 'sale'
+          ? ((r.title || '') + (r.qty != null ? ' ×' + r.qty : ''))
+          : (r.kind === 'payment' ? ((r.method || '') + (r.note ? ' · ' + r.note : '')) : (r.method || r.title || ''));
+        doc.text(String(r.date || '—').slice(0, 12), cols[0], y);
+        doc.text(typ, cols[1], y);
+        doc.text(String(r.clientName || '—').slice(0, 18), cols[2], y);
+        doc.text(String(r.ref || '—').slice(0, 14), cols[3], y);
+        doc.text(String(detail || '—').slice(0, 22), cols[4], y);
+        doc.text((Number(r.amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 }), cols[5], y, { align: 'right' });
+        y += 12;
+      });
+      if (!rows.length) {
+        doc.text('No transactions in this period.', M, y);
+        y += 14;
+      }
+
+      // Products by client
+      y += 16;
+      if (y > H - 120) { doc.addPage(); y = 48; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor.apply(doc, TEAL);
+      doc.text('Products by client', M, y);
+      y += 14;
+      doc.setFontSize(9);
+      doc.text('Client', M, y);
+      doc.text('SKU', M + 140, y);
+      doc.text('Product', M + 200, y);
+      doc.text('Qty', W - M - 90, y, { align: 'right' });
+      doc.text('Amount', W - M, y, { align: 'right' });
+      y += 8;
+      doc.setDrawColor(226, 232, 240);
+      doc.line(M, y, W - M, y);
+      y += 12;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor.apply(doc, INK);
+      if (!productSales.length) {
+        doc.text('No products sold in this period for the selected filters.', M, y);
+        y += 12;
+      } else {
+        productSales.forEach(function (s) {
+          if (y > H - 50) { doc.addPage(); y = 48; }
+          doc.text(String(s.clientName || '—').slice(0, 24), M, y);
+          doc.text(String(s.sku || '—').slice(0, 10), M + 140, y);
+          doc.text(String(s.productName || '—').slice(0, 28), M + 200, y);
+          doc.text(String(s.qty || 0), W - M - 90, y, { align: 'right' });
+          doc.text((Number(s.amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 }), W - M, y, { align: 'right' });
+          y += 12;
+        });
+      }
+
+      const sanitize = function (s, max) {
+        return String(s || '').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max || 40);
+      };
+      const clientPart = (filters.clientIds && filters.clientIds.length === 1)
+        ? sanitize((getClient(filters.clientIds[0]) || {}).name || 'Client', 40)
+        : (filters.clientIds && filters.clientIds.length ? 'Selected clients' : 'All clients');
+      const periodPart = sanitize((filters.from || 'all') + ' to ' + (filters.to || 'all'), 40);
+      doc.save(clientPart + ' - Report - ' + periodPart + '.pdf');
+    }).catch(function (err) {
+      console.error(err);
+      alert(err.message || 'Could not generate report PDF.');
+    });
+    return;
   }
-  const collected = rows.filter(r => r.kind === 'payment').reduce((s, r) => s + r.amount, 0);
-  const period = `${filters.from || '…'} to ${filters.to || '…'}`;
+
+  // Fallback: browser print
   const area = document.getElementById('print-area');
   if (!area) { alert('Print area not found.'); return; }
-  area.innerHTML = `
-    <div class="report-print-sheet">
-      <h1>${escHtml(co.name || 'Medicano Resources Limited')}</h1>
-      <div class="meta">
-        <div>Transaction Statement (${escHtml(filters.type || 'payments')})</div>
-        <div>Client: ${escHtml(clientLabel)}</div>
-        <div>Period: ${escHtml(period)}</div>
-        <div>Generated: ${escHtml(new Date().toLocaleString())}</div>
-        ${co.address ? `<div>${escHtml(co.address)}</div>` : ''}
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Type</th>
-            <th>Client</th>
-            <th>Reference</th>
-            <th>Detail</th>
-            <th class="num">Amount (₦)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.length ? rows.map(r => `
-            <tr>
-              <td>${escHtml(r.date)}</td>
-              <td>${r.kind === 'payment' ? 'Payment' : (r.kind === 'custom' ? (r.method || 'Custom') : 'Invoice')}</td>
-              <td>${escHtml(r.clientName)}</td>
-              <td>${escHtml(r.ref)}</td>
-              <td>${escHtml(r.kind === 'payment' ? ((r.method || '') + (r.note ? ' · ' + r.note : '')) : (r.method || ''))}</td>
-              <td class="num">${(r.amount || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            </tr>
-          `).join('') : `<tr><td colspan="6">No transactions in this period.</td></tr>`}
-        </tbody>
-      </table>
-      <div class="totals">Payments collected: ₦${collected.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · ${rows.length} row(s)</div>
-    </div>
-  `;
+  const productRows = productSales.length ? productSales.map(function (s) {
+    return '<tr><td>' + escHtml(s.clientName) + '</td><td>' + escHtml(s.sku || '—') + '</td><td>' + escHtml(s.productName) +
+      '</td><td class="num">' + s.qty + '</td><td class="num">' + (Number(s.amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 }) + '</td></tr>';
+  }).join('') : '<tr><td colspan="5">No products sold in this period.</td></tr>';
+  area.innerHTML = '<div class="report-print-sheet"><h1>' + escHtml(co.name || 'Medicano') + '</h1>' +
+    '<div class="meta"><div>Transaction Report</div><div>Client: ' + escHtml(clientLabel) + '</div><div>Period: ' + escHtml(period) +
+    '</div><div>Product: ' + escHtml(productLabel) + '</div></div>' +
+    '<h2>Transactions</h2><table><thead><tr><th>Date</th><th>Type</th><th>Client</th><th>Ref</th><th>Detail</th><th class="num">Amount</th></tr></thead><tbody>' +
+    (rows.length ? rows.map(function (r) {
+      return '<tr><td>' + escHtml(r.date) + '</td><td>' + escHtml(r.kind) + '</td><td>' + escHtml(r.clientName) + '</td><td>' + escHtml(r.ref) +
+        '</td><td>' + escHtml(r.title || r.method || '') + '</td><td class="num">' + (Number(r.amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 }) + '</td></tr>';
+    }).join('') : '<tr><td colspan="6">No rows</td></tr>') +
+    '</tbody></table><h2>Products by client</h2><table><thead><tr><th>Client</th><th>SKU</th><th>Product</th><th class="num">Qty</th><th class="num">Amount</th></tr></thead><tbody>' +
+    productRows + '</tbody></table></div>';
   window.print();
 }
+
 
 function exportTransactionReportCsv() {
   ensureBackupBeforeSensitiveAction('exporting this CSV');
   const filters = getReportFilterState();
-  const rows = collectLedgerRows(filters);
+  const rows = filters.type === 'sales'
+    ? collectProductSalesByClient(filters).map(function (s) {
+        return {
+          date: (filters.from || '') + ' → ' + (filters.to || ''),
+          kind: 'sale',
+          clientName: s.clientName,
+          ref: s.sku || '',
+          title: s.productName,
+          method: 'Qty ' + s.qty,
+          amount: s.amount
+        };
+      })
+    : collectLedgerRows(filters);
+  const productSales = collectProductSalesByClient(filters);
   const header = ['Date', 'Type', 'Client', 'Reference', 'Title', 'Detail', 'Amount NGN'];
   const lines = [header];
-  rows.forEach(r => {
+  rows.forEach(function (r) {
     lines.push([
       r.date,
       r.kind,
       r.clientName,
       r.ref,
       r.title,
-      r.kind === 'payment' ? ((r.method || '') + (r.note ? ' · ' + r.note : '')) : (r.method || ''),
+      r.kind === 'payment' ? ((r.method || '') + (r.note ? ' · ' + r.note : '')) : (r.method || r.note || ''),
       (Number(r.amount) || 0).toFixed(2)
     ]);
   });
-  const escape = (v) => {
+  // Products bought by each client
+  lines.push([]);
+  lines.push(['PRODUCTS BY CLIENT']);
+  lines.push(['Client', 'SKU', 'Product', 'Qty units', 'Amount NGN']);
+  productSales.forEach(function (s) {
+    lines.push([
+      s.clientName,
+      s.sku || '',
+      s.productName,
+      s.qty,
+      (Number(s.amount) || 0).toFixed(2)
+    ]);
+  });
+  if (!productSales.length) lines.push(['—', '', 'No products sold in this period', '0', '0.00']);
+  const escape = function (v) {
     const s = String(v ?? '');
     if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
     return s;
   };
-  const csv = lines.map(row => row.map(escape).join(',')).join(String.fromCharCode(10));
+  const csv = lines.map(function (row) { return row.map(escape).join(','); }).join(String.fromCharCode(10));
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `medicano-ledger-${filters.from || 'all'}-to-${filters.to || 'all'}.csv`;
+  const sanitize = function (s, max) {
+    return String(s || '').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max || 40);
+  };
+  const period = sanitize((filters.from || 'all') + '_to_' + (filters.to || 'all'), 40);
+  const clientPart = (filters.clientIds && filters.clientIds.length === 1)
+    ? sanitize((getClient(filters.clientIds[0]) || {}).name || 'Client', 40)
+    : (filters.clientIds && filters.clientIds.length ? 'Selected-clients' : 'All-clients');
+  a.download = clientPart + ' - Report - ' + period + '.csv';
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
 
 function promptAddPayment(invId) {
   const inv = (data.invoices || []).find(x => x.id === invId);
