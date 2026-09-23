@@ -1,5 +1,5 @@
 /* Medicano PWA Service Worker */
-const CACHE = 'medicano-v110';
+const CACHE = 'medicano-v111';
 const ASSETS = [
   './firebase-config.js',
   './firebase-app.js',

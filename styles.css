@@ -6302,3 +6302,57 @@ html.dark .report-status-pill.is-service { background: #312e81; color: #c7d2fe; 
 html.dark .report-status-pill.is-expense { background: #334155; color: #e2e8f0; }
 .report-card-spaced { margin-bottom: 0.75rem; }
 .report-summary-row { margin-bottom: 0.25rem; }
+
+
+/* Reports: mobile-friendly client select + spacing */
+#page-reports .report-filter-grid-v2 {
+  overflow: visible !important;
+}
+#page-reports .report-filter-panel {
+  overflow: visible !important;
+}
+#page-reports #report-client {
+  max-width: none !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  pointer-events: auto !important;
+  -webkit-appearance: menulist !important;
+  appearance: menulist !important;
+  position: relative;
+  z-index: 5;
+}
+#page-reports .filter-date-field {
+  overflow: visible !important;
+  max-width: none !important;
+}
+#page-reports .report-filter-grid-v2 .filter-date-field .filter-control {
+  max-width: none !important;
+  width: 100% !important;
+}
+#page-reports .report-actions-row {
+  margin-top: 1rem;
+  margin-bottom: 0.35rem;
+  gap: 0.75rem;
+}
+#page-reports .report-summary-row {
+  margin-top: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+#page-reports .report-preview-wrap {
+  margin-top: 0.5rem;
+}
+#page-reports .report-mobile-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.85rem 0.75rem 1.25rem;
+}
+#page-reports .report-card-spaced {
+  margin-bottom: 0 !important;
+}
+#page-reports .report-result-card {
+  margin-bottom: 0;
+}
+#page-reports .report-action-btn {
+  margin-bottom: 0.15rem;
+}

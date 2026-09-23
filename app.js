@@ -7383,10 +7383,24 @@ function initReportsPage() {
     return (a.name || '').localeCompare(b.name || '');
   });
   if (clientSel) {
-    clientSel.innerHTML = '<option value="">All clients</option>' + clients.map(function (c) {
-      return '<option value="' + c.id + '">' + escHtml(c.name || 'Client') + '</option>';
-    }).join('');
-    if (saved.clientId) clientSel.value = saved.clientId;
+    // Build options with createElement so mobile browsers register the list reliably
+    clientSel.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = 'All clients';
+    clientSel.appendChild(allOpt);
+    clients.forEach(function (c) {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name || 'Client';
+      clientSel.appendChild(opt);
+    });
+    if (saved.clientId) {
+      clientSel.value = saved.clientId;
+      if (clientSel.value !== saved.clientId) clientSel.value = '';
+    }
+    // Ensure change fires render on mobile
+    clientSel.onchange = function () { renderTransactionReport(); };
   }
 
   const from = document.getElementById('report-date-from');
@@ -7534,96 +7548,104 @@ function printTransactionReport() {
       const TEAL = [15, 118, 110];
       const GRAY = [100, 116, 139];
       const INK = [30, 41, 59];
-      let y = 48;
+      let y = 36;
 
+      // Logo — same aspect ratio as invoice PDFs (not squashed)
+      const logoW = 200;
+      const logoH = logoW * (258 / 1080);
       try {
         const logo = (typeof COMPANY_LOGO_DATAURL !== 'undefined') ? COMPANY_LOGO_DATAURL : null;
         if (logo) {
-          const fmt = logo.indexOf('image/jpeg') >= 0 ? 'JPEG' : 'PNG';
-          doc.addImage(logo, fmt, M, y - 8, 150, 30);
+          const fmt = (logo.indexOf('image/jpeg') >= 0 || logo.indexOf('/9j/') >= 0) ? 'JPEG' : 'PNG';
+          doc.addImage(logo, fmt, M, y, logoW, logoH);
         }
       } catch (eL) {}
 
+      // Title block on the right, within margins
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(15);
+      doc.setFontSize(16);
       doc.setTextColor.apply(doc, TEAL);
-      doc.text('SALES REPORT', W - M, y + 4, { align: 'right' });
-      y += 18;
+      doc.text('SALES REPORT', W - M, y + 14, { align: 'right' });
+      y = Math.max(y + logoH, y + 28) + 12;
+
+      // Meta lines left-aligned under header so they never spill past margins
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor.apply(doc, GRAY);
-      doc.text('Period: ' + period, W - M, y, { align: 'right' }); y += 11;
-      doc.text('Client: ' + clientLabel, W - M, y, { align: 'right' }); y += 11;
-      doc.text('Product: ' + productLabel + '  ·  Type: ' + typeLabel, W - M, y, { align: 'right' }); y += 14;
+      const metaW = W - 2 * M;
+      const metaLines = [
+        'Period: ' + period,
+        'Client: ' + clientLabel,
+        'Product: ' + productLabel,
+        'Type: ' + typeLabel
+      ];
+      metaLines.forEach(function (line) {
+        const wrapped = doc.splitTextToSize(line, metaW);
+        doc.text(wrapped, M, y);
+        y += wrapped.length * 12;
+      });
+      y += 6;
       doc.setDrawColor.apply(doc, TEAL);
       doc.setLineWidth(2);
       doc.line(M, y, W - M, y);
-      y += 16;
+      y += 14;
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor.apply(doc, TEAL);
       doc.text(co.name || 'Medicano Resources Limited', M, y);
-      y += 18;
+      y += 16;
 
-      // Column headers
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor.apply(doc, TEAL);
-      const cDate = M;
-      const cClient = M + 58;
-      const cProduct = M + 148;
-      const cQty = W - M - 150;
-      const cAmt = W - M - 95;
-      const cRef = W - M - 55;
-      // Use simpler fixed columns
-      doc.text('Date', M, y);
-      doc.text('Client', M + 52, y);
-      doc.text('Product', M + 130, y);
-      doc.text('Qty', W - M - 155, y, { align: 'right' });
-      doc.text('Amount', W - M - 90, y, { align: 'right' });
-      doc.text('Ref', W - M - 55, y);
-      doc.text('Status', W - M, y, { align: 'right' });
-      y += 6;
-      doc.setDrawColor(226, 232, 240);
-      doc.setLineWidth(0.6);
-      doc.line(M, y, W - M, y);
-      y += 11;
+      // Columns: Date | Client | Product | Qty | Amount | Invoice ref | Status
+      const col = {
+        date: M,
+        client: M + 52,
+        product: M + 118,
+        qty: W - M - 168,
+        amount: W - M - 108,
+        ref: W - M - 58,
+        status: W - M
+      };
+      function drawReportTableHeader(yy) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor.apply(doc, TEAL);
+        doc.text('Date', col.date, yy);
+        doc.text('Client', col.client, yy);
+        doc.text('Product', col.product, yy);
+        doc.text('Qty', col.qty, yy, { align: 'right' });
+        doc.text('Amount', col.amount, yy, { align: 'right' });
+        doc.text('Invoice ref', col.ref, yy);
+        doc.text('Status', col.status, yy, { align: 'right' });
+        yy += 5;
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.6);
+        doc.line(M, yy, W - M, yy);
+        return yy + 10;
+      }
+      y = drawReportTableHeader(y);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setTextColor.apply(doc, INK);
 
       rows.forEach(function (r) {
         if (y > H - 56) {
           doc.addPage();
           y = 48;
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8);
-          doc.setTextColor.apply(doc, TEAL);
-          doc.text('Date', M, y);
-          doc.text('Client', M + 52, y);
-          doc.text('Product', M + 130, y);
-          doc.text('Qty', W - M - 155, y, { align: 'right' });
-          doc.text('Amount', W - M - 90, y, { align: 'right' });
-          doc.text('Ref', W - M - 55, y);
-          doc.text('Status', W - M, y, { align: 'right' });
-          y += 6;
-          doc.setDrawColor(226, 232, 240);
-          doc.line(M, y, W - M, y);
-          y += 11;
+          y = drawReportTableHeader(y);
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(8);
+          doc.setFontSize(7.5);
           doc.setTextColor.apply(doc, INK);
         }
-        doc.text(String(r.date || '—').slice(0, 10), M, y);
-        doc.text(String(r.clientName || '—').slice(0, 14), M + 52, y);
-        doc.text(String(r.productName || '—').slice(0, 28), M + 130, y);
-        doc.text(String(r.qty || 0), W - M - 155, y, { align: 'right' });
-        doc.text((Number(r.amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 }), W - M - 90, y, { align: 'right' });
-        doc.text(String(r.ref || '—').slice(0, 10), W - M - 55, y);
-        doc.text(statusLabel(r.status), W - M, y, { align: 'right' });
-        y += 12;
+        doc.text(String(r.date || '—').slice(0, 10), col.date, y);
+        doc.text(String(r.clientName || '—').slice(0, 12), col.client, y);
+        doc.text(String(r.productName || '—').slice(0, 22), col.product, y);
+        doc.text(String(r.qty || 0), col.qty, y, { align: 'right' });
+        doc.text((Number(r.amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 }), col.amount, y, { align: 'right' });
+        doc.text(String(r.ref || '—').slice(0, 12), col.ref, y);
+        doc.text(statusLabel(r.status), col.status, y, { align: 'right' });
+        y += 11;
       });
 
       if (!rows.length) {
