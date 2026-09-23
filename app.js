@@ -7727,7 +7727,8 @@ function printTransactionReport() {
         const layout = measureRow(r);
         if (y + layout.height + 24 > H - 40) {
           doc.addPage();
-          y = drawPageChrome();
+          // Continuation pages: list only (no logo / period / meta)
+          y = 36;
           y = drawListHeader(y);
         }
 
@@ -7777,12 +7778,12 @@ function printTransactionReport() {
         doc.line(M, y, W - M, y);
       });
 
-      // Footer totals
-      if (y + 40 > H - 28) {
+      // Footer totals — stay inside margins; amount aligns with Amount column
+      if (y + 44 > H - 28) {
         doc.addPage();
         y = 48;
       }
-      y += 18;
+      y += 16;
       doc.setDrawColor(INK[0], INK[1], INK[2]);
       doc.setLineWidth(0.9);
       doc.line(M, y, W - M, y);
@@ -7790,13 +7791,17 @@ function printTransactionReport() {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(INK[0], INK[1], INK[2]);
-      doc.text('Total qty  ' + totalQty, M, y);
-      doc.text('Total value  ₦' + fmtAmt(totalValue), W - M, y, { align: 'right' });
+      doc.text('Total qty:  ' + totalQty, M, y);
+      // Value sits on the Amount column, not past the right margin
+      const totalAmtStr = 'NGN ' + fmtAmt(totalValue);
+      doc.text('Total value:', cAmount.x - 6, y, { align: 'right' });
+      doc.text(totalAmtStr, cAmount.x + cAmount.w, y, { align: 'right' });
       y += 14;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-      doc.text('Generated ' + new Date().toLocaleString('en-GB') + '  ·  ' + rows.length + ' line(s)', M, y);
+      const genStr = 'Generated ' + new Date().toLocaleString('en-GB') + '  ·  ' + rows.length + ' line(s)';
+      doc.text(doc.splitTextToSize(genStr, usable), M, y);
 
       const clientPart = sanitize(clientLabel, 40);
       const periodPart = sanitize((filters.from || 'all') + ' to ' + (filters.to || 'all'), 40);
