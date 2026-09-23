@@ -7510,9 +7510,49 @@ function renderTransactionReport() {
     '</div>';
 }
 
+
+function exportDataQuiet() {
+  try {
+    data.lastBackupAt = new Date().toISOString();
+    if (typeof saveData === 'function') saveData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'medicano-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    if (typeof logAudit === 'function') logAudit('backup', 'Full data export');
+    if (typeof updateBackupBanner === 'function') updateBackupBanner();
+  } catch (e) {
+    console.warn('exportDataQuiet', e);
+  }
+}
+
+function ensureBackupBeforeSensitiveAction(actionLabel) {
+  try {
+    const last = data.lastBackupAt ? new Date(data.lastBackupAt) : null;
+    const days = last ? Math.floor((Date.now() - last.getTime()) / 86400000) : 999;
+    if (days < 14) return true;
+    // Skip blocking confirm on small screens so PDF can still download
+    if (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches) {
+      return true;
+    }
+    const msg = (last
+      ? ('Last backup was ' + days + ' day(s) ago. ')
+      : 'No backup yet. ') +
+      'Download a backup before ' + actionLabel + '?' + String.fromCharCode(10, 10) +
+      'OK = backup now, Cancel = continue without backup.';
+    if (confirm(msg)) {
+      exportDataQuiet();
+    }
+  } catch (e) {}
+  return true;
+}
+
 function printTransactionReport() {
   try {
-    ensureBackupBeforeSensitiveAction('printing this report');
+    if (typeof ensureBackupBeforeSensitiveAction === 'function') ensureBackupBeforeSensitiveAction('printing this report');
     const filters = getReportFilterState();
     const rows = collectReportRows(filters);
     const co = data.company || {};
@@ -7677,7 +7717,7 @@ function printTransactionReport() {
 }
 
 function exportTransactionReportCsv() {
-  ensureBackupBeforeSensitiveAction('exporting this CSV');
+  if (typeof ensureBackupBeforeSensitiveAction === 'function') ensureBackupBeforeSensitiveAction('exporting this CSV');
   const filters = getReportFilterState();
   const rows = collectReportRows(filters);
   const lines = [['Date', 'Client', 'Product', 'SKU', 'Qty', 'Amount NGN', 'Invoice ref', 'Status']];
