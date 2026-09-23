@@ -6260,3 +6260,45 @@ html.dark .report-action-secondary {
   background: #334155;
   color: #f8fafc;
 }
+
+
+/* Reports v2 */
+.report-page { display: flex; flex-direction: column; gap: 1rem; }
+.report-filter-panel { padding: 1rem 1.1rem; }
+.report-filter-grid-v2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 0.85rem;
+}
+@media (min-width: 900px) {
+  .report-filter-grid-v2 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.report-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+.report-status-pill {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.report-status-pill.is-paid { background: #d1fae5; color: #065f46; }
+.report-status-pill.is-partial { background: #fef3c7; color: #92400e; }
+.report-status-pill.is-unpaid { background: #fee2e2; color: #991b1b; }
+.report-status-pill.is-service { background: #e0e7ff; color: #3730a3; }
+.report-status-pill.is-expense { background: #f1f5f9; color: #334155; }
+html.dark .report-status-pill.is-paid { background: #064e3b; color: #a7f3d0; }
+html.dark .report-status-pill.is-partial { background: #78350f; color: #fde68a; }
+html.dark .report-status-pill.is-unpaid { background: #7f1d1d; color: #fecaca; }
+html.dark .report-status-pill.is-service { background: #312e81; color: #c7d2fe; }
+html.dark .report-status-pill.is-expense { background: #334155; color: #e2e8f0; }
+.report-card-spaced { margin-bottom: 0.75rem; }
+.report-summary-row { margin-bottom: 0.25rem; }

@@ -3076,93 +3076,70 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
         </section>
 
         <section id="page-reports" class="page hidden">
-          <div class="flex flex-col gap-4">
-            <div class="report-filter-grid">
-              <label class="filter-date-field">
-                <span class="filter-date-label">Start date</span>
-                <input id="report-date-from" type="date" class="filter-control" title="Start date"
-                  onchange="renderTransactionReport()" />
-              </label>
-              <label class="filter-date-field">
-                <span class="filter-date-label">End date</span>
-                <input id="report-date-to" type="date" class="filter-control" title="End date"
-                  onchange="renderTransactionReport()" />
-              </label>
-              <label class="filter-date-field">
-                <span class="filter-date-label">Type</span>
-                <select id="report-type" class="filter-control filter-status-select status-select-dark"
-                  onchange="onReportTypeChange()">
-                  <option value="all" selected>All (incl. custom)</option>
-                  <option value="payments">Payments</option>
-                  <option value="invoices">Invoices</option>
-                  <option value="both">Payments + invoices</option>
-                  <option value="sales">Sales (items sold)</option>
-                  <option value="services">Services</option>
-                  <option value="expenses">Expenses</option>
-                  <option value="custom">Custom rows only</option>
-                </select>
-              </label>
-              <label class="filter-date-field">
-                <span class="filter-date-label">Method</span>
-                <select id="report-method" class="filter-control filter-status-select"
-                  onchange="renderTransactionReport()">
-                  <option value="">All methods</option>
-                  <option value="transfer">Transfer</option>
-                  <option value="cash">Cash</option>
-                  <option value="cheque">Cheque</option>
-                  <option value="card">Card</option>
-                  <option value="other">Other</option>
-                </select>
-              </label>
-              <label class="filter-date-field report-product-field">
-                <span class="filter-date-label">Product</span>
-                <div class="report-product-search-wrap">
-                  <input type="hidden" id="report-product-id" value="" />
-                  <input id="report-product-search" type="search" class="filter-control"
-                    placeholder="Search product SKU or name…" autocomplete="off"
-                    oninput="onReportProductSearchInput()"
-                    onfocus="onReportProductSearchInput()" />
-                  <button type="button" class="report-product-clear" onclick="clearReportProductFilter()" title="Clear product filter">✕</button>
-                  <div id="report-product-drop" class="report-product-drop hidden"></div>
-                </div>
-              </label>
-              <label class="filter-date-field">
-                <select id="report-sort" class="filter-control filter-status-select list-sort-select"
-                  onchange="renderTransactionReport()" title="Sort" aria-label="Sort">
-                  <option value="date-desc">Date (newest)</option>
-                  <option value="date-asc">Date (oldest)</option>
-                  <option value="amount-desc">Amount (high → low)</option>
-                  <option value="amount-asc">Amount (low → high)</option>
-                  <option value="name-asc">Name A–Z</option>
-                  <option value="name-desc">Name Z–A</option>
-                  <option value="qty-desc">Qty sold (high → low)</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <button type="button" onclick="printTransactionReport()" class="report-action-btn report-action-primary">Download PDF</button>
-              <button type="button" onclick="exportTransactionReportCsv()" class="report-action-btn report-action-secondary">Export CSV</button>
-              <button type="button" onclick="addSelectedReportRowsToInvoice()" class="report-action-btn report-action-secondary">Add selected to invoice</button>
-            </div>
-
-            <div class="panel-soft">
-              <div class="flex items-center justify-between gap-2 mb-3">
-                <h4 class="font-semibold text-sm m-0">Clients</h4>
-                <div class="flex gap-2">
-                  <button type="button" class="pres-tool-btn pres-tool-select" onclick="reportSelectAllClients(true); renderTransactionReport()">Select all</button>
-                  <button type="button" class="pres-tool-btn pres-tool-clear" onclick="reportSelectAllClients(false); renderTransactionReport()">Clear</button>
-                </div>
+          <div class="report-page">
+            <div class="report-filter-panel panel-soft">
+              <div class="report-filter-grid report-filter-grid-v2">
+                <label class="filter-date-field">
+                  <span class="filter-date-label">Start date</span>
+                  <input id="report-date-from" type="date" class="filter-control" onchange="renderTransactionReport()" />
+                </label>
+                <label class="filter-date-field">
+                  <span class="filter-date-label">End date</span>
+                  <input id="report-date-to" type="date" class="filter-control" onchange="renderTransactionReport()" />
+                </label>
+                <label class="filter-date-field">
+                  <span class="filter-date-label">Client</span>
+                  <select id="report-client" class="filter-control filter-status-select" onchange="renderTransactionReport()">
+                    <option value="">All clients</option>
+                  </select>
+                </label>
+                <label class="filter-date-field report-product-field">
+                  <span class="filter-date-label">Product</span>
+                  <div class="report-product-search-wrap">
+                    <input type="hidden" id="report-product-id" value="" />
+                    <input id="report-product-search" type="search" class="filter-control"
+                      placeholder="Search product…" autocomplete="off"
+                      oninput="onReportProductSearchInput()"
+                      onfocus="onReportProductSearchInput()" />
+                    <button type="button" class="report-product-clear" onclick="clearReportProductFilter()" title="Clear">✕</button>
+                    <div id="report-product-drop" class="report-product-drop hidden"></div>
+                  </div>
+                </label>
+                <label class="filter-date-field">
+                  <span class="filter-date-label">Type</span>
+                  <select id="report-type" class="filter-control filter-status-select status-select-dark" onchange="renderTransactionReport()">
+                    <option value="all" selected>All statuses</option>
+                    <option value="paid">Paid</option>
+                    <option value="partial">Partial</option>
+                    <option value="unpaid">Unpaid</option>
+                    <option value="services">Services</option>
+                    <option value="expenses">Expenses</option>
+                  </select>
+                </label>
+                <label class="filter-date-field">
+                  <span class="filter-date-label">Sort</span>
+                  <select id="report-sort" class="filter-control filter-status-select" onchange="renderTransactionReport()">
+                    <option value="date-desc">Date (newest)</option>
+                    <option value="date-asc">Date (oldest)</option>
+                    <option value="amount-desc">Amount (high → low)</option>
+                    <option value="amount-asc">Amount (low → high)</option>
+                    <option value="name-asc">Name A–Z</option>
+                    <option value="name-desc">Name Z–A</option>
+                    <option value="qty-desc">Qty (high → low)</option>
+                    <option value="qty-asc">Qty (low → high)</option>
+                  </select>
+                </label>
               </div>
-              <div id="report-client-list" class="report-client-rows"></div>
-              <p class="text-xs text-slate-500 mt-3 mb-0">Leave all cleared to include every client. Filters update live.</p>
+              <div class="report-actions-row">
+                <button type="button" onclick="printTransactionReport()" class="report-action-btn report-action-primary">Download PDF</button>
+                <button type="button" onclick="exportTransactionReportCsv()" class="report-action-btn report-action-secondary">Export CSV</button>
+              </div>
             </div>
 
-            <div id="report-summary" class="dash-stats-row"></div>
+            <div id="report-summary" class="dash-stats-row report-summary-row"></div>
             <div id="report-preview" class="report-preview-wrap"></div>
           </div>
         </section>
-
 <section id="page-inventory" class="page hidden">
           <div class="space-y-5">
             <!-- Period filter + equal metric cards -->

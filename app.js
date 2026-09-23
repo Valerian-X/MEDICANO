@@ -6986,73 +6986,323 @@ function getSelectedReportClientIds() {
 
 function getReportFilterState() {
   const hid = document.getElementById('report-product-id');
-  const sel = document.getElementById('report-product');
+  const clientEl = document.getElementById('report-client');
+  const clientId = clientEl ? (clientEl.value || '') : '';
   return {
     from: document.getElementById('report-date-from')?.value || '',
     to: document.getElementById('report-date-to')?.value || '',
-    clientIds: getSelectedReportClientIds(),
-    method: document.getElementById('report-method')?.value || '',
+    clientId: clientId,
+    clientIds: clientId ? [clientId] : [],
     type: document.getElementById('report-type')?.value || 'all',
-    productId: (hid && hid.value) || (sel && sel.value) || ''
+    productId: (hid && hid.value) || '',
+    sort: document.getElementById('report-sort')?.value || 'date-desc'
   };
 }
 
-function collectProductSalesByClient(filters) {
+function saveReportFilters() {
+  try {
+    localStorage.setItem(REPORT_FILTERS_KEY, JSON.stringify(getReportFilterState()));
+  } catch (e) {}
+}
+
+function loadReportFilters() {
+  try {
+    return JSON.parse(localStorage.getItem(REPORT_FILTERS_KEY) || 'null');
+  } catch (e) { return null; }
+}
+
+/** Rank invoice status so paid / partial beat older proforma / draft copies */
+function reportStatusRank(status) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'paid') return 100;
+  if (s === 'partial') return 80;
+  if (s === 'sent' || s === 'unpaid') return 50;
+  if (s === 'overdue') return 40;
+  if (s === 'cancelled') return 0;
+  if (s === 'draft') return 10;
+  return 30;
+}
+
+function normalizeInvoiceRef(ref) {
+  return String(ref || '').trim().toUpperCase().replace(/\s+/g, '');
+}
+
+/**
+ * Prefer the latest meaningful version of each invoice.
+ * Same invoice number (or same client + number) → keep highest status rank, then newest updatedAt.
+ * Drops cancelled; drops draft/proforma when a stronger status exists for that ref.
+ */
+function getPreferredInvoices() {
+  const map = new Map();
+  (data.invoices || []).forEach(function (inv) {
+    if (!inv || !inv.id) return;
+    const st = String(inv.status || '').toLowerCase();
+    if (st === 'cancelled') return;
+    const ref = normalizeInvoiceRef(inv.invoiceNumber);
+    const key = ref
+      ? ('ref:' + (inv.clientId || '') + ':' + ref)
+      : ('id:' + inv.id);
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, inv);
+      return;
+    }
+    const rNew = reportStatusRank(inv.status);
+    const rOld = reportStatusRank(prev.status);
+    if (rNew > rOld) {
+      map.set(key, inv);
+      return;
+    }
+    if (rNew === rOld) {
+      const tNew = inv.updatedAt || inv.createdAt || inv.date || '';
+      const tOld = prev.updatedAt || prev.createdAt || prev.date || '';
+      if (String(tNew) >= String(tOld)) map.set(key, inv);
+    }
+  });
+  return Array.from(map.values());
+}
+
+function reportStatusBucket(status) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'paid') return 'paid';
+  if (s === 'partial') return 'partial';
+  if (s === 'cancelled') return 'cancelled';
+  if (s === 'draft') return 'draft';
+  return 'unpaid'; // sent, unpaid, overdue, etc.
+}
+
+/**
+ * Primary report rows: one line per product sold (invoice line),
+ * plus services / expenses when type filter asks for them.
+ */
+function collectReportRows(filters) {
   filters = filters || getReportFilterState();
   const from = filters.from || '';
   const to = filters.to || '';
-  const clientSet = (filters.clientIds && filters.clientIds.length) ? new Set(filters.clientIds) : null;
+  const clientId = filters.clientId || '';
   const productId = filters.productId || '';
-  const byKey = {};
+  const type = filters.type || 'all';
+  const rows = [];
 
-  (data.invoices || []).forEach(function (inv) {
-    if (!inv || inv.status === 'cancelled' || inv.status === 'draft') return;
-    if (clientSet && !clientSet.has(inv.clientId)) return;
-    const d = (inv.date || (inv.createdAt || '').slice(0, 10) || '');
-    if (from && d && d < from) return;
-    if (to && d && d > to) return;
-    const client = getClient(inv.clientId);
-    const clientName = client ? client.name : (inv.clientName || '—');
-    (inv.items || []).forEach(function (it) {
-      const pid = it.productId || '';
-      const name = (it.name || '').trim() || 'Item';
-      if (productId) {
-        if (pid && pid !== productId) return;
-        if (!pid) {
-          const p = getProduct(productId);
-          const matchName = p && p.name && name.toLowerCase() === String(p.name).toLowerCase();
-          const matchSku = p && p.sku && name.toLowerCase().indexOf(String(p.sku).toLowerCase()) >= 0;
-          if (!matchName && !matchSku) return;
-        }
+  const wantSales = type === 'all' || type === 'paid' || type === 'partial' || type === 'unpaid';
+  const wantServices = type === 'all' || type === 'services';
+  const wantExpenses = type === 'all' || type === 'expenses';
+
+  if (wantSales) {
+    getPreferredInvoices().forEach(function (inv) {
+      const bucket = reportStatusBucket(inv.status);
+      if (type === 'paid' && bucket !== 'paid') return;
+      if (type === 'partial' && bucket !== 'partial') return;
+      if (type === 'unpaid' && bucket !== 'unpaid') return;
+
+      if (clientId && inv.clientId !== clientId) return;
+      const d = (inv.date || (inv.createdAt || '').slice(0, 10) || '');
+      if (from && d && d < from) return;
+      if (to && d && d > to) return;
+
+      const client = getClient(inv.clientId);
+      const clientName = client ? client.name : (inv.clientName || '—');
+      const items = inv.items || [];
+      if (!items.length) {
+        // Invoice with no lines — still show as one row if no product filter
+        if (productId) return;
+        rows.push({
+          kind: 'sale',
+          id: inv.id,
+          date: d || '—',
+          clientId: inv.clientId || '',
+          clientName: clientName,
+          productId: '',
+          productName: inv.title || 'Invoice',
+          sku: '',
+          qty: 1,
+          amount: Number(inv.totalNgn != null ? inv.totalNgn : inv.totalNGN) || 0,
+          ref: inv.invoiceNumber || '—',
+          status: bucket,
+          statusRaw: inv.status || '',
+          invoiceId: inv.id
+        });
+        return;
       }
-      const qty = Number(it.qty) || 0;
-      const line = Number(it.lineNgn != null ? it.lineNgn : it.lineNGN) ||
-        ((Number(it.qty) || 0) * (Number(it.unitNgn != null ? it.unitNgn : it.unitNGN) || 0));
-      const pKey = pid || ('name:' + name.toLowerCase());
-      const key = (inv.clientId || clientName) + '|' + pKey;
-      if (!byKey[key]) {
+      items.forEach(function (it, idx) {
+        const pid = it.productId || '';
+        const name = (it.name || '').trim() || 'Item';
+        if (productId) {
+          if (pid && pid !== productId) return;
+          if (!pid) {
+            const p = getProduct(productId);
+            const matchName = p && p.name && name.toLowerCase() === String(p.name).toLowerCase();
+            const matchSku = p && p.sku && name.toLowerCase().indexOf(String(p.sku).toLowerCase()) >= 0;
+            if (!matchName && !matchSku) return;
+          }
+        }
+        const qty = Number(it.qty) || 0;
+        const line = Number(it.lineNgn != null ? it.lineNgn : it.lineNGN) ||
+          (qty * (Number(it.unitNgn != null ? it.unitNgn : it.unitNGN) || 0));
         const p = pid ? getProduct(pid) : null;
-        byKey[key] = {
+        rows.push({
+          kind: 'sale',
+          id: inv.id + '-' + idx,
+          date: d || '—',
           clientId: inv.clientId || '',
           clientName: clientName,
           productId: pid,
           productName: name || (p && p.name) || 'Item',
           sku: (p && p.sku) || it.sku || '',
-          qty: 0,
-          amount: 0
-        };
-      }
-      byKey[key].qty += qty;
-      byKey[key].amount += line;
+          qty: qty,
+          amount: line,
+          ref: inv.invoiceNumber || '—',
+          status: bucket,
+          statusRaw: inv.status || '',
+          invoiceId: inv.id
+        });
+      });
     });
-  });
+  }
 
+  if (wantServices) {
+    (data.services || []).forEach(function (svc) {
+      if (clientId && svc.clientId !== clientId) return;
+      const d = (svc.date || (svc.createdAt || '').slice(0, 10) || '');
+      if (from && d && d < from) return;
+      if (to && d && d > to) return;
+      if (productId) return; // product filter not applicable
+      const client = svc.clientId ? getClient(svc.clientId) : null;
+      rows.push({
+        kind: 'service',
+        id: svc.id || ('svc-' + d),
+        date: d || '—',
+        clientId: svc.clientId || '',
+        clientName: client ? client.name : (svc.clientName || '—'),
+        productId: '',
+        productName: svc.title || svc.name || svc.description || 'Service',
+        sku: '',
+        qty: Number(svc.qty) || 1,
+        amount: Number(svc.amount) || Number(svc.totalNgn) || 0,
+        ref: svc.ref || svc.invoiceNumber || '—',
+        status: 'service',
+        statusRaw: 'service',
+        invoiceId: ''
+      });
+    });
+  }
+
+  if (wantExpenses) {
+    (data.officeExpenses || []).forEach(function (ex) {
+      const d = (ex.date || (ex.createdAt || '').slice(0, 10) || '');
+      if (from && d && d < from) return;
+      if (to && d && d > to) return;
+      if (clientId) return; // expenses are office-level
+      if (productId) return;
+      rows.push({
+        kind: 'expense',
+        id: ex.id || ('exp-' + d),
+        date: d || '—',
+        clientId: '',
+        clientName: 'Office',
+        productId: '',
+        productName: ex.title || ex.name || ex.category || 'Expense',
+        sku: '',
+        qty: 1,
+        amount: Number(ex.amount) || 0,
+        ref: ex.ref || '—',
+        status: 'expense',
+        statusRaw: 'expense',
+        invoiceId: ''
+      });
+    });
+  }
+
+  return sortReportRows(rows, filters.sort || 'date-desc');
+}
+
+function sortReportRows(rows, sort) {
+  const list = rows.slice();
+  const cmpStr = function (a, b) { return String(a || '').localeCompare(String(b || '')); };
+  switch (sort) {
+    case 'date-asc':
+      list.sort(function (a, b) { return cmpStr(a.date, b.date) || cmpStr(a.clientName, b.clientName); });
+      break;
+    case 'amount-desc':
+      list.sort(function (a, b) { return (b.amount || 0) - (a.amount || 0); });
+      break;
+    case 'amount-asc':
+      list.sort(function (a, b) { return (a.amount || 0) - (b.amount || 0); });
+      break;
+    case 'name-asc':
+      list.sort(function (a, b) { return cmpStr(a.clientName, b.clientName) || cmpStr(a.productName, b.productName); });
+      break;
+    case 'name-desc':
+      list.sort(function (a, b) { return cmpStr(b.clientName, a.clientName) || cmpStr(b.productName, a.productName); });
+      break;
+    case 'qty-desc':
+      list.sort(function (a, b) { return (b.qty || 0) - (a.qty || 0); });
+      break;
+    case 'qty-asc':
+      list.sort(function (a, b) { return (a.qty || 0) - (b.qty || 0); });
+      break;
+    case 'date-desc':
+    default:
+      list.sort(function (a, b) { return cmpStr(b.date, a.date) || cmpStr(a.clientName, b.clientName); });
+  }
+  return list;
+}
+
+/** Back-compat helpers used elsewhere */
+function collectProductSalesByClient(filters) {
+  const rows = collectReportRows(Object.assign({}, filters || getReportFilterState(), { type: filters && filters.type ? filters.type : 'all' }));
+  const byKey = {};
+  rows.filter(function (r) { return r.kind === 'sale'; }).forEach(function (r) {
+    const key = (r.clientId || r.clientName) + '|' + (r.productId || r.productName);
+    if (!byKey[key]) {
+      byKey[key] = {
+        clientId: r.clientId,
+        clientName: r.clientName,
+        productId: r.productId,
+        productName: r.productName,
+        sku: r.sku,
+        qty: 0,
+        amount: 0
+      };
+    }
+    byKey[key].qty += Number(r.qty) || 0;
+    byKey[key].amount += Number(r.amount) || 0;
+  });
   return Object.values(byKey).sort(function (a, b) {
     return a.clientName.localeCompare(b.clientName) || a.productName.localeCompare(b.productName);
   });
 }
 
-/** Searchable product filter for reports (handles large catalogs) */
+function collectLedgerRows(opts) {
+  // Map old callers onto the new sale-line model
+  const filters = Object.assign({}, getReportFilterState(), opts || {});
+  if (opts && opts.clientIds && opts.clientIds.length === 1) filters.clientId = opts.clientIds[0];
+  if (opts && opts.from) filters.from = opts.from;
+  if (opts && opts.to) filters.to = opts.to;
+  return collectReportRows(filters).map(function (r) {
+    return {
+      kind: r.kind === 'sale' ? 'invoice' : r.kind,
+      id: r.id,
+      date: r.date,
+      clientId: r.clientId,
+      clientName: r.clientName,
+      ref: r.ref,
+      title: r.productName,
+      method: r.status,
+      note: 'Qty ' + r.qty,
+      amount: r.amount,
+      editable: false
+    };
+  });
+}
+
+function getSelectedReportClientIds() {
+  const id = document.getElementById('report-client')?.value || '';
+  return id ? [id] : [];
+}
+
+function reportSelectAllClients() { /* no-op: dropdown mode */ }
+
 function onReportProductSearchInput() {
   const input = document.getElementById('report-product-search');
   const drop = document.getElementById('report-product-drop');
@@ -7103,46 +7353,58 @@ function clearReportProductFilter() {
   renderTransactionReport();
 }
 
-
-function saveReportFilters() {
-  try {
-    const f = getReportFilterState();
-    localStorage.setItem(REPORT_FILTERS_KEY, JSON.stringify(f));
-  } catch (e) {}
+function onReportTypeChange() {
+  renderTransactionReport();
 }
 
-function loadReportFilters() {
-  try {
-    return JSON.parse(localStorage.getItem(REPORT_FILTERS_KEY) || 'null');
-  } catch (e) { return null; }
+function statusPillClass(status) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'paid') return 'report-status-pill is-paid';
+  if (s === 'partial') return 'report-status-pill is-partial';
+  if (s === 'service') return 'report-status-pill is-service';
+  if (s === 'expense') return 'report-status-pill is-expense';
+  return 'report-status-pill is-unpaid';
+}
+
+function statusLabel(status) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'paid') return 'Paid';
+  if (s === 'partial') return 'Partial';
+  if (s === 'service') return 'Service';
+  if (s === 'expense') return 'Expense';
+  if (s === 'draft') return 'Draft';
+  return 'Unpaid';
 }
 
 function initReportsPage() {
-  const list = document.getElementById('report-client-list');
   const saved = loadReportFilters() || {};
-  const clients = (data.clients || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  const selected = new Set(saved.clientIds || []);
-
-  if (list) {
-    list.innerHTML = clients.map(c => {
-      const on = selected.size ? selected.has(c.id) : false;
-      const sub = [c.contact, c.phone, c.email].filter(Boolean).join(' · ') || 'Client';
-      return `<label class="select-row report-client-row ${on ? 'is-selected' : ''}">
-        <span class="select-row-text">
-          <span class="select-row-title">${escHtml(c.name || 'Client')}</span>
-          <span class="select-row-sub">${escHtml(sub)}</span>
-        </span>
-        <input type="checkbox" class="select-row-check" value="${c.id}" ${on ? 'checked' : ''}
-          onchange="this.closest('.select-row').classList.toggle('is-selected', this.checked); renderTransactionReport()" />
-      </label>`;
-    }).join('') || '<p class="text-slate-400 text-sm p-2">No clients yet</p>';
+  const clientSel = document.getElementById('report-client');
+  const clients = (data.clients || []).slice().sort(function (a, b) {
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  if (clientSel) {
+    clientSel.innerHTML = '<option value="">All clients</option>' + clients.map(function (c) {
+      return '<option value="' + c.id + '">' + escHtml(c.name || 'Client') + '</option>';
+    }).join('');
+    if (saved.clientId) clientSel.value = saved.clientId;
   }
 
   const from = document.getElementById('report-date-from');
   const to = document.getElementById('report-date-to');
-  const method = document.getElementById('report-method');
+  if (from) {
+    if (saved.from) from.value = saved.from;
+    else {
+      const now = new Date();
+      from.value = localYMD(new Date(now.getFullYear(), now.getMonth(), 1));
+    }
+  }
+  if (to) to.value = localYMD(new Date());
   const type = document.getElementById('report-type');
-  // Restore product search filter
+  if (type && saved.type) type.value = saved.type;
+  else if (type) type.value = 'all';
+  const sort = document.getElementById('report-sort');
+  if (sort && saved.sort) sort.value = saved.sort;
+
   try {
     if (saved.productId) {
       const p = getProduct(saved.productId);
@@ -7151,427 +7413,268 @@ function initReportsPage() {
       if (hid) hid.value = saved.productId;
       if (inp && p) inp.value = (p.sku ? p.sku + ' · ' : '') + (p.name || '');
     }
-  } catch (eP) {}
-
-  // Start date: keep saved or default to 1st of this month (local)
-  if (from) {
-    if (saved.from) from.value = saved.from;
-    else {
-      const now = new Date();
-      from.value = localYMD(new Date(now.getFullYear(), now.getMonth(), 1));
-    }
-  }
-  // End date: always today's local date
-  if (to) {
-    to.value = localYMD(new Date());
-  }
-  if (method && saved.method != null) method.value = saved.method;
-  // Type: always All whenever Reports opens
-  if (type) type.value = 'all';
-
-  // Persist the forced defaults so UI and filters match
-  try {
-    saveReportFilters();
   } catch (e) {}
 
   renderTransactionReport();
 }
 
-
-function appendReportProductSalesPanel(preview, filters, productSales) {
-  if (!preview) return;
-  try {
-    const sales = productSales || collectProductSalesByClient(filters || getReportFilterState());
-    if (preview.innerHTML.indexOf('Products by client') >= 0) return;
-    const salesHtml = '<div class="panel-soft mt-4 p-4">' +
-      '<h3 class="font-semibold text-slate-800 mb-3">Products by client</h3>' +
-      (sales.length
-        ? ('<div class="table-desktop-only overflow-x-auto"><table class="w-full text-sm"><thead><tr>' +
-           '<th class="text-left">Client</th><th class="text-left">SKU</th><th class="text-left">Product</th>' +
-           '<th class="text-right">Qty</th><th class="text-right">Amount</th></tr></thead><tbody>' +
-           sales.map(function (s) {
-             return '<tr><td>' + escHtml(s.clientName) + '</td><td>' + escHtml(s.sku || '—') + '</td><td>' +
-               escHtml(s.productName) + '</td><td class="text-right">' + s.qty + '</td><td class="text-right">' +
-               formatNGN(s.amount) + '</td></tr>';
-           }).join('') + '</tbody></table></div>')
-        : '<p class="text-slate-500 text-sm mb-0">No products sold in this period for the selected filters.</p>') +
-      '</div>';
-    preview.innerHTML += salesHtml;
-  } catch (e) { console.warn(e); }
-}
-
 function renderTransactionReport() {
   const toEl = document.getElementById('report-date-to');
   if (toEl && !toEl.value) toEl.value = localYMD(new Date());
-  const typeEl = document.getElementById('report-type');
-  if (typeEl && !typeEl.value) typeEl.value = 'all';
   const filters = getReportFilterState();
   saveReportFilters();
-  const rows = collectLedgerRows(filters);
+  const rows = collectReportRows(filters);
   const summary = document.getElementById('report-summary');
   const preview = document.getElementById('report-preview');
   if (!preview) return;
 
-  const payments = rows.filter(r => r.kind === 'payment');
-  const invoices = rows.filter(r => r.kind === 'invoice');
-  const collected = payments.reduce((s, r) => s + r.amount, 0);
-  const invoiced = invoices.reduce((s, r) => s + r.amount, 0);
-  const clientCount = new Set(rows.map(r => r.clientId || r.clientName)).size;
+  const totalValue = rows.reduce(function (s, r) { return s + (Number(r.amount) || 0); }, 0);
+  const totalQty = rows.reduce(function (s, r) { return s + (Number(r.qty) || 0); }, 0);
+  const clientCount = new Set(rows.map(function (r) { return r.clientId || r.clientName; })).size;
+  const paidValue = rows.filter(function (r) { return r.status === 'paid'; })
+    .reduce(function (s, r) { return s + (Number(r.amount) || 0); }, 0);
 
   if (summary) {
-    summary.innerHTML = `
-      <div class="report-stat"><p class="rsl">Rows</p><p class="rsv">${rows.length}</p></div>
-      <div class="report-stat"><p class="rsl">Collected</p><p class="rsv">${formatNGN(collected)}</p></div>
-      <div class="report-stat"><p class="rsl">Invoiced</p><p class="rsv">${formatNGN(invoiced)}</p></div>
-      <div class="report-stat"><p class="rsl">Clients</p><p class="rsv">${clientCount}</p></div>
-    `;
+    summary.innerHTML =
+      '<div class="report-stat"><p class="rsl">Lines</p><p class="rsv">' + rows.length + '</p></div>' +
+      '<div class="report-stat"><p class="rsl">Units</p><p class="rsv">' + totalQty + '</p></div>' +
+      '<div class="report-stat"><p class="rsl">Total value</p><p class="rsv">' + formatNGN(totalValue) + '</p></div>' +
+      '<div class="report-stat"><p class="rsl">Paid value</p><p class="rsv">' + formatNGN(paidValue) + '</p></div>' +
+      '<div class="report-stat"><p class="rsl">Clients</p><p class="rsv">' + clientCount + '</p></div>';
   }
 
   if (!rows.length) {
-    preview.innerHTML = '<div class="panel-soft report-empty">No transactions in this period for the selected filters.</div>' +
-      '<div class="report-add-row-wrap"><button type="button" class="report-add-row-btn" onclick="openReportRowEditor()">+ Add table row</button></div>';
-    appendReportProductSalesPanel(preview, filters, productSales);
+    preview.innerHTML = '<div class="panel-soft report-empty">No sales match these filters. Adjust date, client, product, or type.</div>';
     return;
   }
 
-  const detailOf = (r) => {
-    if (r.kind === 'payment') return (r.method || '') + (r.note ? ' · ' + r.note : '');
-    if (r.kind === 'custom') return r.note || r.title || r.method || 'Custom';
-    return r.method || 'issued';
-  };
+  // Desktop table
+  const tableRows = rows.map(function (r) {
+    return '<tr>' +
+      '<td>' + escHtml(r.date) + '</td>' +
+      '<td>' + escHtml(r.clientName) + '</td>' +
+      '<td>' + escHtml(r.productName) + (r.sku ? '<div class="text-xs text-slate-400">' + escHtml(r.sku) + '</div>' : '') + '</td>' +
+      '<td class="num">' + (r.qty || 0) + '</td>' +
+      '<td class="num">' + formatNGN(r.amount) + '</td>' +
+      '<td>' + escHtml(r.ref) + '</td>' +
+      '<td><span class="' + statusPillClass(r.status) + '">' + statusLabel(r.status) + '</span></td>' +
+      '</tr>';
+  }).join('');
 
-  // Desktop: table · Mobile: entity-style cards (same data)
-  preview.innerHTML = `
-    <div class="responsive-table-shell panel-soft">
-      <div class="table-desktop-only">
-        <div class="rt-scroll">
-          <table class="report-table data-table">
-            <thead>
-              <tr>
-                <th></th>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Client</th>
-                <th>Reference</th>
-                <th>Detail</th>
-                <th class="num">Amount</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows.map(r => `
-                <tr>
-                  <td>${r.editable ? `<input type="checkbox" class="rr-row-check" value="${r.id}" />` : ''}</td>
-                  <td>${escHtml(r.date)}</td>
-                  <td><span class="report-type-pill ${r.kind === 'payment' ? 'pay' : (r.kind === 'custom' ? 'custom' : 'inv')}">${r.kind === 'payment' ? 'Payment' : (r.kind === 'custom' ? escHtml(r.method || 'Custom') : 'Invoice')}</span></td>
-                  <td>${escHtml(r.clientName)}</td>
-                  <td>${escHtml(r.ref)}${r.title ? `<div class="text-xs text-slate-400">${escHtml(r.title)}</div>` : ''}</td>
-                  <td>${escHtml(detailOf(r))}</td>
-                  <td class="num">${formatNGN(r.amount)}</td>
-                  <td>${r.editable ? `<button type="button" class="text-xs font-semibold text-brand-700" onclick="openReportRowEditor('${r.id}')">Edit</button>` : ''}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="6" class="num" style="font-weight:700">Total collected (payments)</td>
-                <td class="num" style="font-weight:800">${formatNGN(collected)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
-      <div class="table-mobile-only entity-cards report-mobile-cards">
-        ${rows.map(r => `
-          <div class="entity-card report-result-card report-card-spaced">
-            <div class="entity-card-header">
-              <div class="entity-card-main">
-                <span class="entity-card-title">${escHtml(r.clientName)}</span>
-                <span class="entity-card-sub">${escHtml(r.ref)} · ${escHtml(r.date)}</span>
-              </div>
-              <span class="entity-card-price">${formatNGN(r.amount)}</span>
-            </div>
-            <div class="entity-card-body is-open" style="display:block">
-              <div class="entity-detail"><span class="entity-detail-label">Type</span><span class="entity-detail-value"><span class="report-type-pill ${r.kind === 'payment' ? 'pay' : (r.kind === 'custom' ? 'custom' : 'inv')}">${r.kind === 'payment' ? 'Payment' : (r.kind === 'custom' ? (r.method || 'Custom') : 'Invoice')}</span></span></div>
-              <div class="entity-detail"><span class="entity-detail-label">Detail</span><span class="entity-detail-value">${escHtml(detailOf(r) || '—')}</span></div>
-              ${r.title ? `<div class="entity-detail"><span class="entity-detail-label">Title</span><span class="entity-detail-value">${escHtml(r.title)}</span></div>` : ''}
-              <div class="entity-detail"><span class="entity-detail-label">Amount</span><span class="entity-detail-value">${formatNGN(r.amount)}</span></div>
-              ${r.editable ? `<div class="entity-detail"><span class="entity-detail-label"></span><span class="entity-detail-value"><button type="button" class="text-xs font-semibold" onclick="openReportRowEditor('${r.id}')">Edit</button></span></div>` : ''}
-            </div>
-          </div>
-        `).join('')}
-        <div class="panel-soft report-mobile-total">
-          <span class="entity-detail-label">Total collected</span>
-          <span class="entity-card-price">${formatNGN(collected)}</span>
-        </div>
-      </div>
-    </div>
-  `;
-}
+  // Mobile cards — amount purchased is prominent
+  const cards = rows.map(function (r) {
+    return '<div class="entity-card report-result-card report-card-spaced">' +
+      '<div class="entity-card-header">' +
+        '<div class="entity-card-main">' +
+          '<span class="entity-card-title">' + escHtml(r.clientName) + '</span>' +
+          '<span class="entity-card-sub">' + escHtml(r.date) + ' · ' + escHtml(r.ref) + '</span>' +
+        '</div>' +
+        '<span class="entity-card-price">' + formatNGN(r.amount) + '</span>' +
+      '</div>' +
+      '<div class="entity-card-body is-open" style="display:block">' +
+        '<div class="entity-detail"><span class="entity-detail-label">Product</span><span class="entity-detail-value">' + escHtml(r.productName) + '</span></div>' +
+        '<div class="entity-detail"><span class="entity-detail-label">Qty</span><span class="entity-detail-value">' + (r.qty || 0) + '</span></div>' +
+        '<div class="entity-detail"><span class="entity-detail-label">Amount</span><span class="entity-detail-value">' + formatNGN(r.amount) + '</span></div>' +
+        '<div class="entity-detail"><span class="entity-detail-label">Status</span><span class="entity-detail-value"><span class="' + statusPillClass(r.status) + '">' + statusLabel(r.status) + '</span></span></div>' +
+      '</div></div>';
+  }).join('');
 
-
-function ensureBackupBeforeSensitiveAction(actionLabel) {
-  try {
-    const last = data.lastBackupAt ? new Date(data.lastBackupAt) : null;
-    const days = last ? Math.floor((Date.now() - last.getTime()) / 86400000) : 999;
-    if (days < 14) return true;
-    // Non-blocking on small screens — PDF must still download
-    if (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches) {
-      return true;
-    }
-    const msg = (last
-      ? ('Last backup was ' + days + ' day(s) ago. ')
-      : 'No backup yet. ') +
-      'Download a backup before ' + actionLabel + '?' + String.fromCharCode(10, 10) +
-      'OK = backup now, Cancel = continue without backup.';
-    if (confirm(msg)) {
-      exportDataQuiet();
-    }
-  } catch (e) {}
-  return true;
-}
-
-function exportDataQuiet() {
-  data.lastBackupAt = new Date().toISOString();
-  saveData();
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `medicano-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  logAudit('backup', 'Full data export');
-  saveData();
-  updateBackupBanner();
+  preview.innerHTML =
+    '<div class="responsive-table-shell panel-soft">' +
+      '<div class="table-desktop-only"><div class="rt-scroll">' +
+        '<table class="report-table data-table">' +
+          '<thead><tr>' +
+            '<th>Date</th><th>Client</th><th>Product</th><th class="num">Qty</th><th class="num">Amount</th><th>Invoice ref</th><th>Status</th>' +
+          '</tr></thead>' +
+          '<tbody>' + tableRows + '</tbody>' +
+          '<tfoot><tr><td colspan="3" class="num" style="font-weight:700">Total</td>' +
+            '<td class="num" style="font-weight:700">' + totalQty + '</td>' +
+            '<td class="num" style="font-weight:800">' + formatNGN(totalValue) + '</td>' +
+            '<td colspan="2"></td></tr></tfoot>' +
+        '</table></div></div>' +
+      '<div class="table-mobile-only entity-cards report-mobile-cards">' + cards + '</div>' +
+    '</div>';
 }
 
 function printTransactionReport() {
   try {
-  ensureBackupBeforeSensitiveAction('printing this report');
-  const filters = getReportFilterState();
-  if (typeof collectProductSalesByClient !== 'function') {
-    alert('Report module is outdated. Please hard-refresh the app (v109).');
-    return;
-  }
-  const productSales = collectProductSalesByClient(filters);
-  const rows = filters.type === 'sales'
-    ? productSales.map(function (s) {
-        return {
-          kind: 'sale', date: '—', clientName: s.clientName, ref: s.sku || '—',
-          title: s.productName, method: 'Qty ' + s.qty, note: '', amount: s.amount, qty: s.qty
-        };
-      })
-    : collectLedgerRows(filters);
-  const co = data.company || {};
-  const clientLabel = filters.clientIds && filters.clientIds.length
-    ? filters.clientIds.map(function (id) { const c = getClient(id); return c ? c.name : id; }).join(', ')
-    : 'All clients';
-  const period = (filters.from || '…') + ' → ' + (filters.to || '…');
-  const productLabel = filters.productId
-    ? ((getProduct(filters.productId) || {}).name || filters.productId)
-    : 'All products';
+    ensureBackupBeforeSensitiveAction('printing this report');
+    const filters = getReportFilterState();
+    const rows = collectReportRows(filters);
+    const co = data.company || {};
+    const clientLabel = filters.clientId
+      ? ((getClient(filters.clientId) || {}).name || 'Client')
+      : 'All clients';
+    const period = (filters.from || '…') + ' → ' + (filters.to || '…');
+    const productLabel = filters.productId
+      ? ((getProduct(filters.productId) || {}).name || filters.productId)
+      : 'All products';
+    const typeLabel = ({
+      all: 'All statuses', paid: 'Paid', partial: 'Partial', unpaid: 'Unpaid',
+      services: 'Services', expenses: 'Expenses'
+    })[filters.type] || filters.type;
 
-  // Prefer jsPDF download (same style as invoices)
-  if (typeof loadJsPdf === 'function') {
+    const totalValue = rows.reduce(function (s, r) { return s + (Number(r.amount) || 0); }, 0);
+    const totalQty = rows.reduce(function (s, r) { return s + (Number(r.qty) || 0); }, 0);
+
+    function sanitize(s, max) {
+      return String(s || '').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max || 40);
+    }
+
+    if (typeof loadJsPdf !== 'function') {
+      alert('PDF engine not available.');
+      return;
+    }
+
     loadJsPdf().then(function (JsPDF) {
       const doc = new JsPDF({ unit: 'pt', format: 'a4' });
       const W = doc.internal.pageSize.getWidth();
       const H = doc.internal.pageSize.getHeight();
-      const M = 42;
+      const M = 40;
       const TEAL = [15, 118, 110];
       const GRAY = [100, 116, 139];
       const INK = [30, 41, 59];
       let y = 48;
+
       try {
         const logo = (typeof COMPANY_LOGO_DATAURL !== 'undefined') ? COMPANY_LOGO_DATAURL : null;
         if (logo) {
           const fmt = logo.indexOf('image/jpeg') >= 0 ? 'JPEG' : 'PNG';
-          doc.addImage(logo, fmt, M, y - 10, 160, 32);
+          doc.addImage(logo, fmt, M, y - 8, 150, 30);
         }
       } catch (eL) {}
+
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
+      doc.setFontSize(15);
       doc.setTextColor.apply(doc, TEAL);
-      doc.text('TRANSACTION REPORT', W - M, y, { align: 'right' });
-      y += 16;
+      doc.text('SALES REPORT', W - M, y + 4, { align: 'right' });
+      y += 18;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor.apply(doc, GRAY);
-      doc.text('Period: ' + period, W - M, y, { align: 'right' });
-      y += 12;
-      doc.text('Client: ' + clientLabel, W - M, y, { align: 'right' });
-      y += 12;
-      doc.text('Product: ' + productLabel, W - M, y, { align: 'right' });
-      y += 18;
+      doc.text('Period: ' + period, W - M, y, { align: 'right' }); y += 11;
+      doc.text('Client: ' + clientLabel, W - M, y, { align: 'right' }); y += 11;
+      doc.text('Product: ' + productLabel + '  ·  Type: ' + typeLabel, W - M, y, { align: 'right' }); y += 14;
       doc.setDrawColor.apply(doc, TEAL);
       doc.setLineWidth(2);
       doc.line(M, y, W - M, y);
-      y += 20;
+      y += 16;
+
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setTextColor.apply(doc, TEAL);
       doc.text(co.name || 'Medicano Resources Limited', M, y);
-      y += 22;
+      y += 18;
 
-      // Transactions table
+      // Column headers
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setTextColor.apply(doc, TEAL);
-      const cols = [M, M + 70, M + 120, M + 220, M + 320, W - M];
-      doc.text('Date', cols[0], y);
-      doc.text('Type', cols[1], y);
-      doc.text('Client', cols[2], y);
-      doc.text('Ref', cols[3], y);
-      doc.text('Detail', cols[4], y);
-      doc.text('Amount', cols[5], y, { align: 'right' });
-      y += 8;
+      const cDate = M;
+      const cClient = M + 58;
+      const cProduct = M + 148;
+      const cQty = W - M - 150;
+      const cAmt = W - M - 95;
+      const cRef = W - M - 55;
+      // Use simpler fixed columns
+      doc.text('Date', M, y);
+      doc.text('Client', M + 52, y);
+      doc.text('Product', M + 130, y);
+      doc.text('Qty', W - M - 155, y, { align: 'right' });
+      doc.text('Amount', W - M - 90, y, { align: 'right' });
+      doc.text('Ref', W - M - 55, y);
+      doc.text('Status', W - M, y, { align: 'right' });
+      y += 6;
       doc.setDrawColor(226, 232, 240);
       doc.setLineWidth(0.6);
       doc.line(M, y, W - M, y);
-      y += 12;
+      y += 11;
+
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor.apply(doc, INK);
+
       rows.forEach(function (r) {
-        if (y > H - 80) { doc.addPage(); y = 48; }
-        const typ = r.kind === 'payment' ? 'Payment' : (r.kind === 'sale' ? 'Sale' : (r.kind === 'custom' ? 'Custom' : 'Invoice'));
-        const detail = r.kind === 'sale'
-          ? ((r.title || '') + (r.qty != null ? ' ×' + r.qty : ''))
-          : (r.kind === 'payment' ? ((r.method || '') + (r.note ? ' · ' + r.note : '')) : (r.method || r.title || ''));
-        doc.text(String(r.date || '—').slice(0, 12), cols[0], y);
-        doc.text(typ, cols[1], y);
-        doc.text(String(r.clientName || '—').slice(0, 18), cols[2], y);
-        doc.text(String(r.ref || '—').slice(0, 14), cols[3], y);
-        doc.text(String(detail || '—').slice(0, 22), cols[4], y);
-        doc.text((Number(r.amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 }), cols[5], y, { align: 'right' });
+        if (y > H - 56) {
+          doc.addPage();
+          y = 48;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.setTextColor.apply(doc, TEAL);
+          doc.text('Date', M, y);
+          doc.text('Client', M + 52, y);
+          doc.text('Product', M + 130, y);
+          doc.text('Qty', W - M - 155, y, { align: 'right' });
+          doc.text('Amount', W - M - 90, y, { align: 'right' });
+          doc.text('Ref', W - M - 55, y);
+          doc.text('Status', W - M, y, { align: 'right' });
+          y += 6;
+          doc.setDrawColor(226, 232, 240);
+          doc.line(M, y, W - M, y);
+          y += 11;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor.apply(doc, INK);
+        }
+        doc.text(String(r.date || '—').slice(0, 10), M, y);
+        doc.text(String(r.clientName || '—').slice(0, 14), M + 52, y);
+        doc.text(String(r.productName || '—').slice(0, 28), M + 130, y);
+        doc.text(String(r.qty || 0), W - M - 155, y, { align: 'right' });
+        doc.text((Number(r.amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 }), W - M - 90, y, { align: 'right' });
+        doc.text(String(r.ref || '—').slice(0, 10), W - M - 55, y);
+        doc.text(statusLabel(r.status), W - M, y, { align: 'right' });
         y += 12;
       });
+
       if (!rows.length) {
-        doc.text('No transactions in this period.', M, y);
+        doc.text('No sales match these filters.', M, y);
         y += 14;
       }
 
-      // Products by client
-      y += 16;
-      if (y > H - 120) { doc.addPage(); y = 48; }
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor.apply(doc, TEAL);
-      doc.text('Products by client', M, y);
-      y += 14;
-      doc.setFontSize(9);
-      doc.text('Client', M, y);
-      doc.text('SKU', M + 140, y);
-      doc.text('Product', M + 200, y);
-      doc.text('Qty', W - M - 90, y, { align: 'right' });
-      doc.text('Amount', W - M, y, { align: 'right' });
-      y += 8;
+      y += 10;
       doc.setDrawColor(226, 232, 240);
       doc.line(M, y, W - M, y);
-      y += 12;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor.apply(doc, INK);
-      if (!productSales.length) {
-        doc.text('No products sold in this period for the selected filters.', M, y);
-        y += 12;
-      } else {
-        productSales.forEach(function (s) {
-          if (y > H - 50) { doc.addPage(); y = 48; }
-          doc.text(String(s.clientName || '—').slice(0, 24), M, y);
-          doc.text(String(s.sku || '—').slice(0, 10), M + 140, y);
-          doc.text(String(s.productName || '—').slice(0, 28), M + 200, y);
-          doc.text(String(s.qty || 0), W - M - 90, y, { align: 'right' });
-          doc.text((Number(s.amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 }), W - M, y, { align: 'right' });
-          y += 12;
-        });
-      }
+      y += 14;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor.apply(doc, TEAL);
+      doc.text('Total qty: ' + totalQty, M, y);
+      doc.text('Total value: ₦' + totalValue.toLocaleString('en-NG', { minimumFractionDigits: 2 }), W - M, y, { align: 'right' });
 
-      const sanitize = function (s, max) {
-        return String(s || '').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max || 40);
-      };
-      const clientPart = (filters.clientIds && filters.clientIds.length === 1)
-        ? sanitize((getClient(filters.clientIds[0]) || {}).name || 'Client', 40)
-        : (filters.clientIds && filters.clientIds.length ? 'Selected clients' : 'All clients');
+      const clientPart = sanitize(clientLabel, 40);
       const periodPart = sanitize((filters.from || 'all') + ' to ' + (filters.to || 'all'), 40);
       doc.save(clientPart + ' - Report - ' + periodPart + '.pdf');
     }).catch(function (err) {
       console.error(err);
       alert(err.message || 'Could not generate report PDF.');
     });
-    return;
-  }
-
-  // Fallback: browser print
-  const area = document.getElementById('print-area');
-  if (!area) { alert('Print area not found.'); return; }
-  const productRows = productSales.length ? productSales.map(function (s) {
-    return '<tr><td>' + escHtml(s.clientName) + '</td><td>' + escHtml(s.sku || '—') + '</td><td>' + escHtml(s.productName) +
-      '</td><td class="num">' + s.qty + '</td><td class="num">' + (Number(s.amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 }) + '</td></tr>';
-  }).join('') : '<tr><td colspan="5">No products sold in this period.</td></tr>';
-  area.innerHTML = '<div class="report-print-sheet"><h1>' + escHtml(co.name || 'Medicano') + '</h1>' +
-    '<div class="meta"><div>Transaction Report</div><div>Client: ' + escHtml(clientLabel) + '</div><div>Period: ' + escHtml(period) +
-    '</div><div>Product: ' + escHtml(productLabel) + '</div></div>' +
-    '<h2>Transactions</h2><table><thead><tr><th>Date</th><th>Type</th><th>Client</th><th>Ref</th><th>Detail</th><th class="num">Amount</th></tr></thead><tbody>' +
-    (rows.length ? rows.map(function (r) {
-      return '<tr><td>' + escHtml(r.date) + '</td><td>' + escHtml(r.kind) + '</td><td>' + escHtml(r.clientName) + '</td><td>' + escHtml(r.ref) +
-        '</td><td>' + escHtml(r.title || r.method || '') + '</td><td class="num">' + (Number(r.amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 }) + '</td></tr>';
-    }).join('') : '<tr><td colspan="6">No rows</td></tr>') +
-    '</tbody></table><h2>Products by client</h2><table><thead><tr><th>Client</th><th>SKU</th><th>Product</th><th class="num">Qty</th><th class="num">Amount</th></tr></thead><tbody>' +
-    productRows + '</tbody></table></div>';
-  window.print();
   } catch (err) {
     console.error('printTransactionReport', err);
     alert('Could not generate report PDF: ' + (err && err.message ? err.message : err));
   }
 }
 
-
 function exportTransactionReportCsv() {
   ensureBackupBeforeSensitiveAction('exporting this CSV');
   const filters = getReportFilterState();
-  const rows = filters.type === 'sales'
-    ? collectProductSalesByClient(filters).map(function (s) {
-        return {
-          date: (filters.from || '') + ' → ' + (filters.to || ''),
-          kind: 'sale',
-          clientName: s.clientName,
-          ref: s.sku || '',
-          title: s.productName,
-          method: 'Qty ' + s.qty,
-          amount: s.amount
-        };
-      })
-    : collectLedgerRows(filters);
-  const productSales = collectProductSalesByClient(filters);
-  const header = ['Date', 'Type', 'Client', 'Reference', 'Title', 'Detail', 'Amount NGN'];
-  const lines = [header];
+  const rows = collectReportRows(filters);
+  const lines = [['Date', 'Client', 'Product', 'SKU', 'Qty', 'Amount NGN', 'Invoice ref', 'Status']];
   rows.forEach(function (r) {
     lines.push([
       r.date,
-      r.kind,
       r.clientName,
+      r.productName,
+      r.sku || '',
+      r.qty,
+      (Number(r.amount) || 0).toFixed(2),
       r.ref,
-      r.title,
-      r.kind === 'payment' ? ((r.method || '') + (r.note ? ' · ' + r.note : '')) : (r.method || r.note || ''),
-      (Number(r.amount) || 0).toFixed(2)
+      statusLabel(r.status)
     ]);
   });
-  // Products bought by each client
+  const totalValue = rows.reduce(function (s, r) { return s + (Number(r.amount) || 0); }, 0);
+  const totalQty = rows.reduce(function (s, r) { return s + (Number(r.qty) || 0); }, 0);
   lines.push([]);
-  lines.push(['PRODUCTS BY CLIENT']);
-  lines.push(['Client', 'SKU', 'Product', 'Qty units', 'Amount NGN']);
-  productSales.forEach(function (s) {
-    lines.push([
-      s.clientName,
-      s.sku || '',
-      s.productName,
-      s.qty,
-      (Number(s.amount) || 0).toFixed(2)
-    ]);
-  });
-  if (!productSales.length) lines.push(['—', '', 'No products sold in this period', '0', '0.00']);
+  lines.push(['TOTAL', '', '', '', totalQty, totalValue.toFixed(2), '', '']);
   const escape = function (v) {
     const s = String(v ?? '');
     if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
@@ -7584,10 +7687,10 @@ function exportTransactionReportCsv() {
   const sanitize = function (s, max) {
     return String(s || '').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max || 40);
   };
-  const period = sanitize((filters.from || 'all') + '_to_' + (filters.to || 'all'), 40);
-  const clientPart = (filters.clientIds && filters.clientIds.length === 1)
-    ? sanitize((getClient(filters.clientIds[0]) || {}).name || 'Client', 40)
-    : (filters.clientIds && filters.clientIds.length ? 'Selected-clients' : 'All-clients');
+  const clientPart = filters.clientId
+    ? sanitize((getClient(filters.clientId) || {}).name || 'Client', 40)
+    : 'All clients';
+  const period = sanitize((filters.from || 'all') + ' to ' + (filters.to || 'all'), 40);
   a.download = clientPart + ' - Report - ' + period + '.csv';
   a.click();
   URL.revokeObjectURL(a.href);
