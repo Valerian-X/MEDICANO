@@ -7586,33 +7586,33 @@ function printTransactionReport() {
     }
 
     loadJsPdf().then(function (JsPDF) {
-      // Landscape gives room for full client names without crowding
+      // Landscape for room; editorial list layout for the rows
       const doc = new JsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
-      const W = doc.internal.pageSize.getWidth();   // ~841
-      const H = doc.internal.pageSize.getHeight();  // ~595
-      const M = 36;
+      const W = doc.internal.pageSize.getWidth();
+      const H = doc.internal.pageSize.getHeight();
+      const M = 48;
       const TEAL = [15, 118, 110];
       const GRAY = [100, 116, 139];
-      const INK = [30, 41, 59];
-      const LINE = [226, 232, 240];
-      const ROW_H = 16; // base line height
+      const MUTED = [120, 130, 140];
+      const INK = [20, 24, 28];
+      const RULE = [200, 205, 210];
       const usable = W - 2 * M;
+      const LINE_H = 13;
+      const PAD_Y = 14; // vertical breathing room like the reference list
 
-      // Column plan (left edges + widths) — totals ~ usable width
-      // Date 58 | Client 150 | Product 210 | Qty 40 | Amount 90 | Ref 90 | Status 70
-      const cols = [
-        { key: 'date',    title: 'Date',        x: M,           w: 58,  align: 'left' },
-        { key: 'client',  title: 'Client',      x: M + 58,      w: 150, align: 'left' },
-        { key: 'product', title: 'Product',     x: M + 208,     w: 210, align: 'left' },
-        { key: 'qty',     title: 'Qty',         x: M + 418,     w: 40,  align: 'right' },
-        { key: 'amount',  title: 'Amount (₦)',  x: M + 458,     w: 90,  align: 'right' },
-        { key: 'ref',     title: 'Invoice ref', x: M + 548,     w: 95,  align: 'left' },
-        { key: 'status',  title: 'Status',      x: M + 643,     w: usable - 643, align: 'left' }
-      ];
+      // Editorial columns — generous gaps, aligned like the design services sheet
+      // Client (lead) | Date | Product | Qty | Amount | Invoice ref | Status
+      const cClient  = { x: M,            w: 160 };
+      const cDate    = { x: M + 170,      w: 70  };
+      const cProduct = { x: M + 250,      w: 220 };
+      const cQty     = { x: M + 480,      w: 36  };
+      const cAmount  = { x: M + 526,      w: 88  };
+      const cRef     = { x: M + 624,      w: 90  };
+      const cStatus  = { x: M + 724,      w: usable - 724 };
 
-      function drawHeaderBlock() {
-        let y = 28;
-        const logoW = 180;
+      function drawPageChrome() {
+        let y = 32;
+        const logoW = 170;
         const logoH = logoW * (258 / 1080);
         try {
           const logo = (typeof COMPANY_LOGO_DATAURL !== 'undefined') ? COMPANY_LOGO_DATAURL : null;
@@ -7623,131 +7623,113 @@ function printTransactionReport() {
         } catch (eL) {}
 
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(18);
-        doc.setTextColor(TEAL[0], TEAL[1], TEAL[2]);
-        doc.text('SALES REPORT', W - M, y + 16, { align: 'right' });
-
+        doc.setFontSize(20);
+        doc.setTextColor(INK[0], INK[1], INK[2]);
+        doc.text('Sales Report', W - M, y + 18, { align: 'right' });
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-        doc.text(co.name || 'Medicano Resources Limited', W - M, y + 32, { align: 'right' });
+        doc.text(co.name || 'Medicano Resources Limited', W - M, y + 34, { align: 'right' });
 
-        y = Math.max(y + logoH, y + 40) + 10;
+        y = Math.max(y + logoH, y + 42) + 8;
 
-        // Meta strip
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(INK[0], INK[1], INK[2]);
-        const meta = [
-          ['Period', period],
-          ['Client', clientLabel],
-          ['Product', productLabel],
-          ['Type', typeLabel]
-        ];
-        // Two columns of meta
-        const mid = M + usable / 2;
-        meta.forEach(function (pair, i) {
-          const colX = i < 2 ? M : mid;
-          const rowY = y + (i % 2) * 14;
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8);
-          doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-          doc.text(pair[0].toUpperCase(), colX, rowY);
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9);
-          doc.setTextColor(INK[0], INK[1], INK[2]);
-          const valLines = doc.splitTextToSize(String(pair[1] || '—'), usable / 2 - 70);
-          doc.text(valLines[0] || '—', colX + 52, rowY);
-        });
-        y += 36;
+        // Compact meta
+        doc.setFontSize(8);
+        doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+        const metaStr = 'Period  ' + period + '    ·    Client  ' + clientLabel +
+          '    ·    Product  ' + productLabel + '    ·    Type  ' + typeLabel;
+        const metaWrap = doc.splitTextToSize(metaStr, usable);
+        doc.text(metaWrap, M, y);
+        y += metaWrap.length * 11 + 10;
 
-        doc.setDrawColor(TEAL[0], TEAL[1], TEAL[2]);
-        doc.setLineWidth(1.75);
+        // Top rule before list
+        doc.setDrawColor(INK[0], INK[1], INK[2]);
+        doc.setLineWidth(0.9);
         doc.line(M, y, W - M, y);
-        return y + 16;
+        return y + 4;
       }
 
-      function drawTableHeader(y) {
-        // Soft band behind header
-        doc.setFillColor(240, 253, 250);
-        doc.rect(M, y - 10, usable, 20, 'F');
+      function drawListHeader(y) {
+        y += PAD_Y;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
-        doc.setTextColor(TEAL[0], TEAL[1], TEAL[2]);
-        cols.forEach(function (c) {
-          if (c.align === 'right') {
-            doc.text(c.title, c.x + c.w, y, { align: 'right' });
-          } else {
-            doc.text(c.title, c.x, y);
-          }
-        });
-        y += 6;
-        doc.setDrawColor(TEAL[0], TEAL[1], TEAL[2]);
-        doc.setLineWidth(0.8);
+        doc.setTextColor(INK[0], INK[1], INK[2]);
+        doc.text('Client', cClient.x, y);
+        doc.text('Date', cDate.x, y);
+        doc.text('Product', cProduct.x, y);
+        doc.text('Qty', cQty.x + cQty.w, y, { align: 'right' });
+        doc.text('Amount', cAmount.x + cAmount.w, y, { align: 'right' });
+        doc.text('Invoice ref', cRef.x, y);
+        doc.text('Status', cStatus.x, y);
+        y += 8;
+        // Hairline under header (like reference)
+        doc.setDrawColor(RULE[0], RULE[1], RULE[2]);
+        doc.setLineWidth(0.5);
         doc.line(M, y, W - M, y);
-        return y + 12;
+        return y;
       }
 
-      function rowLines(r) {
+      function measureRow(r) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        const clientLines = doc.splitTextToSize(String(r.clientName || '—'), cClient.w - 6);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
-        const clientLines = doc.splitTextToSize(String(r.clientName || '—'), cols[1].w - 4);
-        const productLines = doc.splitTextToSize(String(r.productName || '—'), cols[2].w - 4);
-        const n = Math.max(clientLines.length, productLines.length, 1);
+        const productLines = doc.splitTextToSize(String(r.productName || '—'), cProduct.w - 6);
+        const lines = Math.max(clientLines.length, productLines.length, 1);
         return {
           clientLines: clientLines,
           productLines: productLines,
-          height: n * ROW_H + 6
+          // Top pad + text block + bottom pad before rule
+          height: PAD_Y + lines * LINE_H + 6
         };
       }
 
-      let y = drawHeaderBlock();
-      y = drawTableHeader(y);
+      let y = drawPageChrome();
+      y = drawListHeader(y);
 
       if (!rows.length) {
+        y += PAD_Y + 4;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
         doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-        doc.text('No sales match these filters.', M, y + 8);
+        doc.text('No sales match these filters.', M, y);
       }
 
-      rows.forEach(function (r, idx) {
-        const layout = rowLines(r);
-        if (y + layout.height > H - 48) {
+      rows.forEach(function (r) {
+        const layout = measureRow(r);
+        if (y + layout.height + 24 > H - 40) {
           doc.addPage();
-          y = 36;
-          y = drawTableHeader(y);
+          y = drawPageChrome();
+          y = drawListHeader(y);
         }
 
-        // Alternating row tint
-        if (idx % 2 === 1) {
-          doc.setFillColor(248, 250, 252);
-          doc.rect(M, y - 10, usable, layout.height, 'F');
-        }
+        // Content baseline after top padding
+        const textY = y + PAD_Y;
+
+        // Lead column — Client (bold, like category labels in the reference)
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(INK[0], INK[1], INK[2]);
+        doc.text(layout.clientLines, cClient.x, textY);
+
+        // Supporting columns — regular weight, slightly muted
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(60, 65, 70);
+        doc.text(String(r.date || '—').slice(0, 10), cDate.x, textY);
+        doc.text(layout.productLines, cProduct.x, textY);
+        doc.text(String(r.qty || 0), cQty.x + cQty.w, textY, { align: 'right' });
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(INK[0], INK[1], INK[2]);
+        doc.text(fmtAmt(r.amount), cAmount.x + cAmount.w, textY, { align: 'right' });
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
-        doc.setTextColor(INK[0], INK[1], INK[2]);
-
-        // Date
-        doc.text(String(r.date || '—').slice(0, 10), cols[0].x, y);
-
-        // Client (wrapped)
-        doc.text(layout.clientLines, cols[1].x, y);
-
-        // Product (wrapped)
-        doc.text(layout.productLines, cols[2].x, y);
-
-        // Qty
-        doc.text(String(r.qty || 0), cols[3].x + cols[3].w, y, { align: 'right' });
-
-        // Amount
-        doc.setFont('helvetica', 'bold');
-        doc.text(fmtAmt(r.amount), cols[4].x + cols[4].w, y, { align: 'right' });
-        doc.setFont('helvetica', 'normal');
-
-        // Invoice ref
-        doc.text(String(r.ref || '—').slice(0, 16), cols[5].x, y);
+        doc.setTextColor(60, 65, 70);
+        doc.text(String(r.ref || '—').slice(0, 18), cRef.x, textY);
 
         // Status
         const st = statusLabel(r.status);
@@ -7758,38 +7740,35 @@ function printTransactionReport() {
         else if (r.status === 'service') doc.setTextColor(55, 48, 163);
         else if (r.status === 'expense') doc.setTextColor(51, 65, 85);
         else doc.setTextColor(153, 27, 27);
-        doc.text(st, cols[6].x, y);
-        doc.setTextColor(INK[0], INK[1], INK[2]);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
+        doc.text(st, cStatus.x, textY);
 
         y += layout.height;
 
-        // Light separator
-        doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-        doc.setLineWidth(0.4);
-        doc.line(M, y - 8, W - M, y - 8);
+        // Thin horizontal rule between rows (reference layout)
+        doc.setDrawColor(RULE[0], RULE[1], RULE[2]);
+        doc.setLineWidth(0.45);
+        doc.line(M, y, W - M, y);
       });
 
-      // Totals footer
-      if (y > H - 56) {
+      // Footer totals
+      if (y + 40 > H - 28) {
         doc.addPage();
         y = 48;
       }
-      y += 4;
-      doc.setDrawColor(TEAL[0], TEAL[1], TEAL[2]);
-      doc.setLineWidth(1.25);
+      y += 18;
+      doc.setDrawColor(INK[0], INK[1], INK[2]);
+      doc.setLineWidth(0.9);
       doc.line(M, y, W - M, y);
       y += 16;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
-      doc.setTextColor(TEAL[0], TEAL[1], TEAL[2]);
-      doc.text('Total quantity:  ' + totalQty, M, y);
-      doc.text('Total value:  ₦' + fmtAmt(totalValue), W - M, y, { align: 'right' });
+      doc.setTextColor(INK[0], INK[1], INK[2]);
+      doc.text('Total qty  ' + totalQty, M, y);
+      doc.text('Total value  ₦' + fmtAmt(totalValue), W - M, y, { align: 'right' });
       y += 14;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
       doc.text('Generated ' + new Date().toLocaleString('en-GB') + '  ·  ' + rows.length + ' line(s)', M, y);
 
       const clientPart = sanitize(clientLabel, 40);
