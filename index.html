@@ -3114,12 +3114,17 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
                   <option value="other">Other</option>
                 </select>
               </label>
-              <label class="filter-date-field">
+              <label class="filter-date-field report-product-field">
                 <span class="filter-date-label">Product</span>
-                <select id="report-product" class="filter-control filter-status-select"
-                  onchange="renderTransactionReport()">
-                  <option value="">All products</option>
-                </select>
+                <div class="report-product-search-wrap">
+                  <input type="hidden" id="report-product-id" value="" />
+                  <input id="report-product-search" type="search" class="filter-control"
+                    placeholder="Search product SKU or name…" autocomplete="off"
+                    oninput="onReportProductSearchInput()"
+                    onfocus="onReportProductSearchInput()" />
+                  <button type="button" class="report-product-clear" onclick="clearReportProductFilter()" title="Clear product filter">✕</button>
+                  <div id="report-product-drop" class="report-product-drop hidden"></div>
+                </div>
               </label>
               <label class="filter-date-field">
                 <select id="report-sort" class="filter-control filter-status-select list-sort-select"
@@ -3136,9 +3141,9 @@ html.dark .stat-mini-label { color: rgba(248,250,252,0.75) !important; }
             </div>
 
             <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <button type="button" onclick="printTransactionReport()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800 text-white rounded-full text-sm font-semibold">Print statement</button>
-              <button type="button" onclick="exportTransactionReportCsv()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-100 text-slate-800 rounded-full text-sm font-semibold">Export CSV</button>
-              <button type="button" onclick="addSelectedReportRowsToInvoice()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-700 text-white rounded-full text-sm font-semibold">Add selected to invoice</button>
+              <button type="button" onclick="printTransactionReport()" class="report-action-btn report-action-primary">Download PDF</button>
+              <button type="button" onclick="exportTransactionReportCsv()" class="report-action-btn report-action-secondary">Export CSV</button>
+              <button type="button" onclick="addSelectedReportRowsToInvoice()" class="report-action-btn report-action-secondary">Add selected to invoice</button>
             </div>
 
             <div class="panel-soft">

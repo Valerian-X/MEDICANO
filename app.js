@@ -5666,11 +5666,25 @@ function loadJsPdf() {
   return new Promise((resolve, reject) => {
     if (window.jspdf && window.jspdf.jsPDF) return resolve(window.jspdf.jsPDF);
     if (window.jsPDF) return resolve(window.jsPDF);
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    s.onload = () => resolve((window.jspdf && window.jspdf.jsPDF) || window.jsPDF);
-    s.onerror = () => reject(new Error('Could not load PDF engine. Please connect to the internet once to generate presentations.'));
-    document.head.appendChild(s);
+    // Prefer local copy (offline / APK), then CDN
+    function trySrc(src, next) {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = function () {
+        const C = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+        if (C) resolve(C);
+        else if (next) next();
+        else reject(new Error('PDF engine loaded but jsPDF was not found.'));
+      };
+      s.onerror = function () {
+        if (next) next();
+        else reject(new Error('Could not load PDF engine. Check that jspdf.umd.min.js is in the app folder.'));
+      };
+      document.head.appendChild(s);
+    }
+    trySrc('jspdf.umd.min.js', function () {
+      trySrc('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    });
   });
 }
 
@@ -6971,14 +6985,124 @@ function getSelectedReportClientIds() {
 }
 
 function getReportFilterState() {
+  const hid = document.getElementById('report-product-id');
+  const sel = document.getElementById('report-product');
   return {
     from: document.getElementById('report-date-from')?.value || '',
     to: document.getElementById('report-date-to')?.value || '',
     clientIds: getSelectedReportClientIds(),
     method: document.getElementById('report-method')?.value || '',
-    type: document.getElementById('report-type')?.value || 'all'
+    type: document.getElementById('report-type')?.value || 'all',
+    productId: (hid && hid.value) || (sel && sel.value) || ''
   };
 }
+
+function collectProductSalesByClient(filters) {
+  filters = filters || getReportFilterState();
+  const from = filters.from || '';
+  const to = filters.to || '';
+  const clientSet = (filters.clientIds && filters.clientIds.length) ? new Set(filters.clientIds) : null;
+  const productId = filters.productId || '';
+  const byKey = {};
+
+  (data.invoices || []).forEach(function (inv) {
+    if (!inv || inv.status === 'cancelled' || inv.status === 'draft') return;
+    if (clientSet && !clientSet.has(inv.clientId)) return;
+    const d = (inv.date || (inv.createdAt || '').slice(0, 10) || '');
+    if (from && d && d < from) return;
+    if (to && d && d > to) return;
+    const client = getClient(inv.clientId);
+    const clientName = client ? client.name : (inv.clientName || '—');
+    (inv.items || []).forEach(function (it) {
+      const pid = it.productId || '';
+      const name = (it.name || '').trim() || 'Item';
+      if (productId) {
+        if (pid && pid !== productId) return;
+        if (!pid) {
+          const p = getProduct(productId);
+          const matchName = p && p.name && name.toLowerCase() === String(p.name).toLowerCase();
+          const matchSku = p && p.sku && name.toLowerCase().indexOf(String(p.sku).toLowerCase()) >= 0;
+          if (!matchName && !matchSku) return;
+        }
+      }
+      const qty = Number(it.qty) || 0;
+      const line = Number(it.lineNgn != null ? it.lineNgn : it.lineNGN) ||
+        ((Number(it.qty) || 0) * (Number(it.unitNgn != null ? it.unitNgn : it.unitNGN) || 0));
+      const pKey = pid || ('name:' + name.toLowerCase());
+      const key = (inv.clientId || clientName) + '|' + pKey;
+      if (!byKey[key]) {
+        const p = pid ? getProduct(pid) : null;
+        byKey[key] = {
+          clientId: inv.clientId || '',
+          clientName: clientName,
+          productId: pid,
+          productName: name || (p && p.name) || 'Item',
+          sku: (p && p.sku) || it.sku || '',
+          qty: 0,
+          amount: 0
+        };
+      }
+      byKey[key].qty += qty;
+      byKey[key].amount += line;
+    });
+  });
+
+  return Object.values(byKey).sort(function (a, b) {
+    return a.clientName.localeCompare(b.clientName) || a.productName.localeCompare(b.productName);
+  });
+}
+
+/** Searchable product filter for reports (handles large catalogs) */
+function onReportProductSearchInput() {
+  const input = document.getElementById('report-product-search');
+  const drop = document.getElementById('report-product-drop');
+  const hid = document.getElementById('report-product-id');
+  if (!input || !drop) return;
+  const q = String(input.value || '').trim().toLowerCase();
+  if (!q) {
+    if (hid) hid.value = '';
+    drop.classList.add('hidden');
+    drop.innerHTML = '';
+    renderTransactionReport();
+    return;
+  }
+  const matches = (data.products || []).filter(function (p) {
+    const hay = ((p.sku || '') + ' ' + (p.name || '') + ' ' + (p.brand || '')).toLowerCase();
+    return hay.indexOf(q) >= 0;
+  }).slice(0, 40);
+  if (!matches.length) {
+    drop.innerHTML = '<div class="report-product-opt muted">No matches</div>';
+    drop.classList.remove('hidden');
+    return;
+  }
+  drop.innerHTML = matches.map(function (p) {
+    const lab = (p.sku ? p.sku + ' · ' : '') + (p.name || p.id);
+    return '<button type="button" class="report-product-opt" data-id="' + p.id + '">' + escHtml(lab) + '</button>';
+  }).join('');
+  drop.classList.remove('hidden');
+  drop.querySelectorAll('.report-product-opt[data-id]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const id = btn.getAttribute('data-id');
+      const p = getProduct(id);
+      if (hid) hid.value = id || '';
+      if (input) input.value = p ? ((p.sku ? p.sku + ' · ' : '') + (p.name || '')) : '';
+      drop.classList.add('hidden');
+      drop.innerHTML = '';
+      renderTransactionReport();
+    });
+  });
+}
+
+function clearReportProductFilter() {
+  const input = document.getElementById('report-product-search');
+  const hid = document.getElementById('report-product-id');
+  const drop = document.getElementById('report-product-drop');
+  if (input) input.value = '';
+  if (hid) hid.value = '';
+  if (drop) { drop.classList.add('hidden'); drop.innerHTML = ''; }
+  renderTransactionReport();
+}
+
 
 function saveReportFilters() {
   try {
@@ -7018,6 +7142,16 @@ function initReportsPage() {
   const to = document.getElementById('report-date-to');
   const method = document.getElementById('report-method');
   const type = document.getElementById('report-type');
+  // Restore product search filter
+  try {
+    if (saved.productId) {
+      const p = getProduct(saved.productId);
+      const hid = document.getElementById('report-product-id');
+      const inp = document.getElementById('report-product-search');
+      if (hid) hid.value = saved.productId;
+      if (inp && p) inp.value = (p.sku ? p.sku + ' · ' : '') + (p.name || '');
+    }
+  } catch (eP) {}
 
   // Start date: keep saved or default to 1st of this month (local)
   if (from) {
@@ -7177,17 +7311,23 @@ function renderTransactionReport() {
 
 
 function ensureBackupBeforeSensitiveAction(actionLabel) {
-  const last = data.lastBackupAt ? new Date(data.lastBackupAt) : null;
-  const days = last ? Math.floor((Date.now() - last.getTime()) / 86400000) : 999;
-  if (days < 7) return true;
-  const msg = (last
-    ? ('Last backup was ' + days + ' day(s) ago. ')
-    : 'No backup yet. ') +
-    'Download a backup before ' + actionLabel + '?' + String.fromCharCode(10, 10) +
-    'OK = backup now, Cancel = continue without backup.';
-  if (confirm(msg)) {
-    exportDataQuiet();
-  }
+  try {
+    const last = data.lastBackupAt ? new Date(data.lastBackupAt) : null;
+    const days = last ? Math.floor((Date.now() - last.getTime()) / 86400000) : 999;
+    if (days < 14) return true;
+    // Non-blocking on small screens — PDF must still download
+    if (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches) {
+      return true;
+    }
+    const msg = (last
+      ? ('Last backup was ' + days + ' day(s) ago. ')
+      : 'No backup yet. ') +
+      'Download a backup before ' + actionLabel + '?' + String.fromCharCode(10, 10) +
+      'OK = backup now, Cancel = continue without backup.';
+    if (confirm(msg)) {
+      exportDataQuiet();
+    }
+  } catch (e) {}
   return true;
 }
 
@@ -7207,8 +7347,13 @@ function exportDataQuiet() {
 }
 
 function printTransactionReport() {
+  try {
   ensureBackupBeforeSensitiveAction('printing this report');
   const filters = getReportFilterState();
+  if (typeof collectProductSalesByClient !== 'function') {
+    alert('Report module is outdated. Please hard-refresh the app (v109).');
+    return;
+  }
   const productSales = collectProductSalesByClient(filters);
   const rows = filters.type === 'sales'
     ? productSales.map(function (s) {
@@ -7376,6 +7521,10 @@ function printTransactionReport() {
     '</tbody></table><h2>Products by client</h2><table><thead><tr><th>Client</th><th>SKU</th><th>Product</th><th class="num">Qty</th><th class="num">Amount</th></tr></thead><tbody>' +
     productRows + '</tbody></table></div>';
   window.print();
+  } catch (err) {
+    console.error('printTransactionReport', err);
+    alert('Could not generate report PDF: ' + (err && err.message ? err.message : err));
+  }
 }
 
 

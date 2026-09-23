@@ -6161,3 +6161,102 @@ html.dark .product-picker-item:hover,
 body.dark .product-picker-item:hover { background: #1a1a1a; }
 html.dark .ppi-name, body.dark .ppi-name { color: #f1f5f9; }
 html.dark .product-pager, body.dark .product-pager { background: rgba(255,255,255,0.04); }
+
+
+/* Report product search */
+.report-product-search-wrap {
+  position: relative;
+  width: 100%;
+}
+.report-product-search-wrap .filter-control {
+  width: 100%;
+  padding-right: 2.25rem;
+}
+.report-product-clear {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.25rem;
+  z-index: 2;
+}
+.report-product-drop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 240px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  z-index: 40;
+}
+html.dark .report-product-drop {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.report-product-opt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.875rem;
+  color: #0f172a;
+  cursor: pointer;
+}
+.report-product-opt:hover,
+.report-product-opt:focus {
+  background: #f1f5f9;
+}
+html.dark .report-product-opt {
+  color: #f1f5f9;
+}
+html.dark .report-product-opt:hover,
+html.dark .report-product-opt:focus {
+  background: #334155;
+}
+.report-product-opt.muted {
+  color: #94a3b8;
+  cursor: default;
+}
+
+/* Report action buttons — readable in light & dark */
+.report-action-btn {
+  width: 100%;
+  padding: 0.65rem 1.1rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+@media (min-width: 640px) {
+  .report-action-btn { width: auto; }
+}
+.report-action-primary {
+  background: #0f766e;
+  color: #ffffff;
+}
+.report-action-secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+html.dark .report-action-primary {
+  background: #14b8a6;
+  color: #042f2e;
+}
+html.dark .report-action-secondary {
+  background: #334155;
+  color: #f8fafc;
+}
